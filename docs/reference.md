@@ -2296,7 +2296,8 @@ An answer the runner lets go (new arguments, `refresh`, a newer send,
 leaving the view) sends nothing more as its own; what it sent stays sent.
 An answer asked anew runs its source again, so key a request that must not
 repeat. An answer in flight may also `fetch`, though a mutation's
-synchronous source still may not do both. A refused commit's batches are
+synchronous source still may not do both: a mutation whose source sent
+fetches in a later turn (after an `await`). A refused commit's batches are
 taken back without telling the code, so a protocol that awaits a reply
 times out. Its bounds are a mutation's, over all its turns (`socket answer
 exceeds 256 operations`, `… 1 MiB`); overload throws without failing the
