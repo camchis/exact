@@ -1782,7 +1782,7 @@ host.
 | Zero or one `Selection` (the action takes it or leaves it) | `selectionchange`, on a `text` ([text selection](#text-selection)) |
 | Zero or one `InputEvent` | `selectionchange` and `beforeinput`, on a plain text field |
 | Zero or one `MediaSessionActionDetails` (the action takes it or leaves it) | `seekbackward`, `seekforward`, `seekto`, `previoustrack`, `nexttrack`, `stop`, on an `audio` or `video` with `metadata=` ([media session](#media-session)) |
-| Zero or one `ToggleEvent` (the action takes it or leaves it) | `toggle`, on a popover: `oldState` and `newState` |
+| Zero or one `ToggleEvent` (the action takes it or leaves it) | `toggle`, on a popover: `oldState` and `newState`. It fires at the popover, never at the button that opens it, so on an element with no `popover` it is refused (`lower-handler-tag`) |
 | Zero or one `AtomEvent` (the action takes it or leaves it) | `atompress`, on a node with `atoms=` ([inline atoms](#inline-atoms-atom-atoms-atomfaces-atompress)) |
 | Zero or one frame record (the action takes it or leaves it) | on an `iframe`: `currententrychange`, `navigatesuccess` and `navigateerror` (`FrameNavigation`), `capture` (`FrameCapture`), `download` (`FrameDownload`), `newwindow` (`FrameNewWindow`) and `userpromptopened` (`FrameUserPrompt`) |
 | Zero or one `MIDIMessageEvent` (the action takes it or leaves it) | `midimessage`, on an element with `midiinputs=` ([MIDI](#midi-exactmidi-sendmidi-midimessage)) |

@@ -597,6 +597,10 @@ impl Lowerer<'_> {
             {
                 continue;
             }
+            if let Some(e) = crate::handlers::unheard_toggle(tag, expanded, a) {
+                self.errors.push(e);
+                continue;
+            }
             if let Err(e) = self.attr(
                 tag,
                 contract_syntax::payload_control(tag, attrs),
