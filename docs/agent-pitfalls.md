@@ -337,6 +337,13 @@ This list holds what the [agent guide](contract-for-agents.md)'s rules don't mak
   press. (Bake-off r25, timetable: Saved and back took the board from 07:34 to
   05:00.)
 
+- **A mixed native bake alone does not include its Rust source in the JS web build.**
+  A source composed with `exact_js_bake::build_mixed_with` still needs a module
+  crate exporting that source through `exact_logic_abi::export!`, named by
+  `rust.module.package` in app.json. Without it, the JS target calls TypeScript
+  for the Rust source and gets `UnknownSource`. The canvas gallery's `logic/`
+  crate and manifest show the declaration. (Web capture smoke, 2026-11-12.)
+
 - **A data answer past 16 MiB fails only on the JS target.** A 64 MiB string from
   a Rust source loaded on the wasm web host and on Linux, and on the JS target
   the resource failed (`Rust module rejected the call`). Cause: the JS target's
