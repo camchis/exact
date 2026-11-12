@@ -7,7 +7,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { CATEGORIES, MEMORY_ENTITLEMENT, appleCategory, memoryEntitlements } from './plist.mjs';
-import { entitlements, infoPlist, macInfoPlist } from './build.mjs';
+import { EXACT_PRIVACY_API_TYPES, entitlements, infoPlist, macInfoPlist, privacyManifest } from './build.mjs';
 import { profile } from './devices.mjs';
 import { nativeManifestMetadata, readManifest, webAppManifest } from '../../scripts/app.mjs';
 
@@ -125,4 +125,45 @@ test('the web manifest carries the categories, and they are part of the Apple bi
   const bare = { name: 'Dice', app: { id: 'dev.exact.dice' } };
   for (const platform of ['ios', 'macos']) assert.notDeepEqual(nativeManifestMetadata(manifest, platform), nativeManifestMetadata(bare, platform));
   for (const platform of ['android', 'linux', 'windows']) assert.deepEqual(nativeManifestMetadata(manifest, platform), nativeManifestMetadata(bare, platform));
+});
+
+test("the bundle's privacy manifest joins the app's required reasons to Exact's own, one entry per type", () => {
+  const types = (pairs) => pairs.map(([type, reasons]) => ({ NSPrivacyAccessedAPIType: type, NSPrivacyAccessedAPITypeReasons: reasons }));
+  // An app that says nothing gets Exact's reasons alone, and no tracking or collection keys it did not write.
+  assert.deepEqual(parse(privacyManifest(app({}))), { NSPrivacyAccessedAPITypes: types(EXACT_PRIVACY_API_TYPES) });
+  const declared = parse(privacyManifest(app({ host: { ios: { privacyManifest: {
+    NSPrivacyTracking: false,
+    NSPrivacyTrackingDomains: [],
+    NSPrivacyCollectedDataTypes: [{ NSPrivacyCollectedDataType: 'NSPrivacyCollectedDataTypeProductInteraction', NSPrivacyCollectedDataTypeLinked: false, NSPrivacyCollectedDataTypeTracking: false, NSPrivacyCollectedDataTypePurposes: ['NSPrivacyCollectedDataTypePurposeAnalytics'] }],
+    NSPrivacyAccessedAPITypes: types([['NSPrivacyAccessedAPICategoryUserDefaults', ['1C8F.1', 'CA92.1']], ['NSPrivacyAccessedAPICategoryDiskSpace', ['E174.1']]]),
+  } } } })));
+  assert.deepEqual(declared, {
+    NSPrivacyTracking: false,
+    NSPrivacyTrackingDomains: [],
+    NSPrivacyCollectedDataTypes: [{ NSPrivacyCollectedDataType: 'NSPrivacyCollectedDataTypeProductInteraction', NSPrivacyCollectedDataTypeLinked: false, NSPrivacyCollectedDataTypeTracking: false, NSPrivacyCollectedDataTypePurposes: ['NSPrivacyCollectedDataTypePurposeAnalytics'] }],
+    NSPrivacyAccessedAPITypes: types([
+      ['NSPrivacyAccessedAPICategorySystemBootTime', ['35F9.1']],
+      ['NSPrivacyAccessedAPICategoryUserDefaults', ['CA92.1', '1C8F.1']],
+      ['NSPrivacyAccessedAPICategoryFileTimestamp', ['C617.1', '3B52.1']],
+      ['NSPrivacyAccessedAPICategoryActiveKeyboards', ['54BD.1']],
+      ['NSPrivacyAccessedAPICategoryDiskSpace', ['E174.1']],
+    ]),
+  });
+});
+
+test('app.json refuses a privacy manifest with an unknown key, API type or reason', () => {
+  const dir = mkdtempSync(resolve(tmpdir(), 'manifest-privacy-'));
+  const read = (privacyManifest) => {
+    writeFileSync(resolve(dir, 'app.json'), JSON.stringify({ name: 'Dice', app: { id: 'dev.exact.dice', name: 'Dice' }, host: { ios: { privacyManifest } } }));
+    return readManifest(dir, 'dice');
+  };
+  const api = (type, reasons) => ({ NSPrivacyAccessedAPITypes: [{ NSPrivacyAccessedAPIType: type, NSPrivacyAccessedAPITypeReasons: reasons }] });
+  try {
+    assert.deepEqual(read(api('NSPrivacyAccessedAPICategoryDiskSpace', ['E174.1'])).host.ios.privacyManifest, api('NSPrivacyAccessedAPICategoryDiskSpace', ['E174.1']));
+    assert.throws(() => read({ NSPrivacyTracking: 'no' }), /host\.ios\.privacyManifest\.NSPrivacyTracking: expected boolean/);
+    assert.throws(() => read({ NSPrivacyTrackingDomain: [] }), /host\.ios\.privacyManifest\.NSPrivacyTrackingDomain: not a known key/);
+    assert.throws(() => read(api('NSPrivacyAccessedAPICategoryClipboard', ['E174.1'])), /NSPrivacyAccessedAPITypes\[0\]\.NSPrivacyAccessedAPIType: "NSPrivacyAccessedAPICategoryClipboard" is not one of/);
+    assert.throws(() => read(api('NSPrivacyAccessedAPICategoryDiskSpace', ['E174'])), /NSPrivacyAccessedAPITypeReasons\[0\]: "E174" does not match/);
+    assert.throws(() => read(api('NSPrivacyAccessedAPICategoryDiskSpace', [])), /NSPrivacyAccessedAPITypeReasons: fewer than 1 items/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
 });

@@ -990,6 +990,32 @@ receipt, and signed GPU frameworks (primary and named modules). Copy those
 frameworks intact into the embedding app's `Frameworks/`; their binaries must
 retain the baked digests.
 
+### Privacy manifest
+
+Every iOS and tvOS build writes `PrivacyInfo.xcprivacy` at the app bundle's
+root. Apple requires apps that use
+[required-reason APIs](https://developer.apple.com/documentation/bundleresources/describing-use-of-required-reason-api)
+to declare approved reasons in a privacy manifest, and documents this as an App
+Store Connect submission requirement since 1 May 2024. The file names Exact's own: the host's clocks
+(system boot time, `35F9.1`), its settings (user defaults, `CA92.1`), file
+metadata in the app's container and of documents the person chose (file
+timestamps, `C617.1` and `3B52.1`) and the emoji keyboard of an emoji text
+area (active keyboards, `54BD.1`). `host.ios.privacyManifest` adds the app's,
+in Apple's keys: whether it tracks, its tracking domains, the data it collects,
+and additional reasons for API uses in the app executable, joined to Exact's
+reasons for the same type. SDKs and other bundles containing calling
+executables or dynamic libraries need their own manifests; the build writes
+only the app's.
+
+```json
+{ "host": { "ios": { "privacyManifest": {
+  "NSPrivacyTracking": false,
+  "NSPrivacyAccessedAPITypes": [
+    { "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryDiskSpace", "NSPrivacyAccessedAPITypeReasons": ["E174.1"] }
+  ]
+} } } }
+```
+
 ### Native CI preparation
 
 The [EAS iOS](recipes/eas-ios.md) and [EAS Android](recipes/eas-android.md)

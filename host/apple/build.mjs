@@ -446,6 +446,32 @@ export const infoPlist = (app, device = false, { executable = appleExecutableNam
   return plistFile(withPackageKeys(dict, reach));
 };
 
+/** The required-reason APIs Exact's own runtime calls on iOS and tvOS, each with Apple's reason
+ * (developer.apple.com/documentation/bundleresources/describing-use-of-required-reason-api):
+ * the host's clocks (`CACurrentMediaTime`, `ProcessInfo.systemUptime`) time events inside the app;
+ * its own settings (the developer menu, launch observation, shortcut items) are `UserDefaults`;
+ * Rust's `std::fs`, the document store and Hermes read file metadata in the app's container, and
+ * `app_fs` the modified time of documents the person chose; an emoji text area asks for the emoji
+ * keyboard (TextAreaIOS). The bundled SQLite's `statfs` and `fstatfs`, which read a volume's type and
+ * flags and not its free space, are not here: no disk-space reason describes them. */
+export const EXACT_PRIVACY_API_TYPES = [
+  ['NSPrivacyAccessedAPICategorySystemBootTime', ['35F9.1']],
+  ['NSPrivacyAccessedAPICategoryUserDefaults', ['CA92.1']],
+  ['NSPrivacyAccessedAPICategoryFileTimestamp', ['C617.1', '3B52.1']],
+  ['NSPrivacyAccessedAPICategoryActiveKeyboards', ['54BD.1']],
+];
+
+/** The bundle's PrivacyInfo.xcprivacy: `host.ios.privacyManifest`'s keys as the app wrote them, with
+ * Exact's own reasons joined to its `NSPrivacyAccessedAPITypes` (one entry per type, reasons merged). */
+export function privacyManifest(app) {
+  const { NSPrivacyAccessedAPITypes: declared = [], ...rest } = app.manifest.host?.ios?.privacyManifest ?? {};
+  const types = new Map(EXACT_PRIVACY_API_TYPES.map(([type, reasons]) => [type, [...reasons]]));
+  for (const { NSPrivacyAccessedAPIType: type, NSPrivacyAccessedAPITypeReasons: reasons } of declared) {
+    types.set(type, [...new Set([...(types.get(type) ?? []), ...reasons])]);
+  }
+  return plistFile({ ...rest, NSPrivacyAccessedAPITypes: [...types].map(([type, reasons]) => ({ NSPrivacyAccessedAPIType: type, NSPrivacyAccessedAPITypeReasons: reasons })) });
+}
+
 /** What App Store Connect reads from a distributed bundle and Xcode would
  * have written (`--archive`): the build's toolchain (DT* keys) and the store's
  * counters, EXACT_VERSION and EXACT_BUILD_NUMBER (the version and build
@@ -1317,7 +1343,7 @@ async function main(args, lockHeld = false) {
     placeAppleArtifact(binDir, paths.products);
   };
 
-  const bundleTools = {runApple,appleArtifacts, macInfoPlist, copyAppleStaticTrees, writeUsageStrings, receipt, shippedReceipt, assertAppleIdentity, placeAppleArtifact, infoPlist, distributionKeys, copyAppleGpuProducts, entitlements, appClip};
+  const bundleTools = {runApple,appleArtifacts, macInfoPlist, copyAppleStaticTrees, writeUsageStrings, receipt, shippedReceipt, assertAppleIdentity, placeAppleArtifact, infoPlist, privacyManifest, distributionKeys, copyAppleGpuProducts, entitlements, appClip};
   if (!ios) {
     const bundlePath = assembleMac({intents, shared, library, serviceDylibs, macWidgets, triple: moduleTripleFor(app, ios, device, tv), appleReach, hasWeb, webLoadName, args, app, paths, binDir, libDir, bin, loadName, hasGpu, dylib, moduleDylibs, looseArms, hasSvg, svgLoadName, modulesLoadName, modulesBuilt, svgBuilt, canvasGpuLoadName, canvasGpuBuilt, sha1, linkRoot, swiftc, buildReceipt, development, bakedCompat, rosterKeys, production, distribution, stampSdk, products, composition, sdk, bakedPlan, cleanup}, bundleTools);
     publishProducts();

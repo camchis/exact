@@ -740,6 +740,29 @@
               "type": "boolean",
               "description": "Whether iOS may turn Game Mode on while the app runs: priority on the CPU and GPU, lower Bluetooth latency for controllers and AirPods, and less background work (LSSupportsGameMode, iOS 18.6; GCSupportsGameMode for iOS 18.0 to 18.5, written when minimumOS is below 18.6). Absent: true for a game (an Apple category of games or a game genre in categories, or a game the game shell builds), else no key. false keeps Game Mode off for a game too light to need it."
             },
+            "privacyManifest": {
+              "type": "object",
+              "additionalProperties": false,
+              "description": "The app's privacy manifest (PrivacyInfo.xcprivacy at the bundle's root, iOS and tvOS), in Apple's keys: what the app collects and why it calls required-reason APIs. The build writes the file either way, with the reasons for the APIs Exact's own runtime calls joined to NSPrivacyAccessedAPITypes; list here only the app executable's own other uses (its Rust, its native code). An SDK or other bundle with its own executable or dynamic library needs its own manifest, which the build does not write. Absent: Exact's reasons alone.",
+              "properties": {
+                "NSPrivacyTracking": { "type": "boolean", "description": "Whether the app uses data for tracking as App Tracking Transparency defines it." },
+                "NSPrivacyTrackingDomains": { "type": "array", "items": { "type": "string", "minLength": 1 }, "description": "The internet domains the app connects to for tracking." },
+                "NSPrivacyCollectedDataTypes": { "type": "array", "items": { "type": "object" }, "description": "The data types the app collects, each a dictionary in Apple's keys (NSPrivacyCollectedDataType, NSPrivacyCollectedDataTypeLinked, NSPrivacyCollectedDataTypeTracking, NSPrivacyCollectedDataTypePurposes)." },
+                "NSPrivacyAccessedAPITypes": {
+                  "type": "array",
+                  "description": "The app's own required-reason API uses. Each type's reasons join Exact's for the same type.",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["NSPrivacyAccessedAPIType", "NSPrivacyAccessedAPITypeReasons"],
+                    "properties": {
+                      "NSPrivacyAccessedAPIType": { "enum": ["NSPrivacyAccessedAPICategoryFileTimestamp", "NSPrivacyAccessedAPICategorySystemBootTime", "NSPrivacyAccessedAPICategoryDiskSpace", "NSPrivacyAccessedAPICategoryActiveKeyboards", "NSPrivacyAccessedAPICategoryUserDefaults"] },
+                      "NSPrivacyAccessedAPITypeReasons": { "type": "array", "minItems": 1, "items": { "type": "string", "pattern": "^[0-9A-Z]{4}\\.[0-9]$" } }
+                    }
+                  }
+                }
+              }
+            },
             "increasedMemoryLimit": {
               "type": "boolean",
               "description": "Sign com.apple.developer.kernel.increased-memory-limit: on the iPhone and iPad models that allow it, the app may use more memory than the default limit (iOS 15). The app must still work without it; os_proc_available_memory says what it has. A device build needs a profile whose App ID has Increased Memory Limit enabled, and is refused without one. Extensions, App Clips and tvOS never take it. Absent or false: the default limit."

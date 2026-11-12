@@ -8,7 +8,7 @@ import { homedir, tmpdir } from 'node:os';
 import { delimiter, resolve, toNamespacedPath } from 'node:path';
 import { HERMES_INSTALLER, PINNED_RUST, hermesBundle, hermesLeanSysRoots } from './app.mjs';
 import { androidHermes, checkHermesBundles, appleCrossTargets, appleSetupTargets, platformRowNames } from './exact.mjs';
-import { iosAssets, iosTarget, entitlements, infoPlist, macInfoPlist, documentTypes, importedTypes, exportedTypes, writeUsageStrings, designCompatible, COMPATIBLE_SDK, moduleTripleFor } from '../host/apple/build.mjs';
+import { iosAssets, iosTarget, entitlements, infoPlist, macInfoPlist, privacyManifest, documentTypes, importedTypes, exportedTypes, writeUsageStrings, designCompatible, COMPATIBLE_SDK, moduleTripleFor } from '../host/apple/build.mjs';
 import { HOST_SDKS, olderVersion, useXcode, xcodeRefusal } from '../host/apple/devices.mjs';
 import { encodePng } from './png.mjs';
 import { macReleaseEntitlements, launchImageInventory } from '../host/apple/assets.mjs';
@@ -165,7 +165,7 @@ test.skipIf(!packagingTools)('production iOS bundles preserve Rust frameworks, s
         modulesBuilt: dylib, modulesLoadName: pairs[1][0], hasSvg: true, svgBuilt: dylib, svgLoadName: pairs[2][0],
         canvasGpuBuilt: dylib, canvasGpuLoadName: pairs[3][0], serviceDylibs: [{ built: dylib, load: pairs[4][0], framework: pairs[4][1] }],
         args: [], unsigned: true, sha1: '-', linkRoot: binDir, sdkName: 'iphoneos' }, {
-        runApple: run, infoPlist: () => plistFile({ CFBundleIdentifier: app.id, CFBundleExecutable: 'ExactClip', CFBundlePackageType: 'APPL' }),
+        runApple: run, infoPlist: () => plistFile({ CFBundleIdentifier: app.id, CFBundleExecutable: 'ExactClip', CFBundlePackageType: 'APPL' }), privacyManifest,
         copyAppleStaticTrees() {}, writeUsageStrings() {}, assertAppleIdentity() {}, distributionKeys: () => ({}),
         receipt: () => whole, shippedReceipt, copyAppleGpuProducts, entitlements: () => plistFile({}), appClip: () => ({ id: app.id + '.Clip', name: 'Clip', executable: 'Clip' }),
       });
@@ -911,8 +911,10 @@ test.skipIf(!packagingTools)('simulator App Clips embed their own entitlements a
       device: false, triple: 'arm64-apple-ios17.0-simulator', sdk: run('xcrun', ['--sdk', 'iphonesimulator', '--show-sdk-path']).stdout.trim(),
       appleReach: reach, bakedCompat: compat, bakedPlan: plan, buildReceipt: { binary: { metadata: {} }, graph: {} },
       libDir: dir, gpuArtifacts: [], looseArms: [], serviceDylibs: [], args: [], unsigned: true, sha1: '-', linkRoot: dir,
-    }, { runApple: run, infoPlist, copyAppleStaticTrees() {}, writeUsageStrings() {}, assertAppleIdentity() {},
+    }, { runApple: run, infoPlist, privacyManifest, copyAppleStaticTrees() {}, writeUsageStrings() {}, assertAppleIdentity() {},
       receipt: () => '{}', copyAppleGpuProducts, entitlements, appClip });
+    // The app's privacy manifest sits at its root, inside what the signature seals (verified below).
+    assert.equal(readFileSync(resolve(bundle, 'PrivacyInfo.xcprivacy'), 'utf8'), privacyManifest(app));
     const parent = embedded(resolve(bundle, 'ExactClip'));
     const child = embedded(resolve(bundle, 'AppClips/ExactClip.app/ExactClip'));
     assert.equal(child['application-identifier'], 'SIMULATORX.com.exact.cliptest.Clip');

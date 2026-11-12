@@ -155,7 +155,7 @@ export function assembleMac({intents, shared, library, serviceDylibs, macWidgets
     }
     return bundlePath;
 }
-export function assembleIOS({intents, shared, library, serviceDylibs, triple, app, paths, binDir, bin, clipBin, device, development, appleReach, tv, bakedCompat, bakedPlan, ipa, linkRoot, swiftc, buildReceipt, rosterKeys, sdkName, production, distribution, stampSdk, libDir, gpuArtifacts, looseArms, modulesBuilt, modulesLoadName, hasSvg, svgBuilt, svgLoadName, svgFilterBuilt, svgFilterLibraryName, canvasGpuBuilt, canvasGpuLoadName, args, unsigned, prof, ph, sha1, composition, destination, target, sdk, hasGpu, dylib, alarm = null}, {runApple, appleArtifacts, macInfoPlist, copyAppleStaticTrees, writeUsageStrings, receipt, shippedReceipt, assertAppleIdentity, placeAppleArtifact, infoPlist, distributionKeys, copyAppleGpuProducts, entitlements, appClip}) {
+export function assembleIOS({intents, shared, library, serviceDylibs, triple, app, paths, binDir, bin, clipBin, device, development, appleReach, tv, bakedCompat, bakedPlan, ipa, linkRoot, swiftc, buildReceipt, rosterKeys, sdkName, production, distribution, stampSdk, libDir, gpuArtifacts, looseArms, modulesBuilt, modulesLoadName, hasSvg, svgBuilt, svgLoadName, svgFilterBuilt, svgFilterLibraryName, canvasGpuBuilt, canvasGpuLoadName, args, unsigned, prof, ph, sha1, composition, destination, target, sdk, hasGpu, dylib, alarm = null}, {runApple, appleArtifacts, macInfoPlist, copyAppleStaticTrees, writeUsageStrings, receipt, shippedReceipt, assertAppleIdentity, placeAppleArtifact, infoPlist, privacyManifest, distributionKeys, copyAppleGpuProducts, entitlements, appClip}) {
   // The bundle, assembled from scratch (new inodes, see above), with the app's assets (a phone reads no other
   // machine's paths); ad-hoc signed for a simulator, signed with the team's identity, profile, and entitlements for a phone.
   iosBundleGrants(app.manifest, bakedCompat.inputs?.grantCeiling);
@@ -179,6 +179,9 @@ export function assembleIOS({intents, shared, library, serviceDylibs, triple, ap
   const assetKeys = iosAssets(app, bundle, device, { tv, catalog: production, requireIcon: distribution, kept: { dir: resolve(linkRoot, 'assets'), stamp: swiftc }, expected: buildReceipt.binary.metadata.appleAssetCatalogs ?? [], ...(tv ? {} : { expectedLaunchImage: buildReceipt.binary.metadata.launchImage ?? null }), launch: buildReceipt.graph.launchBackground });
   const stamp = { ...rosterKeys, ...(production ? distributionKeys(sdkName) : {}), ...buildInfo(app, { root, archive: !!ipa && distribution, production: production || distribution, ...stampSdk }) };
   writeFileSync(resolve(bundle, 'Info.plist'), infoPlist(app, device, { development, distributed: distribution, reach: appleReach, icon: assetKeys, distribution: stamp, tv }));
+  // The reasons for the required-reason APIs the app's executable calls, Exact's and the app's (Apple requires them
+  // of an App Store submission). Only the app's bundle gets one: App Clips, extensions and ExactCore.framework do not.
+  writeFileSync(resolve(bundle, 'PrivacyInfo.xcprivacy'), privacyManifest(app));
   if (shared) run('plutil', ['-insert', 'ExactWidgetGeneration', '-string', createHash('sha256').update(JSON.stringify([bakedCompat.id, buildReceipt.graph.artifacts])).digest('hex'), resolve(bundle, 'Info.plist')]);
   writeUsageStrings(appleReach, bundle);
   // AlarmKit's countdown is a Live Activity the extension draws (LLP 1133.030 D8 item 2).
