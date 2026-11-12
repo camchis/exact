@@ -2155,7 +2155,7 @@ lasts half as long. `pan=` places it from −1 (left) to 1 (right) by Web Audio'
 equal-power law (LLP 1125
 D10). `stopSounds()` (or `stopSounds(group=…)`) ends what
 sounds and cancels what waits. The web plays the first sound after the page's first
-tap or key; Linux and Windows keep the record and play nothing.
+tap or key; Linux, Windows and Android keep the record and play nothing.
 
 ```contract
 sound "assets/ding.wav"

@@ -2507,7 +2507,7 @@ each voice ended is the same on every host and under the driver's clock
 | --- | --- |
 | web (both targets) | Web Audio: a one-shot `AudioBufferSourceNode` per voice at `start(when)` with its `playbackRate`, through a `StereoPannerNode` when its `pan` is not 0, aimed at the speaker through the context's output timestamp; the first sound after the page's first tap or key (one before it is dropped and journaled `sound blocked`) |
 | macOS, iOS, tvOS | one `AVAudioEngine` with a C mixer behind an `AVAudioSourceNode`, sample-accurate (a playback rate reads between frames by linear interpolation; a pan follows the `StereoPannerNode`'s equal-power algorithm), in an arm loaded on demand (`libexact_sound.dylib`; `ExactSound.framework` in an `.ipa`) |
-| Linux, Windows | none: the record only (`state.sounds.output` is `"none"` outside the driver) |
+| Linux, Windows, Android (its reader runs the Linux host) | none: the runner keeps the voice record, but the host plays no Contract sound effects |
 
 Under the driver no scheduled sound plays on any host (`output: "agent"`). `app.json`'s
 root `audio_session` chooses the session every sound, video and canvas shares.
