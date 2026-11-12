@@ -114,8 +114,13 @@ pub(crate) fn emit(
         .collect::<Vec<_>>());
     std::fs::write(out.join("artifacts.json"), graph.to_string()).map_err(|e| e.to_string())?;
     compat.target = target.into();
+    // The binary's version and build number (compat.rs) outlive the receipt.
+    let version = ["version", "buildNumber"].map(|key| (key, compat.embedded[key].clone()));
     compat.embedded = json!({"seq":0,"plan":plan_card,"assets":assets,"entryDigest":null,
         "genesis":true,"trust":trust});
+    for (key, value) in version.into_iter().filter(|(_, value)| !value.is_null()) {
+        compat.embedded[key] = value;
+    }
     if plans.as_object().is_some_and(|p| !p.is_empty()) {
         compat.embedded["plans"] = plans;
     }

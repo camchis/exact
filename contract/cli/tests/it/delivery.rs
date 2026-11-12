@@ -60,13 +60,14 @@ fn a_baked_plan_shows_the_embedded_answer_with_no_host_in_sight() {
     assert_eq!(text_of(&r, "delivery-stream").as_deref(), Some("embedded"));
     assert_eq!(text_of(&r, "delivery-seq").as_deref(), Some("0"));
     assert_eq!(text_of(&r, "delivery-staged").as_deref(), Some("current"));
+    assert_eq!(text_of(&r, "delivery-version").as_deref(), Some(" ()"));
     assert_eq!(r.delivery(), &Delivery::default());
     assert_eq!(
         mirror(&r),
         serde_json::from_str::<serde_json::Value>(
             "{\"stream\":\"embedded\",\"seq\":0,\"embeddedSeq\":0,\"staged\":false,\
-         \"sunset\":\"\",\"interpreted\":[],\"compatibilityId\":\"\",\"L\":\"A\",\
-         \"E\":[\"native\"]}"
+         \"sunset\":\"\",\"interpreted\":[],\"compatibilityId\":\"\",\"version\":\"\",\
+         \"buildNumber\":\"\",\"L\":\"A\",\"E\":[\"native\"]}"
         )
         .unwrap()
     );
@@ -86,6 +87,8 @@ fn a_hosts_facts_re_answer_the_resource_in_one_commit_and_the_agent_sees_them() 
             compatibility_id: "9f1c0a2b".into(),
             store: 'A',
             executors: vec!["hermes".into(), "native".into()],
+            version: "1.0.2".into(),
+            build_number: "12".into(),
         })
         .unwrap()
         .expect("the resource is declared, so its answer changed");
@@ -99,11 +102,16 @@ fn a_hosts_facts_re_answer_the_resource_in_one_commit_and_the_agent_sees_them() 
     assert_eq!(text_of(&r, "delivery-seq").as_deref(), Some("44"));
     assert_eq!(text_of(&r, "delivery-staged").as_deref(), Some("staged"));
     assert_eq!(
+        text_of(&r, "delivery-version").as_deref(),
+        Some("1.0.2 (12)")
+    );
+    assert_eq!(
         mirror(&r),
         serde_json::from_str::<serde_json::Value>(
             "{\"stream\":\"prod/abc\",\"seq\":44,\"embeddedSeq\":7,\"staged\":true,\
          \"sunset\":\"This build stops receiving updates in March\",\
-         \"interpreted\":[\"profile\"],\"compatibilityId\":\"9f1c0a2b\",\"L\":\"A\",\
+         \"interpreted\":[\"profile\"],\"compatibilityId\":\"9f1c0a2b\",\
+         \"version\":\"1.0.2\",\"buildNumber\":\"12\",\"L\":\"A\",\
          \"E\":[\"hermes\",\"native\"]}"
         )
         .unwrap()
@@ -118,7 +126,8 @@ fn a_compat_file_names_the_cohort_and_leaves_the_stream_alone() {
     let mut r = boot(&corpus());
     let compat = concat!(
         r#"{"id":"1a2b3c4d5e6f70819a2b3c4d5e6f7081","inputs":{"app":"io.exact.fixture","#,
-        r#""executors":["hermes","native"],"store":{"L":"0","acceptedKinds":["plan"]}}}"#,
+        r#""executors":["hermes","native"],"store":{"L":"0","acceptedKinds":["plan"]}},"#,
+        r#""embedded":{"trust":"development","version":"1.0.2","buildNumber":"12"}}"#,
         "\n"
     );
     assert!(r.set_delivery_from_compat(compat).unwrap().is_some());
@@ -136,6 +145,13 @@ fn a_compat_file_names_the_cohort_and_leaves_the_stream_alone() {
         mirror(&r)["compatibilityId"],
         "1a2b3c4d5e6f70819a2b3c4d5e6f7081"
     );
+    // The binary's own version and build number, from its embedded record.
+    assert_eq!(
+        text_of(&r, "delivery-version").as_deref(),
+        Some("1.0.2 (12)")
+    );
+    assert_eq!(mirror(&r)["version"], "1.0.2");
+    assert_eq!(mirror(&r)["buildNumber"], "12");
 }
 
 #[test]

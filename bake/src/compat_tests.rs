@@ -1,4 +1,4 @@
-use super::{compatibility_with_trust, stored_module, Manifest};
+use super::{build_version, compatibility_with_trust, stored_module, Manifest};
 use std::path::{Path, PathBuf};
 
 #[test]
@@ -1154,4 +1154,17 @@ fn the_closure_leaves_out_exact2s_own_crates() {
         ]
     );
     assert!(names("caltrain").is_empty());
+}
+
+#[test]
+fn the_build_version_takes_the_bundles_defaults_only_when_unset() {
+    let s = |v: &str| Some(v.to_string());
+    assert_eq!(build_version(None, None), ("0.1.0".into(), "1".into()));
+    assert_eq!(
+        build_version(s("1.0.2"), s("12")),
+        ("1.0.2".into(), "12".into())
+    );
+    // As `host/apple`'s `?? '1'` and Gradle's `orElse` do, a set value is kept, even
+    // empty; Android's build validates its own.
+    assert_eq!(build_version(s(""), None), (String::new(), "1".into()));
 }

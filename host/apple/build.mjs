@@ -403,8 +403,7 @@ export const infoPlist = (app, device = false, { executable = appleExecutableNam
     CFBundleName: name,
     CFBundleDisplayName: name,
     CFBundlePackageType: 'APPL',
-    CFBundleVersion: '1',
-    CFBundleShortVersionString: '0.1.0',
+    ...bundleVersion(),
     CFBundleSupportedPlatforms: [tv ? (device ? 'AppleTVOS' : 'AppleTVSimulator') : device ? 'iPhoneOS' : 'iPhoneSimulator'],
     DTPlatformName: tv ? (device ? 'appletvos' : 'appletvsimulator') : device ? 'iphoneos' : 'iphonesimulator',
     MinimumOSVersion: ios.minimumOS ?? '17.0',
@@ -446,14 +445,21 @@ export const infoPlist = (app, device = false, { executable = appleExecutableNam
   return plistFile(withPackageKeys(dict, reach));
 };
 
+/** Every app bundle's version and build number, EXACT_VERSION and
+ * EXACT_BUILD_NUMBER (`0.1.0` and `1` when unset): the values the bake writes
+ * into compat.json for `exactDelivery().version` and `.buildNumber`, so a
+ * development or macOS bundle and its app agree. */
+export function bundleVersion() {
+  return { CFBundleVersion: process.env.EXACT_BUILD_NUMBER ?? '1', CFBundleShortVersionString: process.env.EXACT_VERSION ?? '0.1.0' };
+}
+
 /** What App Store Connect reads from a distributed bundle and Xcode would
  * have written (`--archive`): the build's toolchain (DT* keys) and the store's
  * counters, EXACT_VERSION and EXACT_BUILD_NUMBER (the version and build
  * numbers App Store Connect requires to rise). */
 export function distributionKeys(sdkName = 'iphoneos') {
   return {
-    CFBundleVersion: process.env.EXACT_BUILD_NUMBER ?? '1',
-    CFBundleShortVersionString: process.env.EXACT_VERSION ?? '0.1.0',
+    ...bundleVersion(),
     ...distributionToolchain(sdkName),
     // A device requirement: a simulator bundle on an Intel Mac is x86_64.
     ...(sdkName.endsWith('simulator') ? {} : { UIRequiredDeviceCapabilities: ['arm64'] }),
@@ -500,8 +506,7 @@ export const macInfoPlist = (app, { development = null, icon = {}, reach = null,
   CFBundleName: app.displayName,
   CFBundleDisplayName: app.displayName,
   CFBundlePackageType: 'APPL',
-  CFBundleVersion: '1',
-  CFBundleShortVersionString: '0.1.0',
+  ...bundleVersion(),
   LSMinimumSystemVersion: app.manifest.host?.macos?.minimumOS ?? '14.0',
   NSHighResolutionCapable: true,
   ...usageKeys(reach), // usage strings for the devices the app's grants name (LLP 1069.008)

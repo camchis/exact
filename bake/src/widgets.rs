@@ -217,7 +217,8 @@ mod tests {
                 origin: None,
                 activate: "next-launch".into(),
                 target: target.into(),
-                embedded: Value::Null,
+                // What compat.rs wrote before the receipt: the binary's version.
+                embedded: json!({"version":"2.3.4","buildNumber":"56"}),
                 reach: Value::Null,
                 painter: None,
                 game: false,
@@ -240,6 +241,11 @@ mod tests {
                 );
             }
             assert_eq!(compat.embedded["trust"], "development");
+            assert_eq!(
+                (&compat.embedded["version"], &compat.embedded["buildNumber"]),
+                (&json!("2.3.4"), &json!("56")),
+                "{platform}: the receipt keeps the binary's version"
+            );
             // An updater-free production bake: no trust in its cohort, the
             // build's beside it (LLP 1030 D4).
             compat.inputs = json!({"trust":null,"store":{"L":"0"}});

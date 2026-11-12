@@ -51,7 +51,9 @@ pub fn production(json: &str) -> bool {
 
 /// Every field the runner can fill, by the name a declared shape gives it.
 /// A shape that names anything else is refused at bake (`bake-delivery-field`).
-pub const FIELDS: [&str; 7] = [
+pub const FIELDS: [&str; 9] = [
+    "version",
+    "buildNumber",
     "stream",
     "seq",
     "embeddedSeq",
@@ -87,6 +89,13 @@ pub struct Delivery {
     /// Which of the app's data sources run on an interpreter rather than as
     /// native code (LLP 1029 D2), sorted.
     pub interpreted: Vec<String>,
+    /// The binary's version, as its bundle and APK carry it (`EXACT_VERSION`
+    /// at build: iOS's `CFBundleShortVersionString`, Android's
+    /// `versionName`). Empty until a host hands the runner its `compat.json`.
+    pub version: String,
+    /// The binary's build number (`EXACT_BUILD_NUMBER`: `CFBundleVersion`,
+    /// `versionCode`). Empty until a host hands the runner its `compat.json`.
+    pub build_number: String,
 }
 
 impl Default for Delivery {
@@ -102,6 +111,8 @@ impl Default for Delivery {
             staged: false,
             sunset: None,
             interpreted: Vec::new(),
+            version: String::new(),
+            build_number: String::new(),
         }
     }
 }
@@ -119,12 +130,14 @@ impl Delivery {
             "sunset" => Value::str(self.sunset.as_deref().unwrap_or("")),
             "interpreted" => Value::list(self.interpreted.iter().map(|s| Value::str(s)).collect()),
             "compatibilityId" => Value::str(&self.compatibility_id),
+            "version" => Value::str(&self.version),
+            "buildNumber" => Value::str(&self.build_number),
             _ => return None,
         })
     }
 
-    /// The binary's id, `store.L`, executor set, and embedded sequence from
-    /// its archive's `compat.json`, as
+    /// The binary's id, `store.L`, executor set, embedded sequence, version
+    /// and build number from its archive's `compat.json`, as
     /// `exact_bake::Compat::to_json` writes them. Everything the store has to
     /// say is left as it was; a field the text does not carry is left as it
     /// was too, so a truncated or foreign file degrades to the embedded
@@ -147,6 +160,19 @@ impl Delivery {
             .and_then(strings_at)
         {
             out.executors = executors;
+        }
+        // The binary's own version and build number: `embedded`, which the
+        // compatibility id doesn't digest, so a version bump keeps the cohort.
+        let embedded_string = |key: &str| {
+            member(json, "embedded")
+                .and_then(|embedded| member(embedded, key))
+                .and_then(|rest| string_at(rest).map(|(s, _)| s))
+        };
+        if let Some(version) = embedded_string("version") {
+            out.version = version;
+        }
+        if let Some(build) = embedded_string("buildNumber") {
+            out.build_number = build;
         }
         if let Some(seq) = member(json, "embedded")
             .and_then(|embedded| member(embedded, "seq"))
@@ -353,6 +379,23 @@ mod tests {
             let invalid = format!(r#"{{"embedded":{{"seq":{bad}}},"artifacts":[{{"seq":999}}]}}"#);
             assert_eq!(selected.with_compat(&invalid), selected);
         }
+    }
+
+    #[test]
+    fn the_binarys_version_and_build_number_come_from_its_embedded_record() {
+        let json = r#"{"id":"abc","inputs":{"store":{"L":"0"},"executors":[]},"embedded":{"trust":"production","version":"1.0.2","buildNumber":"12"},"artifacts":[{"embedded":{"version":"9.9.9"}}]}"#;
+        let d = Delivery::default().with_compat(json);
+        assert_eq!(
+            (d.version.as_str(), d.build_number.as_str()),
+            ("1.0.2", "12")
+        );
+        assert_eq!(d.field("version"), Some(Value::str("1.0.2")));
+        assert_eq!(d.field("buildNumber"), Some(Value::str("12")));
+        // A record from before the bake wrote them leaves both empty.
+        let old =
+            Delivery::default().with_compat(r#"{"id":"abc","embedded":{"trust":"development"}}"#);
+        assert_eq!((old.version.as_str(), old.build_number.as_str()), ("", ""));
+        assert_eq!(old.field("version"), Some(Value::str("")));
     }
 
     #[test]

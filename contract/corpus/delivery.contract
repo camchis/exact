@@ -12,6 +12,8 @@ shape DeliveryState
   sunset: string
   interpreted: string[]
   compatibilityId: string
+  version: string
+  buildNumber: string
 
 component App
   resource delivery = exactDelivery() as shape DeliveryState
@@ -25,6 +27,7 @@ component App
     column testId="delivery" padding=16 gap=8
       text delivery.stream testId="delivery-stream"
       text `${delivery.seq}` testId="delivery-seq"
+      text `${delivery.version} (${delivery.buildNumber})` testId="delivery-version"
       if delivery.staged
         text "staged" testId="delivery-staged"
       else

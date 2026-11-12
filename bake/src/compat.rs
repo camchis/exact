@@ -309,6 +309,8 @@ pub fn compatibility_id_pinned(
         println!("cargo:rerun-if-env-changed=EXACT_UPDATE_TRUST");
         println!("cargo:rerun-if-env-changed=EXACT_TYPESCRIPT_PLACEMENT");
         println!("cargo:rerun-if-env-changed=EXACT_RUST_PLACEMENT");
+        println!("cargo:rerun-if-env-changed=EXACT_VERSION");
+        println!("cargo:rerun-if-env-changed=EXACT_BUILD_NUMBER");
     }
     let trust = match std::env::var("EXACT_UPDATE_TRUST") {
         Ok(value) => value,
@@ -337,6 +339,16 @@ pub fn compatibility_id_pinned(
     if let Some(rust) = rust_grants {
         source_scopes(&mut compat, grants.unwrap_or(""), rust);
     }
+    // The binary's version and build number, as its bundle and APK take them
+    // (`EXACT_VERSION`, `EXACT_BUILD_NUMBER`, the same defaults), for
+    // `exactDelivery().version` and `.buildNumber`. In `embedded`, which the id
+    // doesn't digest: a version bump keeps the cohort.
+    let (version, build_number) = build_version(
+        std::env::var("EXACT_VERSION").ok(),
+        std::env::var("EXACT_BUILD_NUMBER").ok(),
+    );
+    compat.embedded["version"] = serde_json::Value::String(version);
+    compat.embedded["buildNumber"] = serde_json::Value::String(build_number);
     if let Some(module) = module {
         compat.inputs["typescriptModule"] = serde_json::Value::String(module.into());
         compat.id = compatibility_digest(&compat.inputs);
@@ -426,6 +438,20 @@ fn source_scopes(compat: &mut Compat, javascript: &str, rust: &str) {
     compat.inputs["javascriptGrants"] = serde_json::Value::String(javascript.into());
     compat.inputs["rustGrants"] = serde_json::Value::String(rust.into());
     compat.id = compatibility_digest(&compat.inputs);
+}
+
+/// The version and build number a build names, with the defaults the Apple
+/// and Android builds use when they are unset (`0.1.0`, `1`): `host/apple`'s
+/// `?? '1'` and Gradle's `orElse` keep a value that is set, even empty
+/// (Android's build still refuses a build number that is no integer).
+pub(crate) fn build_version(
+    version: Option<String>,
+    build_number: Option<String>,
+) -> (String, String) {
+    (
+        version.unwrap_or_else(|| "0.1.0".to_string()),
+        build_number.unwrap_or_else(|| "1".to_string()),
+    )
 }
 
 pub(crate) fn compatibility_digest(inputs: &serde_json::Value) -> String {

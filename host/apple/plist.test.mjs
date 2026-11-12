@@ -98,6 +98,24 @@ test('a package key that collides with a key the build writes is refused, naming
   } finally { PLIST_KEYS.delete('UILaunchScreen'); }
 });
 
+test('every app bundle takes EXACT_VERSION and EXACT_BUILD_NUMBER, the version the bake gives exactDelivery', () => {
+  const app = { id: 'com.example.plist', displayName: 'Plist', manifest: { host: {} } };
+  const versions = () => [infoPlist(app, false), infoPlist(app, true, { tv: true }), macInfoPlist(app)]
+    .map(plist => flat(plist).match(/<key>CFBundleVersion<\/key><string>([^<]*)<\/string><key>CFBundleShortVersionString<\/key><string>([^<]*)<\/string>/)?.slice(1));
+  const saved = [process.env.EXACT_VERSION, process.env.EXACT_BUILD_NUMBER];
+  try {
+    delete process.env.EXACT_VERSION; delete process.env.EXACT_BUILD_NUMBER;
+    assert.deepEqual(versions(), [['1', '0.1.0'], ['1', '0.1.0'], ['1', '0.1.0']]);
+    // A development build and a Mac build too, not only a distributed one (distributionKeys).
+    process.env.EXACT_VERSION = '2.3.4'; process.env.EXACT_BUILD_NUMBER = '56';
+    assert.deepEqual(versions(), [['56', '2.3.4'], ['56', '2.3.4'], ['56', '2.3.4']]);
+  } finally {
+    for (const [key, value] of [['EXACT_VERSION', saved[0]], ['EXACT_BUILD_NUMBER', saved[1]]]) {
+      if (value === undefined) delete process.env[key]; else process.env[key] = value;
+    }
+  }
+});
+
 test('an app that grants no device still gets its packages\' keys and dictionaries, and only from packages it uses', () => {
   withApp('import { purchase } from "@exact/purchases";\n', ['purchases'], (app) => {
     for (const plist of [infoPlist(app, false, { reach: modulePlist(app, null, 'ios', { purchases: '@exact/purchases' }) }), macInfoPlist(app, { reach: modulePlist(app, null, 'macos', { purchases: '@exact/purchases' }) })]) {

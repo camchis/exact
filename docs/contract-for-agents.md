@@ -3766,6 +3766,13 @@ no fold it contains the whole viewport. Declare the fields your app uses in a
 segment shape and `segments: Segment[]` in its viewport shape. Insets and
 rectangles update when the host's document geometry changes.
 
+`exactDelivery().version` and `.buildNumber` are strings: the installed binary's
+version and build number, as the build took them from `EXACT_VERSION` and
+`EXACT_BUILD_NUMBER` (`0.1.0` and `1` when unset; iOS's
+`CFBundleShortVersionString` and `CFBundleVersion`, Android's `versionName` and
+`versionCode`). An update delivered over the air does not change them. The web's
+JS build has no installed binary, and reads both as `""`.
+
 `exactViewport().pointer` and `.hover` are CSS's `pointer` (`fine`, `coarse`,
 `none`) and `hover` (`hover`, `none`) for the primary input: the web's media
 queries; `fine` and `hover` on macOS, Linux and Windows, and `coarse` and `none`

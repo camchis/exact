@@ -137,10 +137,10 @@ impl<D: DataSource> Runner<D> {
         )
     }
 
-    /// [`Runner::set_delivery`] with the binary's own three facts read out
-    /// of the archive's `compat.json` (LLP 1030 D3a) — the compatibility id,
-    /// whether an update store is linked, and the executors — and everything
-    /// else left as it was.
+    /// [`Runner::set_delivery`] with the binary's own facts read out of the
+    /// archive's `compat.json` (LLP 1030 D3a) — the compatibility id, whether
+    /// an update store is linked, the executors, and its version and build
+    /// number — and everything else left as it was.
     pub fn set_delivery_from_compat(
         &mut self,
         compat_json: &str,

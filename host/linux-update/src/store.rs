@@ -215,7 +215,7 @@ impl Updates {
 
     /// What the store has to say, into a runner's delivery facts (LLP 1030
     /// D7): the stream, the running and embedded `seq`, whether an entry is
-    /// staged, the sunset; the binary's own three are left as they were.
+    /// staged, the sunset; the binary's own facts are left as they were.
     pub(crate) fn staged_stream_into(&self, delivery: &mut Delivery) {
         let client = lock(&self.client);
         let embedded = client.embedded();

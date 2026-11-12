@@ -576,7 +576,7 @@ pub fn discard(token: u64) {
 
 /// What the store has to say, into a runner's delivery facts (LLP 1030
 /// D7): the stream, the running and embedded `seq`, whether an entry is
-/// staged, the sunset. The binary's own three (`with_compat`) are left as
+/// staged, the sunset. The binary's own facts (`with_compat`) are left as
 /// they were; with no store open nothing changes.
 pub fn status_into(delivery: &mut Delivery) {
     let snap = lock(&SNAPSHOT);

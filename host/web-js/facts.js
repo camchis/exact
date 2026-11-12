@@ -95,7 +95,7 @@ export function activities(readers) {
 }
 
 export function delivery(readers) {
-  const embedded = { stream: "embedded", seq: 0, embeddedSeq: 0, staged: false, sunset: "", interpreted: [], compatibilityId: "" };
+  const embedded = { stream: "embedded", seq: 0, embeddedSeq: 0, staged: false, sunset: "", interpreted: [], compatibilityId: "", version: "", buildNumber: "" };
   (data.reserved ??= {}).exactDelivery = (_, a, name) => readers[name][1] ?? byName(readers, name, embedded);
 }
 
