@@ -92,6 +92,7 @@ pub const RECIPES: &[(&str, &str)] = &[
     recipe!("timer-that-survives-relaunch"),
     recipe!("timers"),
     recipe!("tips"),
+    recipe!("tools"),
     recipe!("usb-hid-serial"),
     recipe!("web-look"),
     recipe!("website"),
@@ -115,6 +116,7 @@ const ALIASES: &[(&str, &str)] = &[
     ("sequence", "sequencer"),
     ("keyframes", "motion"),
     ("@keyframes", "motion"),
+    ("tool", "tools"),
 ];
 
 /// The recipe a name looks up, as a builder may write it (`grouped-form`,

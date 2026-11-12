@@ -1890,6 +1890,19 @@ price: answers arrive `Later`, outside the action's transaction (LLP 1027.002 D1
   `nav = top(nav).name == "shop" and (url == "/" or url.slice(0, 2) == "/?") ? replace(nav, url) : go(nav, url)`,
   so Back leaves the shop rather than stepping through each filter. (The same store, 2026-11-01.)
 
+- **A browser's agent finds none of a page's tools at load.** A `render=build` route with no
+  `activate` builds its page with `data-activate="interaction"`: the page loads its script,
+  which registers its faced tools with `document.modelContext`, only when the person uses one
+  of its controls. Until then `getTools()` is empty; a scroll or a click outside a control
+  changes nothing, and a page with no controls never offers its tools. Say `activate=idle` on
+  each route whose page offers tools (`home "/" render=build activate=idle`): the script then
+  loads once the page is idle, and the tools are registered within a second of load
+  ([tools](recipes/tools.md)). The script waits for the page's first paint either way: a page
+  that draws nothing at load (only an empty list) never registers them, so give it a heading.
+  **Candidate diagnostic:** a faced tool in an app with a
+  `render=build` route that does not say `activate`. (Exact Bistro, a WebMCP demo site,
+  2026-11-12.)
+
 ## Working on Exact itself
 
 - **A CDP adapter re-sends known children and Styles stays empty.**
