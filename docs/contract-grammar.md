@@ -1924,9 +1924,9 @@ the velocity from the moves of the last 100 ms, with no target. The web takes a
 touch on the scroller, from its first `scroll` under the finger to the last
 finger's lift, with no target and the finger's velocity over its last 100 ms
 of moves (UIKit's is the pan's too), 0 if it rested that long before
-lifting; a mouse or a pen sends neither. Android takes a finger's drag of the
-innermost scroller it moves, from the moment the touch becomes a scroll to the
-lift, with the platform's velocity (`VelocityTracker`) and, as the target, where
+lifting; a mouse or a pen sends neither. Android takes a finger's drag of each
+scroller it moves (an outer one the hand-off reaches too), from the drag's first
+move of it to the lift, with the platform's velocity (`VelocityTracker`) and, as the target, where
 the fling will rest (`OverScroller`), or where the scroller is when nothing is
 thrown. Linux and Windows scroll by no drag and send neither.
 

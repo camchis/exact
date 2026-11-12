@@ -4103,7 +4103,7 @@ grow, and `targetLeft` and `targetTop`, where the momentum will stop, `some` on
 iOS and Android and `none` where the host cannot say before it gets there. macOS
 takes a trackpad's two fingers as the drag and the web a touch, each estimating
 the velocity from the last 100 ms of the fingers' moves; Android takes a finger
-on the innermost scroller it moves, with the platform's velocity; Linux and
+on each scroller it moves, with the platform's velocity; Linux and
 Windows send neither. A wheel, the keyboard and a programmatic scroll send
 neither
 ([events](contract-grammar.md#events)).

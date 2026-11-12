@@ -291,9 +291,12 @@ class ScrollTouchTest {
         Host.told.clear()
         down(400f); answer(reply(scroller(1, 0f, max = 100000f)))
         move(380f); move(340f); move(300f); up(300f)
-        // A finger on the list while it flings stops it and has it: the fling is over, and a drag begins.
+        // A finger on the list while it flings stops it and has it: the fling is over.
         down(400f)
-        assertEquals(listOf("end 1 flings", "rest 1", "start 1"), Host.told.takeLast(3))
+        assertEquals(listOf("end 1 flings", "rest 1"), Host.told.takeLast(2))
+        // It is dragged once the finger moves it.
+        move(380f)
+        assertEquals(listOf("start 1", "move 1"), Host.told.takeLast(2))
     }
 
     @Test fun aDragLetGoOfStillRestsWhereItIs() {
@@ -437,6 +440,29 @@ class ScrollTouchTest {
         answer(reply(scroller(1, 0f)))
         move(380f); move(340f)
         assertEquals("the second scrolls on from there", 100f - slop + 60f - slop, thread.moved[1]!!, 0.01f)
+    }
+
+    @Test fun aNestedDragTellsAndHoldsTheScrollerThatMoves() {
+        // The inner list at its top, the outer one 100 down: a drag down moves only the outer one.
+        down(400f); answer(reply(scroller(1, 0f), scroller(2, 100f)))
+        move(420f); move(440f)
+        assertEquals(listOf("start 2", "move 2", "move 2"), Host.told)
+        // Back up: the way goes to the inner one first, which is dragged from then.
+        move(300f)
+        assertEquals(listOf("start 2", "move 2", "move 2", "start 1", "move 1"), Host.told)
+        up(300f)
+        assertTrue(Host.told.containsAll(listOf("end 2", "end 1")) || Host.told.containsAll(listOf("end 2 flings", "end 1 flings")))
+    }
+
+    @Test fun aNestedDragReadsTheKeyboardOfTheScrollerThatMoves() {
+        for ((inner, outer) in listOf(Dismissal.ON_DRAG to 0, 0 to Dismissal.ON_DRAG)) {
+            setUp()
+            val text = focusedField()
+            down(600f)
+            answer(reply(scroller(1, 0f).also { it[1] = 2 or (inner shl 6) }, scroller(2, 100f).also { it[1] = 2 or (outer shl 6) }))
+            move(620f); move(640f)
+            assertEquals("the outer list moved; inner $inner, outer $outer", outer == 0, text.isFocused)
+        }
     }
 
     private fun ExactView.scrolling(): Scrolling =

@@ -146,9 +146,12 @@ internal class Scrolling(private val view: ExactView) {
     private val owing = ArrayDeque<Owed>()
     /** An earlier touch is being taken now ([owed]): exact2 heard all of it already, so nothing is cancelled there. */
     private var replaying = false
-    /** The scroller whose drag, and then the fling it threw, exact2 is told of ([dragged], [lifted], [rested]): the
-     * innermost the drag moves. */
-    private var held: Scroller? = null
+    /** The scrollers the drag has moved, each told to exact2 as dragged from its first move ([move]) and held so
+     * until the lift, or until the fling the lift threw stops ([lifted], [rested]). */
+    private val held = LinkedHashSet<Scroller>()
+    /** The scroller that first moved in the last [move], and whether this drag has said what it does to the keyboard. */
+    private var mover: Scroller? = null
+    private var keyed = false
 
     /**
      * A touch event: whether it was taken here (a scroll's), so that exact2 does not hear it. A down, and every move
@@ -181,7 +184,7 @@ internal class Scrolling(private val view: ExactView) {
                 if (active.any { it.port.contains(e.x, e.y) }) {
                     mode = DRAGGING
                     dragFrom = active.first().at(sideways)
-                    dragged()
+                    keyed = false
                     return true
                 }
             }
@@ -392,7 +395,7 @@ internal class Scrolling(private val view: ExactView) {
         lastX = if (sideways) downX + sign(x - downX) * slop else x
         lastY = if (sideways) y else downY + sign(y - downY) * slop
         if (!replaying) view.forward(3, x, y, tool, 0L)
-        dragged()
+        keyed = false
     }
 
     /** The finger moved [delta] px along the drag's axis (toward the end positive), at ([x], [y]). */
@@ -402,7 +405,18 @@ internal class Scrolling(private val view: ExactView) {
         pulling?.let { s -> if (d > 0f) { val back = minOf(d, pulled); pulled -= back; d -= back; s.pull?.pull(pulled) } }
         val edged = edged()
         if (edged != null) d -= relax(edged, d, x, y)
+        mover = null
         val rest = if (d != 0f) move(d) else 0f
+        if (!keyed) {
+            // What the drag does to the keyboard is the first scroller's it moves, or, while none can, the one whose
+            // edge it stretches.
+            val s = mover ?: (if (rest != 0f) edged ?: active.firstOrNull() else null)
+            if (s != null) {
+                keyed = true
+                // The keyboard follows only a drag up and down.
+                dismissal.began(if (sideways && s.dismiss == Dismissal.INTERACTIVE) 0 else s.dismiss)
+            }
+        }
         if (rest < 0f && refresh(rest)) return
         if (rest != 0f && edged != null) pull(edged, rest, x, y)
     }
@@ -457,6 +471,9 @@ internal class Scrolling(private val view: ExactView) {
             val took = (at + rest).coerceIn(0f, s.end(sideways)) - at
             if (abs(took) < 0.01f) continue
             s.own = true
+            if (mover == null) mover = s
+            // The finger drags it from its first move (`scrolldragstart`), as a nested scroller the hand-off reaches.
+            if (mode == DRAGGING && held.add(s)) tell { Native.scrollDrag(s.id, false, 0f, 0f, false, 0f, 0f, false) }
             val dx = if (sideways) took else 0f; val dy = if (sideways) 0f else took
             val seq = view.scrolled(s.id, dx, dy, s.rev)
             // Told to exact2's own thread: it is ahead of exact2 by this much until a stream includes the move.
@@ -656,35 +673,26 @@ internal class Scrolling(private val view: ExactView) {
         settle(d, ms)
     }
 
-    /** The touch became a drag of the scrollers in [active]: exact2 is told the innermost's drag began
-     * ([Native.scrollDrag]; its `scrolldragstart`), before the drag's first move. */
-    private fun dragged() {
-        val s = active.firstOrNull() ?: return
-        held = s
-        tell { Native.scrollDrag(s.id, false, 0f, 0f, false, 0f, 0f, false) }
-        // The keyboard follows only a drag up and down.
-        dismissal.began(if (sideways && s.dismiss == Dismissal.INTERACTIVE) 0 else s.dismiss)
-    }
-
     /** The finger let go of the drag at [v] px/s along its axis, positive as the offset grows (`VelocityTracker`'s,
-     * negated): exact2 is told, with where the scroller will rest, which is where [fling] ends when it [flings] and
-     * where it is otherwise; before the fling's first frame, so its `scrolldragend` precedes the fling's `scroll`s.
-     * With nothing thrown the scroll is over, and its `scrollend` comes now; a fling's comes when it stops ([rested]). */
+     * negated): exact2 is told of each scroller it moved, with where that will rest, which is where [fling] ends
+     * (exact2 clamps it to the scroller's range) when it [flings] and where it is otherwise; before the fling's first
+     * frame, so its `scrolldragend` precedes the fling's `scroll`s. With nothing thrown the scroll is over, and its
+     * `scrollend` comes now; a fling's comes when it stops ([rested]). */
     private fun lifted(v: Float, flings: Boolean) {
-        val s = held ?: return
-        if (!flings) held = null
         val travel = if (!flings) 0f else (if (sideways) fling.finalX else fling.finalY).toFloat()
-        val restX = s.at(true) + (if (sideways) travel else 0f)
-        val restY = s.at(false) + (if (sideways) 0f else travel)
         val vx = if (sideways) v else 0f; val vy = if (sideways) 0f else v
-        tell { Native.scrollDrag(s.id, true, vx, vy, true, restX, restY, flings) }
+        for (s in held) {
+            val restX = s.at(true) + (if (sideways) travel else 0f)
+            val restY = s.at(false) + (if (sideways) 0f else travel)
+            tell { Native.scrollDrag(s.id, true, vx, vy, true, restX, restY, flings) }
+        }
+        if (!flings) held.clear()
     }
 
-    /** The fling the drag threw stopped: exact2 is told ([Native.flingEnded]; the scroller's `scrollend`). */
+    /** The fling the drag threw stopped: exact2 is told ([Native.flingEnded]; each scroller's `scrollend`). */
     private fun rested() {
-        val s = held ?: return
-        held = null
-        tell { Native.flingEnded(s.id) }
+        for (s in held) tell { Native.flingEnded(s.id) }
+        held.clear()
     }
 
     /** [f], a call that tells exact2 of a drag, on its thread behind the moves sent before, or here. */
