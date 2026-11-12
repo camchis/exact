@@ -2597,7 +2597,7 @@ login:<NAME>` name is a shell variable's (`[A-Za-z_][A-Za-z0-9_]*`).
 Under the agent nothing runs unless the drive names it: `--process
 <target>=<executable>` runs that file in the target's place,
 `--process <target>=script:<file.json>` answers from a script with no process
-(the format is `host/apple/src/executor_process_script.rs`'s), and
+(the format is `host/executor/src/process_script.rs`'s), and
 `--process <target>=real` runs the granted program itself. A script's events,
 restart delays and readiness move with `clock`; a real child's run on the
 wall, which `clock +<ms> real` waits for. `--login-env NAME=value`

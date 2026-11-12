@@ -644,25 +644,25 @@ impl EventStream {
     }
 }
 
-#[path = "executor_bytes.rs"]
+#[path = "bytes.rs"]
 mod bytes;
-#[path = "executor_listen.rs"]
+#[path = "listen.rs"]
 pub(crate) mod listen;
-#[path = "executor_longpoll.rs"]
+#[path = "longpoll.rs"]
 mod long_poll;
-#[path = "executor_socket.rs"]
+#[path = "socket.rs"]
 mod socket;
-#[path = "executor_upload.rs"]
+#[path = "upload.rs"]
 mod upload;
 
 #[cfg(test)]
-#[path = "executor_stream_tests.rs"]
+#[path = "stream_tests.rs"]
 mod tests;
 
 #[cfg(test)]
-#[path = "executor_stream_timeout_tests.rs"]
+#[path = "stream_timeout_tests.rs"]
 mod timeout_tests;
 
 #[cfg(test)]
-#[path = "executor_protocol_tests.rs"]
+#[path = "protocol_tests.rs"]
 pub(crate) mod protocol_tests;

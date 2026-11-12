@@ -1099,5 +1099,5 @@ fn start_indices(
 }
 
 #[cfg(test)]
-#[path = "executor_preload_tests.rs"]
+#[path = "preload_tests.rs"]
 mod tests;

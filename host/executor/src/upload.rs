@@ -20,7 +20,7 @@ use std::sync::{Arc, Mutex};
 
 /// What an executor's uploads may hold at once, the platform's copies
 /// counted: 256 MiB, the four 64 MiB file bodies reads may hold at once
-/// (`executor_body.rs` `MAX_READERS`). An upload's own lane, 64 MiB, could
+/// (`body.rs` `MAX_READERS`). An upload's own lane, 64 MiB, could
 /// not hold a 50 MB body beside Apple's copy of it.
 const UPLOAD_BYTES: usize =
     super::super::body::MAX_READERS * exact_runner::MAX_BODY_FROM_BYTES as usize;

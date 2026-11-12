@@ -806,5 +806,5 @@ fn run(program: &Path, args: &[String], home: &Path, limit: Duration) -> Option<
 }
 
 #[cfg(test)]
-#[path = "executor_process_real_tests.rs"]
+#[path = "process_real_tests.rs"]
 mod tests;

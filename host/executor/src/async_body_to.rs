@@ -132,5 +132,5 @@ pub(in super::super) fn release_count(book: &mut Book, run: &mut Running) -> boo
 }
 
 #[cfg(test)]
-#[path = "executor_async_body_to_tests.rs"]
+#[path = "async_body_to_tests.rs"]
 mod tests;

@@ -3,13 +3,13 @@
 //! Independent HTTP shares them; its held sockets cannot occupy the ordered worker.
 use exact_runner::{CompletionTiming, Outcome, RequestOut, Work};
 use std::ffi::c_void;
-#[path = "executor_core.rs"]
+#[path = "../../executor/src/lib.rs"]
 mod core;
 pub use core::preload::{
     Control as PreloadControl, Definition as Preload, Event as PreloadEvent, Fact as PreloadFact,
     Observation as PreloadObservation, Observer as PreloadObserver, Preloads,
 };
-#[path = "executor_pump.rs"]
+#[path = "../../executor/src/pump.rs"]
 pub mod pump;
 /// Independent tests have separate worker budgets; production shares one process bound.
 const ISOLATE_WORKER_BUDGET: bool = cfg!(test);

@@ -355,5 +355,5 @@ impl Core {
 }
 
 #[cfg(test)]
-#[path = "executor_socket_tests.rs"]
+#[path = "socket_tests.rs"]
 mod tests;

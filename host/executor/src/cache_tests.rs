@@ -865,7 +865,7 @@ fn unsafe_driver_answers_invalidate_and_url_schemes_are_case_insensitive() {
     }
 }
 
-#[path = "executor_cache_mode_tests.rs"]
+#[path = "cache_mode_tests.rs"]
 mod modes;
 
 #[test]
@@ -1357,7 +1357,7 @@ fn a_write_that_fails_unanswered_invalidates_its_url() {
     }
 }
 
-#[path = "executor_cache_revalidation_tests.rs"]
+#[path = "cache_revalidation_tests.rs"]
 mod revalidation;
 
 #[test]
@@ -1394,5 +1394,5 @@ fn a_redirected_writes_outcome_does_not_resolve_the_last_heads_locations_again()
     }
 }
 
-#[path = "executor_cache_order_tests.rs"]
+#[path = "cache_order_tests.rs"]
 mod order;

@@ -1454,22 +1454,22 @@ fn a_native_call_is_handed_off_and_never_holds_the_ordered_lane() {
     assert_eq!(collect(&core, &woke, 1)[0].0, 20);
 }
 
-#[path = "executor_timeout_tests.rs"]
+#[path = "timeout_tests.rs"]
 mod timeout;
 
-#[path = "executor_again_tests.rs"]
+#[path = "again_tests.rs"]
 mod again;
 
-#[path = "executor_body_tests.rs"]
+#[path = "body_tests.rs"]
 mod body_from;
 
-#[path = "executor_body_to_tests.rs"]
+#[path = "body_to_tests.rs"]
 pub(super) mod body_to;
 
-#[path = "executor_abort_tests.rs"]
+#[path = "abort_tests.rs"]
 pub(crate) mod abort;
 
-#[path = "executor_pump_tests.rs"]
+#[path = "pump_tests.rs"]
 mod pump;
 
 /// The host a lane of the machine fetches through. The Darwin blocking

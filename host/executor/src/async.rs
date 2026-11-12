@@ -4,7 +4,7 @@
 //! deadline and one disposer destroys work let go. HTTP goes to an
 //! asynchronous transport (ibex2's `fetch_async`): on Apple, one
 //! `NSURLSession` per lane. The admission rules, the queues, settlement and
-//! the fence are `executor_core.rs`'s, unchanged.
+//! the fence are `lib.rs`'s, unchanged.
 //!
 //! Releases, then wakes: a callback, the timer, a reader or a buffer's
 //! release only posts to the lane's finisher, which applies what the event
@@ -28,35 +28,35 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc, Mutex};
 use std::time::{Duration, Instant};
 
-#[path = "executor_timer.rs"]
+#[path = "timer.rs"]
 pub(super) mod timer;
 #[cfg(test)]
 use super::MAX_BODY;
 use timer::Timer;
-#[path = "executor_async_body_to.rs"]
+#[path = "async_body_to.rs"]
 mod body_to;
 pub(super) use body_to::release_count;
-#[path = "executor_async_file.rs"]
+#[path = "async_file.rs"]
 mod file;
-#[path = "executor_async_http.rs"]
+#[path = "async_http.rs"]
 mod http;
 #[cfg(test)]
 pub(super) use file::ReaderPhase;
 #[cfg(test)]
-#[path = "executor_async_cache_tests.rs"]
+#[path = "async_cache_tests.rs"]
 mod cache_tests;
 #[cfg(test)]
-#[path = "executor_async_read_tests.rs"]
+#[path = "async_read_tests.rs"]
 mod read_tests;
 #[cfg(test)]
-#[path = "executor_redirect_tests.rs"]
+#[path = "redirect_tests.rs"]
 mod redirect_tests;
 #[cfg(test)]
-#[path = "executor_async_retire_tests.rs"]
+#[path = "async_retire_tests.rs"]
 mod retire_tests;
-#[path = "executor_async_retire.rs"]
+#[path = "async_retire.rs"]
 mod retirement;
-#[path = "executor_workers.rs"]
+#[path = "workers.rs"]
 mod workers;
 pub(super) use retirement::external_end;
 

@@ -156,9 +156,9 @@ struct Tracked {
     deadline: Mutex<Option<(u32, AbortController)>>,
 }
 
-#[path = "executor_metrics.rs"]
+#[path = "metrics.rs"]
 mod metrics_log;
-#[path = "executor_async_transport.rs"]
+#[path = "async_transport.rs"]
 mod tracked_transport;
 
 type RetryStart = Box<dyn FnOnce(Arc<Events>) + Send>;

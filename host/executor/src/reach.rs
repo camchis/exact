@@ -227,5 +227,5 @@ mod tests {
 }
 
 #[cfg(test)]
-#[path = "executor_reach_tests.rs"]
+#[path = "reach_tests.rs"]
 mod executor_tests;

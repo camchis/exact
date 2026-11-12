@@ -5,10 +5,10 @@
 use exact_runner::{CompletionTiming, Outcome, RequestOut, Work};
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::Instant;
-#[path = "../../apple/src/executor_core.rs"]
+#[path = "../../executor/src/lib.rs"]
 #[allow(dead_code)] // `run` is the core's own tests' entry
 mod core;
-#[path = "../../apple/src/executor_pump.rs"]
+#[path = "../../executor/src/pump.rs"]
 pub mod pump;
 /// Each test thread shares a worker budget among its servers and renders. The
 /// dev-dependency enables this for integration tests; production shares one process bound.

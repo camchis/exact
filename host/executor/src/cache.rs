@@ -1026,5 +1026,5 @@ fn http_date(value: &str) -> Option<u64> {
 }
 
 #[cfg(test)]
-#[path = "executor_cache_tests.rs"]
+#[path = "cache_tests.rs"]
 pub(super) mod tests;

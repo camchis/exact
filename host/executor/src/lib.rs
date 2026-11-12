@@ -211,7 +211,7 @@ struct Shared {
     /// Open two-way sockets by stream ticket (LLP 1016.000 D7; `stream.rs`).
     sockets: Mutex<std::collections::HashMap<u64, stream::Socket>>,
     /// Long polls waiting to ask again, by stream ticket (LLP 1016.000 D8;
-    /// `executor_longpoll.rs`): the attempt, when it asks, and what failed.
+    /// `longpoll.rs`): the attempt, when it asks, and what failed.
     retrying: Mutex<std::collections::HashMap<u64, (u32, std::time::Instant, String)>>,
     /// What upload streams hold in memory (LLP 1016.000 D10; `stream.rs`).
     uploads: stream::Uploads,
@@ -1304,22 +1304,22 @@ fn execute(
 // §8); elsewhere every request answers `Unsupported` and none of it links.
 #[cfg_attr(
     any(target_os = "macos", target_os = "linux"),
-    path = "executor_process.rs"
+    path = "process.rs"
 )]
 #[cfg_attr(
     not(any(target_os = "macos", target_os = "linux")),
-    path = "executor_process_off.rs"
+    path = "process_off.rs"
 )]
 mod process;
-#[path = "executor_stream.rs"]
+#[path = "stream.rs"]
 pub(crate) mod stream;
 
 #[cfg(test)]
-#[path = "executor_async_tests.rs"]
+#[path = "async_tests.rs"]
 mod async_tests;
-#[path = "executor_async.rs"]
+#[path = "async.rs"]
 mod asynch;
-#[path = "executor_outcome.rs"]
+#[path = "outcome.rs"]
 mod outcome;
 use asynch::{asynch_lanes, asynchronous, drained};
 use outcome::{
@@ -1327,36 +1327,36 @@ use outcome::{
     Quiet,
 };
 
-#[path = "executor_forget.rs"]
+#[path = "forget.rs"]
 mod forget;
-#[path = "executor_reach.rs"]
+#[path = "reach.rs"]
 mod reach;
 
-#[path = "executor_body.rs"]
+#[path = "body.rs"]
 mod body;
-#[path = "executor_body_to.rs"]
+#[path = "body_to.rs"]
 mod body_to;
 
-#[path = "executor_admission.rs"]
+#[path = "admission.rs"]
 mod admission;
-#[path = "executor_cache.rs"]
+#[path = "cache.rs"]
 mod cache;
-#[path = "executor_preload.rs"]
+#[path = "preload.rs"]
 #[allow(dead_code)] // Launch entry points are host-owned (LLP 1162.000 D4).
 pub(super) mod preload;
-#[path = "executor_reads.rs"]
+#[path = "reads.rs"]
 mod reads;
 
 #[cfg(test)]
-#[path = "executor_read_tests.rs"]
+#[path = "read_tests.rs"]
 mod read_tests;
 
 #[cfg(test)]
-#[path = "executor_idle_tests.rs"]
+#[path = "idle_tests.rs"]
 mod idle_tests;
 #[cfg(test)]
-#[path = "executor_scope_tests.rs"]
+#[path = "scope_tests.rs"]
 mod scope_tests;
 #[cfg(test)]
-#[path = "executor_tests.rs"]
+#[path = "tests.rs"]
 pub(super) mod tests;

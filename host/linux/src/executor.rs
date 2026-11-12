@@ -5,9 +5,9 @@ use exact_runner::{CompletionTiming, Outcome, RequestOut, Work};
 use std::io::{Read, Write};
 #[cfg(unix)]
 use std::os::unix::io::{AsRawFd, RawFd};
-#[path = "../../apple/src/executor_core.rs"]
+#[path = "../../executor/src/lib.rs"]
 mod core;
-#[path = "../../apple/src/executor_pump.rs"]
+#[path = "../../executor/src/pump.rs"]
 pub mod pump;
 /// Each test thread shares a worker budget among its presenters. The
 /// dev-dependency enables this for integration tests; production shares one process bound.

@@ -20,11 +20,11 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::sync::{mpsc, Arc, Condvar, Mutex};
 
-#[path = "executor_process_clock.rs"]
+#[path = "process_clock.rs"]
 pub(crate) mod clock;
-#[path = "executor_process_script.rs"]
+#[path = "process_script.rs"]
 mod script;
-#[path = "executor_process_supervise.rs"]
+#[path = "process_supervise.rs"]
 mod supervise;
 
 use clock::Clock;
@@ -1095,11 +1095,11 @@ impl exact_runner::WorkClock for Work {
 }
 
 // Only the desktops start programs (§8): iOS, tvOS and Android link none of it.
-#[path = "executor_process_groups.rs"]
+#[path = "process_groups.rs"]
 mod groups;
-#[path = "executor_process_real.rs"]
+#[path = "process_real.rs"]
 mod real;
 
 #[cfg(test)]
-#[path = "executor_process_tests.rs"]
+#[path = "process_tests.rs"]
 mod tests;

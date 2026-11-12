@@ -1260,7 +1260,7 @@ fn an_uploads_file_is_read_once_it_has_room() {
     );
 }
 
-#[path = "executor_upload_burst_tests.rs"]
+#[path = "upload_burst_tests.rs"]
 mod upload_burst;
 
 /// LLP 1016.000 D10: an upload waiting in the queue holds no count or

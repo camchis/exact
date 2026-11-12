@@ -629,5 +629,5 @@ mod tests {
 }
 
 #[cfg(test)]
-#[path = "executor_longpoll_tests.rs"]
+#[path = "longpoll_tests.rs"]
 mod loop_tests;

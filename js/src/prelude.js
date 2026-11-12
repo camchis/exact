@@ -1352,7 +1352,7 @@
     else if (o.failed) event = { type: "error", data: "", lastEventId: "", coalesced: 0, kind: o.failed.kind, message: o.failed.message, status: 0 };
     else event = { type: "error", data: o.response.body, lastEventId: "", coalesced: 0, kind: "Response", message: "HTTP " + o.response.status, status: o.response.status };
     // The socket's state as of this event (D7): `open` opens it, an end closes it. A listener's stream ends as its `error`.
-    // `AddressInUse` travels as `Refused`, its message so prefixed (executor_listen.rs).
+    // `AddressInUse` travels as `Refused`, its message so prefixed (host/executor/src/listen.rs).
     if (socket && !o.message && socket.close) { var f = o.failed || { kind: "Network", message: event.message }, inUse = /^AddressInUse: /.test(f.message); socket.close(); event = { type: "error", kind: inUse ? "AddressInUse" : f.kind, message: inUse ? f.message.slice(14) : f.message }; }
     // A child's owner reads its own events (js/src/process.js).
     if (socket && socket.event) event = socket.event(o, event);

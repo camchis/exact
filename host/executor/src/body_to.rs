@@ -13,7 +13,7 @@
 //! header.
 //!
 //! Memory and the lane: the request is charged what it can hold, a reply that
-//! is not 2xx (`executor_core.rs` `reservation`), never the bound on what it
+//! is not 2xx (`lib.rs` `reservation`), never the bound on what it
 //! writes, so a large download neither waits for the lane's whole budget nor
 //! is refused for it. An independent reply read into memory, written to no
 //! file, goes into one buffer of its ceiling, allocated before the first
