@@ -423,6 +423,14 @@ export const DRAG_BOUNDS = { press: 10000, hold: 10000, over: 2000, total: 10000
  * real time and whether the finger is still down. `ask` is the app's carrier; `touches`
  * the runner's.
  */
+/** Whether a drag may reach viewport point `p` by the aim `a`: in its viewport, or over the software keyboard while it
+ *  shows (`a.keyboard`, LLP 1080.000 §11: a person's drag to dismiss it ends there). */
+export function reaches(a, [x, y]) {
+  const within = ([bx, by, bw, bh]) => x >= bx && y >= by && x <= bx + bw && y <= by + bh;
+  return within([0, 0, ...a.viewport]) || (Array.isArray(a.keyboard) && within(a.keyboard));
+}
+const outside = (a) => `outside the viewport (${a.viewport[0]} × ${a.viewport[1]})${Array.isArray(a.keyboard) ? ' and the software keyboard' : ' and no software keyboard shows'}`;
+
 // What a lost touch's error advises: the synthesizer, unlike XCTest's public calls, does not wait for the app to go idle
 const SETTLE_FIRST = 'a real touch played while native work still moves (a push, a sheet, the keyboard) can be lost, so `clock settle` first';
 
@@ -452,9 +460,9 @@ export async function realTap({ ask, touches, id, at, rel, drag, abandon }) {
   // `screen`: where XCTest's synthesizer presses a tap, on the display whose size is `display` (touches.swift).
   let request = { op: 'tap', point: a.point, ...(a.fixed ? { screen: a.fixed, display: a.display } : {}) }, moves = false, ms = 0;
   if (drag) {
-    // The end, from the start the host resolved just now, in the viewport it reported with it.
-    const end = [a.at[0] + drag.dx, a.at[1] + drag.dy], [vw, vh] = a.viewport;
-    if (!(end[0] >= 0 && end[1] >= 0 && end[0] <= vw && end[1] <= vh)) throw new Error(`${what}: the drag would end at (${end}), outside the viewport (${vw} × ${vh})`);
+    // The end, from the start the host resolved just now, in the viewport or over the keyboard it reported with it.
+    const end = [a.at[0] + drag.dx, a.at[1] + drag.dy];
+    if (!reaches(a, end)) throw new Error(`${what}: the drag would end at (${end}), ${outside(a)}`);
     moves = drag.dx !== 0 || drag.dy !== 0;
     ms = drag.press + drag.hold + (moves ? drag.over : 0);
     // Points per second: what XCTest's velocity measured as on a 3x simulator, whatever its header says (§11).
@@ -474,7 +482,7 @@ export async function realTap({ ask, touches, id, at, rel, drag, abandon }) {
       offset += leg.press + (leg.dx || leg.dy ? leg.over : 0);
       x += leg.dx; y += leg.dy;
       const point = [a.at[0] + x, a.at[1] + y];
-      if (point.some((v, i) => v < 0 || v > a.viewport[i])) throw new Error(`${what}: path waypoint (${point}) is outside the viewport`);
+      if (!reaches(a, point)) throw new Error(`${what}: path waypoint (${point}) is ${outside(a)}`);
       checkpoints.push({ offset, end: offset + leg.hold, ops: leg.during, tick: leg.tick });
       offset += leg.hold;
       return { to: [a.fixed[0] + x * rx + y * ux, a.fixed[1] + x * ry + y * uy], over: (leg.dx || leg.dy ? leg.over : 0) / 1000, hold: leg.hold / 1000 };
