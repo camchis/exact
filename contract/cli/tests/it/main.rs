@@ -82,6 +82,7 @@ mod grouped_margins;
 mod grouped_page;
 mod grouped_section_layout;
 mod grouped_separators;
+mod grouped_styled_rows;
 mod grouped_title;
 mod headings;
 mod health;

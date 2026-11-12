@@ -15,6 +15,36 @@ use crate::id::ViewId;
 use crate::kernel::{Kernel, NodeRef};
 use crate::style::{ColorValue, Env};
 
+/// What a standard cell can't draw of a row's box: a height (UIKit keeps a
+/// `min-height` of the row's), a ground and its corners. A row that writes one
+/// is its own views, as one with an authored edge is (LLP 1084 D7).
+const ROW_BOX: [StyleId; 6] = [
+    StyleId::Height,
+    StyleId::BackgroundColor,
+    StyleId::BorderRadiusTopLeft,
+    StyleId::BorderRadiusTopRight,
+    StyleId::BorderRadiusBottomLeft,
+    StyleId::BorderRadiusBottomRight,
+];
+
+/// The same of a row's one column, with its minimum height and where it
+/// places its lines: a subtitle cell's lines are the platform's.
+const STACK_BOX: [StyleId; 9] = [
+    StyleId::Height,
+    StyleId::MinHeight,
+    StyleId::BackgroundColor,
+    StyleId::BorderRadiusTopLeft,
+    StyleId::BorderRadiusTopRight,
+    StyleId::BorderRadiusBottomLeft,
+    StyleId::BorderRadiusBottomRight,
+    StyleId::AlignItems,
+    StyleId::JustifyContent,
+];
+
+fn writes_any(node: &NodeRef<'_>, ids: &[StyleId]) -> bool {
+    ids.iter().any(|&id| node.style.written.has(id))
+}
+
 mod separator;
 pub use separator::GroupedSeparator;
 
@@ -382,7 +412,9 @@ impl Kernel {
                 FlexDirection::Column | FlexDirection::ColumnReverse
             )
         {
-            if (1..=2).contains(&parts.len()) && parts.iter().all(|p| p.node_type == NodeType::Text)
+            if (1..=2).contains(&parts.len())
+                && parts.iter().all(|p| p.node_type == NodeType::Text)
+                && !writes_any(row, &ROW_BOX)
             {
                 out.texts(&parts[0], parts.get(1), true);
             }
@@ -463,8 +495,13 @@ impl Kernel {
                     && stack.style.flex_direction == FlexDirection::Column =>
             {
                 let lines = shown(stack);
+                // A column whose author gave its box a size, a ground, a
+                // corner or an alignment is a layout of its own, not the
+                // subtitle cell's lines: a content configuration draws none
+                // of them.
                 if lines.iter().all(|l| l.node_type == NodeType::Text)
                     && (1..=2).contains(&lines.len())
+                    && !writes_any(stack, &STACK_BOX)
                 {
                     out.texts(&lines[0], lines.get(1), true);
                 } else {
@@ -489,6 +526,7 @@ impl Kernel {
             ]
             .iter()
             .any(|&(width, line)| w.has(width) || w.has(line))
+            || writes_any(row, &ROW_BOX)
         {
             out.custom = true;
         }
