@@ -676,7 +676,9 @@ impl<D: DataSource> Presenter<D> {
             });
             return Ok(true);
         }
-        let pressed = self.handler_target(view, EventKind::Press);
+        // A link with no `press` shows its press too (LLP 1121 D8, as amended),
+        // and is followed by the lift's hit as before.
+        let pressed = self.press_target(view);
         // `-exact-press-haptic` plays at the press, the host's own as the
         // scale and paint below are (LLP 1077 D14; LLP 1061 D7).
         if let Some(id) = pressed {
@@ -687,11 +689,13 @@ impl<D: DataSource> Presenter<D> {
             let (key, origin) = (node.key, node.style.transform_origin.clone());
             self.box_of(id).map(|b| (key, b.unpressed(origin)))
         });
+        // A pressed box that shows its press activates where the lift is in
+        // it; a link with no `press` is followed by the lift's hit instead.
         let press_activates = feedback.is_some_and(|(key, _)| {
-            self.host
-                .kernel()
-                .node_by_key(key)
-                .is_some_and(|node| crate::host::press::shows(&node))
+            self.host.kernel().node_by_key(key).is_some_and(|node| {
+                crate::host::press::shows(&node)
+                    && (self.host.runner().handlers_of(node.id)).contains(&EventKind::Press)
+            })
         });
         if let Some((key, _)) = feedback {
             self.host.press_feedback(key, true, now_ms);

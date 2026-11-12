@@ -5291,7 +5291,8 @@ component App
 `aria-pressed` true) are the runner's: they take `background-color`, `color`,
 `border-color`, `opacity`, `box-shadow` and `-exact-tint-color`, `:checked`
 under `:disabled`, and `:disabled` is your own disabled look (no default dim).
-`:active` is the host's own press of the innermost node with a `press`: it takes
+`:active` is the host's own press of the innermost node with a `press` or a link's
+`href` (`link href=`, `button href=`, as CSS's `a:active`): it takes
 `background-color`, `color`, `opacity` and `-exact-press-scale`, which become the
 node's pressed paint (LLP 1061 D7). Custom nodes ease on the press curve (under
 Reduce Motion too) and replace the host's unsaid press. Native controls keep
