@@ -502,7 +502,7 @@ export function signingOrder(bundle, compat = null, identity = null) {
 
 /** The Mach-O file type of a thin file, or of a universal file's first
  *  architecture (`mach-o/loader.h`: 2 is `MH_EXECUTE`, 6 `MH_DYLIB`). */
-function machOType(path) {
+export function machOType(path) {
   const read = (at, n) => { const b = Buffer.alloc(n), fd = openSync(path, 'r'); try { return readSync(fd, b, 0, n, at) === n ? b : null; } finally { closeSync(fd); } };
   let head = read(0, 16);
   if (!head) return null;
