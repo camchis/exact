@@ -25,6 +25,12 @@ pub fn rust_entry(
         }
         _ => String::new(),
     };
+    // A data source that names no app id takes the manifest's, so a native
+    // host gives it the app's storage roots (`Swappable::named`).
+    let named = inputs["app"]
+        .as_str()
+        .map(|app| format!(".named({app:?})"))
+        .unwrap_or_default();
     let mut supplemental = if let Some(directory) = std::env::var_os("EXACT_RUST_BUNDLE") {
         let receipt: serde_json::Value = serde_json::from_slice(
             &std::fs::read(std::path::Path::new(&directory).join("app.module.json"))
@@ -44,9 +50,9 @@ pub fn rust_entry(
         ) {
             return Err("invalid supplemental Rust module filename".into());
         }
-        format!("{{ use exact_logic::exact_runner::DataSource; exact_logic::Swappable::{mode}({constructor}){native}.replacement(include_bytes!(concat!(env!(\"OUT_DIR\"), \"/app.plan\")), include_str!(concat!(env!(\"OUT_DIR\"), \"/rust/app.module.json\")), include_bytes!(concat!(env!(\"OUT_DIR\"), \"/rust/{file}\")).to_vec()).expect(\"validated baked Rust pair\") }}")
+        format!("{{ use exact_logic::exact_runner::DataSource; exact_logic::Swappable::{mode}({constructor}){native}{named}.replacement(include_bytes!(concat!(env!(\"OUT_DIR\"), \"/app.plan\")), include_str!(concat!(env!(\"OUT_DIR\"), \"/rust/app.module.json\")), include_bytes!(concat!(env!(\"OUT_DIR\"), \"/rust/{file}\")).to_vec()).expect(\"validated baked Rust pair\") }}")
     } else {
-        format!("exact_logic::Swappable::{mode}({constructor}){native}")
+        format!("exact_logic::Swappable::{mode}({constructor}){native}{named}")
     };
     let has_preloads = inputs["preload"]
         .as_array()
@@ -396,6 +402,18 @@ mod tests {
         assert!(super::rust_entry("Data", "data()", "off", &inputs)
             .unwrap()
             .contains("ibex2_sqlite::link();"));
+    }
+
+    /// The entry gives a data source the manifest's app id, which a source
+    /// that names none takes (`Swappable::named`), in every native mode.
+    #[test]
+    fn an_entry_names_the_manifests_app() {
+        let inputs = serde_json::json!({"app": "com.example.notes", "linked": []});
+        for mode in ["off", "native", "tiered", "wasm"] {
+            let entry = super::rust_entry("Data", "data()", mode, &inputs).unwrap();
+            let named = format!("Swappable::{mode}(data()).named(\"com.example.notes\")");
+            assert!(entry.contains(&named), "{entry}");
+        }
     }
 
     /// LLP 1047.001 D3: the entry names its set and invokes the export
