@@ -325,6 +325,37 @@ class ScrollTouchTest {
         assertEquals(emptyList<String>(), Host.told)
     }
 
+    // What a drag does to the keyboard: its scroller's `keyboardDismissMode` (bits 6 and 7 of its flags).
+
+    private fun focusedField(): android.widget.EditText {
+        field(keeps = false)
+        view.isFocusableInTouchMode = true
+        val text = view.fields!!.text(1)!!
+        assertTrue(text.requestFocus())
+        return text
+    }
+
+    private fun dragWith(dismiss: Int) {
+        down(600f); answer(reply(scroller(1, 0f).also { it[1] = 2 or (dismiss shl 6) }))
+        move(580f); move(540f)
+    }
+
+    @Test fun onDragPutsTheKeyboardAwayAsTheDragStarts() {
+        val text = focusedField()
+        dragWith(Dismissal.ON_DRAG)
+        assertFalse("the field let go of the focus, as the person's own blur", text.isFocused)
+    }
+
+    @Test fun unsaidOrNoneOrInteractiveLeavesTheFieldFocusedAtTheStart() {
+        for (dismiss in listOf(0, Dismissal.INTERACTIVE)) {
+            setUp()
+            val text = focusedField()
+            dragWith(dismiss)
+            up(540f)
+            assertTrue("dismiss $dismiss", text.isFocused)
+        }
+    }
+
     private fun ExactView.scrolling(): Scrolling =
         ExactView::class.java.getDeclaredField("scrolling").apply { isAccessible = true }.get(this) as Scrolling
 

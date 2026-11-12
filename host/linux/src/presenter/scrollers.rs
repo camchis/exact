@@ -100,6 +100,10 @@ const X: i32 = 1;
 const Y: i32 = 2;
 const NODE: i32 = 4;
 const BARLESS: i32 = 8;
+/// Bits 6 and 7: what a drag of it does to the keyboard, its authored
+/// `keyboardDismissMode`; unsaid, Android's: nothing (LLP 1115.001 D12).
+const DISMISS_ON_DRAG: i32 = 64;
+const DISMISS_INTERACTIVE: i32 = 128;
 
 fn scrolls(o: Overflow) -> bool {
     matches!(o, Overflow::Scroll | Overflow::Auto)
@@ -486,7 +490,9 @@ impl<D: DataSource> Presenter<D> {
     /// hosted text field the touch is for (0: none; LLP 1115.001 D8), and
     /// eleven words a scroller: id, flags (bit 0 it takes a sideways drag
     /// from here, bit 1 one up or down, bit 2 it has rows the reader can
-    /// move, bit 3 no scrollbar), revision, then as float bits its offset
+    /// move, bit 3 no scrollbar, bit 4 it hears `refresh`, bit 5 its
+    /// `refreshing` is true, bit 6 a drag of it puts the keyboard away and
+    /// bit 7 the keyboard follows that drag), revision, then as float bits its offset
     /// (x, y), its farthest offset (x, y) and its port (x, y, width, height). The reader is told
     /// of each from now on ([`Presenter::reader_scrollers`]).
     pub fn reader_under(&mut self, x: f32, y: f32, scale: f32) -> Vec<i32> {
@@ -553,13 +559,24 @@ impl<D: DataSource> Presenter<D> {
         } else {
             Some(s.id)
         };
-        let barless = id
-            .and_then(|id| self.host.kernel().node(id))
+        let node = id.and_then(|id| self.host.kernel().node(id));
+        let barless = node
+            .as_ref()
             .is_some_and(|n| n.style.scrollbar_width == exact_kernel::ScrollbarWidth::None);
+        let dismiss = match node
+            .as_ref()
+            .filter(|_| s.id != PAGE)
+            .and_then(|n| n.props.str(exact_kernel::PropId::KeyboardDismissMode))
+        {
+            Some("on-drag") => DISMISS_ON_DRAG,
+            Some("interactive") => DISMISS_INTERACTIVE,
+            _ => 0,
+        };
         (if s.axes.0 { X } else { 0 })
             | (if s.axes.1 { Y } else { 0 })
             | (if s.node { NODE } else { 0 })
             | (if barless { BARLESS } else { 0 })
+            | dismiss
     }
 }
 

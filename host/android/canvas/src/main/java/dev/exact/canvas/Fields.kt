@@ -627,6 +627,14 @@ internal class Fields(context: Context) : FrameLayout(context) {
 
     private fun hide() { imm.hideSoftInputFromWindow(windowToken, 0) }
 
+    /** A drag put the keyboard away ([Dismissal]): the field that holds the focus lets go of it, which exact2 hears
+     * as the person's, and the keyboard goes. */
+    fun dismiss() {
+        val f = focused
+        if (f != null && view?.requestFocus() != true) f.text.clearFocus()
+        hide()
+    }
+
     /** A surface of the top layer is over the page ([on]), or no longer ([Surfaces], LLP 1115.001 D10). Under one
      * the page is inert, so no field can take the focus, whatever would hand it one: a hardware key ends touch mode,
      * and the platform then focuses the window's first focusable view, which is a field (seen on a Pixel: Tab in an

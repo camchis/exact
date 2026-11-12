@@ -43,7 +43,8 @@ import kotlin.math.sign
 internal class Scrolling(private val view: ExactView) {
     /** One scroller as exact2 told it, in the view's pixels. */
     class Scroller(val id: Int) {
-        /** Bit 0: it scrolls sideways; bit 1: up and down; bit 2: its rows are a node the reader moves; bit 3: no indicator. */
+        /** Bit 0: it scrolls sideways; bit 1: up and down; bit 2: its rows are a node the reader moves; bit 3: no indicator;
+         * bits 6 and 7: what a drag of it does to the keyboard ([dismiss]). */
         var flags = 0
             set(value) {
                 field = value
@@ -77,6 +78,8 @@ internal class Scrolling(private val view: ExactView) {
         var snapList = false
         val barless get() = flags and 8 != 0
         val node get() = flags and 4 != 0
+        /** Its `keyboardDismissMode`: 0 nothing, [Dismissal.ON_DRAG] or [Dismissal.INTERACTIVE]. */
+        val dismiss get() = (flags shr 6) and 3
         fun at(sideways: Boolean) = if (sideways) nowX + pendX else nowY + pendY
         fun end(sideways: Boolean) = if (sideways) maxX else maxY
     }
@@ -95,6 +98,7 @@ internal class Scrolling(private val view: ExactView) {
     private val frames = Choreographer.getInstance()
     /** Its settle onto a snap position ([OverScroller.startScroll]) eases out as ViewPager's does. */
     private val fling = OverScroller(view.context) { t -> val u = t - 1f; u * u * u * u * u + 1f }
+    private val dismissal = Dismissal(view)
     private var tracker: VelocityTracker? = null
 
     /** The touch that is down: counted, so an answer for one that ended is not taken for the next. */
@@ -177,6 +181,7 @@ internal class Scrolling(private val view: ExactView) {
                 val d = if (sideways) lastX - x else lastY - y
                 lastX = x; lastY = y
                 if (d != 0f) drag(d, x, y)
+                dismissal.moved(y)
                 return true
             }
             MotionEvent.ACTION_POINTER_DOWN -> {
@@ -242,6 +247,7 @@ internal class Scrolling(private val view: ExactView) {
      */
     fun stopped() {
         if (mode == DRAGGING) lifted(0f, false)
+        dismissal.lifted(0f)
         forget()
         tracker?.recycle(); tracker = null
         released()
@@ -265,7 +271,7 @@ internal class Scrolling(private val view: ExactView) {
             val s = scrollers.getOrPut(w[i]) { Scroller(w[i]) }
             if (!s.told) { s.rev = w[i + 2]; s.nowX = f(w[i + 3]); s.nowY = f(w[i + 4]); s.maxX = f(w[i + 5]); s.maxY = f(w[i + 6]) }
             // A queued hit reply can predate the latest statement: its policy is only a fallback.
-            val policy = (if (s.told) s.flags else w[i + 1]) and 8
+            val policy = (if (s.told) s.flags else w[i + 1]) and SAID
             s.flags = (s.flags and 3) or (w[i + 1] and 4) or policy
             s.port.set(f(w[i + 7]), f(w[i + 8]), f(w[i + 7]) + f(w[i + 9]), f(w[i + 8]) + f(w[i + 10]))
             links.add(Link(s, w[i + 1] and 1 != 0, w[i + 1] and 2 != 0))
@@ -432,6 +438,7 @@ internal class Scrolling(private val view: ExactView) {
             t.computeCurrentVelocity(1000, maxFling.toFloat())
             v = -(if (sideways) t.getXVelocity(pointer) else t.getYVelocity(pointer))
         }
+        dismissal.lifted(if (sideways) 0f else -v)
         val edged = edged()
         val stretched = edged != null && STRETCH && edged.edges.any { it != null && it.distance != 0f }
         if (edged != null) { for (e in edged.edges) e?.onRelease(); if (stretched) stretching() }
@@ -542,6 +549,8 @@ internal class Scrolling(private val view: ExactView) {
         val s = active.firstOrNull() ?: return
         held = s
         tell { Native.scrollDrag(s.id, false, 0f, 0f, false, 0f, 0f, false) }
+        // The keyboard follows only a drag up and down.
+        dismissal.began(if (sideways && s.dismiss == Dismissal.INTERACTIVE) 0 else s.dismiss)
     }
 
     /** The finger let go of the drag at [v] px/s along its axis, positive as the offset grows (`VelocityTracker`'s,
@@ -744,6 +753,8 @@ internal class Scrolling(private val view: ExactView) {
     private fun f(bits: Int) = java.lang.Float.intBitsToFloat(bits)
 
     private companion object {
+        /** The bits of a scroller's flags its statement is the authority on, and a hit answer only before one. */
+        const val SAID = 8 or 192
         const val IDLE = 0
         /** A touch is down and exact2 has it; whether it becomes a scroll is not known yet. */
         const val WATCHING = 1

@@ -362,6 +362,15 @@ Each move goes to the innermost; what it cannot take, because it is at its end, 
 to the page. A fling hands off the same way, frame by frame. An `overscroll-behavior` other than `auto` ends the
 chain at its scroller. What no scroller can take stretches the edge of the innermost one that has a node.
 
+**The keyboard** (`Dismissal.kt`, LLP 1115.001 D12). A drag does to the software keyboard what the innermost scroller
+it moves says in `keyboardDismissMode` (bits 6 and 7 of its flags). Unsaid, nothing, as the platform's lists leave the
+keyboard up. `on-drag`: as the drag starts, the focused field lets go of the focus (the app hears a blur) and the
+keyboard goes. `interactive`, up and down: once the finger reaches the keyboard, the keyboard follows it, moved by
+the platform's control of the IME's inset animation (`controlWindowInsetsAnimation`, Android 11 and later); at the
+lift it goes, and the field lets go of the focus, when the finger was moving down or had pulled it more than half
+away, and comes back otherwise. The page is laid out for where the keyboard ends, not each step of the follow. Before
+Android 11 the finger reaching the keyboard puts it away.
+
 **The ends and the indicator.** The stretch is `EdgeEffect`'s own: it stretches the `RenderNode` it is drawn into, so
 while an edge is stretched the scroller's rows are drawn through a node the size of its box (`Scrolling.record`).
 `scrollbar-width="none"` suppresses the indicator, including after a live style change. The page follows the root's setting.
@@ -390,7 +399,7 @@ Not built of D7:
   a scroller nested in a list's row, and the page itself are drawn inside their surroundings, so they move when
   exact2's paint arrives; the frame waits up to 2 ms for it, as it does for a drag's moves. They have no stretch at
   their ends either. Giving each a node needs the recorder to open a group inside a row's recording.
-- `keyboardDismissMode`, pull-to-refresh and a sheet's part in the hand-off are later stages. A hosted `EditText`
+- Pull-to-refresh and a sheet's part in the hand-off are later stages. A hosted `EditText`
   takes part as a child of a ScrollView does (below).
 - A mouse's wheel and a trackpad do not scroll (`onGenericMotionEvent`), and nothing scrolls for TalkBack.
 - A pressable under the finger shows its press at the down, not after the platform's tap delay, so a row may flash
