@@ -465,6 +465,27 @@ class ScrollTouchTest {
         }
     }
 
+    @Test fun aPullTakenAllTheWayBackScrollsAndFlingsAsAnyDrag() {
+        down(300f); answer(reply(refreshable()))
+        move(320f); move(400f)
+        move(250f); move(150f); move(50f); up(50f)
+        assertTrue(thread.moved[1]!! > 0f)
+        assertTrue("it flings", view.scrolling().timerActive)
+        assertFalse(Host.told.contains("refresh 1"))
+    }
+
+    @Test fun aRefreshingListThatGoesStopsItsIndicator() {
+        down(300f); answer(reply(refreshable()))
+        move(320f); move(400f); move(500f); up(500f)
+        statement(refreshing = true)
+        val r = pull()!!
+        assertTrue(r.turning)
+        // The app takes the list away while it refreshes: the statement no longer has it.
+        view.scrolling().told(intArrayOf(2, 2, 0, 0, 0, 0, 0, 0, 500f.toBits()))
+        assertNull(pull())
+        assertFalse("its animator does not run on, holding the view", r.turning)
+    }
+
     private fun ExactView.scrolling(): Scrolling =
         ExactView::class.java.getDeclaredField("scrolling").apply { isAccessible = true }.get(this) as Scrolling
 

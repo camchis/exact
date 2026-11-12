@@ -39,6 +39,8 @@ internal class Refresh(context: Context) : FrameLayout(context) {
     /** The arc turns: the app is refreshing. */
     var spinning = false
         private set
+    /** Its arc's animator runs. */
+    val turning get() = disc.turns
     /** It is going back up ([hide]). */
     var leaving = false
         private set
@@ -116,6 +118,13 @@ internal class Refresh(context: Context) : FrameLayout(context) {
         disc.invalidate()
     }
 
+    /** Taken away (its list went, or its window): nothing of it goes on moving, or holds it. */
+    override fun onDetachedFromWindow() {
+        settle?.cancel(); settle = null
+        disc.still()
+        super.onDetachedFromWindow()
+    }
+
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
         super.onLayout(changed, left, top, right, bottom)
         place()
@@ -148,6 +157,9 @@ internal class Refresh(context: Context) : FrameLayout(context) {
         }
 
         fun still() { turning?.cancel(); turning = null; turned = 0L }
+
+        /** Whether the arc turns now: [spin]'s animator runs. */
+        val turns get() = turning != null
 
         override fun onDraw(canvas: Canvas) {
             val c = width / 2f

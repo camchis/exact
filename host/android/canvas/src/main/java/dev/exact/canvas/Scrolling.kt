@@ -308,6 +308,8 @@ internal class Scrolling(private val view: ExactView) {
      * so neither does a lift that came before it: nothing scrolls or flings in a window that is not shown.
      */
     fun stopped() {
+        // A pull to refresh goes, and stops turning ([Refresh.onDetachedFromWindow]).
+        for (s in scrollers.values) s.pull?.let { (it.parent as? ViewGroup)?.removeView(it); s.pull = null }
         for (o in owing) for (e in o.events) e.recycle()
         owing.clear()
         if (mode == DRAGGING) lifted(0f, false)
@@ -402,7 +404,12 @@ internal class Scrolling(private val view: ExactView) {
     private fun drag(delta: Float, x: Float, y: Float) {
         var d = delta
         // A pull to refresh, and a stretched edge, take the finger's way back before anything scrolls.
-        pulling?.let { s -> if (d > 0f) { val back = minOf(d, pulled); pulled -= back; d -= back; s.pull?.pull(pulled) } }
+        pulling?.let { s ->
+            if (d <= 0f) return@let
+            val back = minOf(d, pulled); pulled -= back; d -= back; s.pull?.pull(pulled)
+            // Taken all the way back and on: the pull is over, and the drag scrolls, and flings, as any other.
+            if (pulled <= 0f && d > 0f) { pulling = null; unpull(s) }
+        }
         val edged = edged()
         if (edged != null) d -= relax(edged, d, x, y)
         mover = null

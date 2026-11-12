@@ -268,6 +268,31 @@ fn a_pull_sends_refresh_and_the_reader_is_told_refreshing() {
 }
 
 #[test]
+fn a_short_or_empty_list_that_refreshes_still_takes_a_pull() {
+    for content in ["box width=400 height=100", "column"] {
+        let source = REFRESH.replace("box width=400 height=1000", content);
+        for tag in ["scroll", "list"] {
+            let mut p =
+                boot(&source.replace("      scroll testId", &format!("      {tag} testId")));
+            let list = id(&p, "list");
+            assert_eq!(
+                flags(&mut p, list) & 18,
+                18,
+                "{tag} of {content}: up and down, and refreshes"
+            );
+            // One that does not refresh has nothing to scroll, and is no scroller under the finger.
+            let mut p = boot(
+                &source
+                    .replace("      scroll testId", &format!("      {tag} testId"))
+                    .replace(" refresh=reload", ""),
+            );
+            let words = p.reader_under(200., 100., 1.);
+            assert_eq!(words[1], 0, "{tag} of {content}");
+        }
+    }
+}
+
+#[test]
 fn a_scroller_that_hears_no_refresh_is_never_pulled() {
     let mut p = boot(&REFRESH.replace(" refresh=reload", ""));
     let list = id(&p, "list");

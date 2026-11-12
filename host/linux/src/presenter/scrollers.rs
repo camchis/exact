@@ -149,16 +149,7 @@ impl<D: DataSource> Presenter<D> {
         if id == PAGE {
             return Some(self.page_scroller());
         }
-        let kernel = self.host.kernel();
-        let node = kernel.node(id)?;
-        let bounds = self.display.bounds(kernel, id).unwrap_or_else(|| {
-            self.brush.scroll_bounds(
-                kernel,
-                self.host.content_region(),
-                &node,
-                limits.get(&id).copied(),
-            )
-        });
+        let bounds = self.scroll_bounds_of(id, limits)?;
         let (ox, oy) = bounds.axes;
         if !scrolls(ox) && !scrolls(oy) {
             return None;
@@ -177,6 +168,38 @@ impl<D: DataSource> Presenter<D> {
             port: [0.0; 4],
             node: self.brush.row_groups().iter().any(|g| g.0 == id),
         })
+    }
+
+    /// How far node `id` scrolls and on which axes, as painted or laid out.
+    fn scroll_bounds_of(
+        &self,
+        id: ViewId,
+        limits: &BTreeMap<ViewId, f32>,
+    ) -> Option<crate::paint::ScrollBounds> {
+        let kernel = self.host.kernel();
+        let node = kernel.node(id)?;
+        Some(self.display.bounds(kernel, id).unwrap_or_else(|| {
+            self.brush.scroll_bounds(
+                kernel,
+                self.host.content_region(),
+                &node,
+                limits.get(&id).copied(),
+            )
+        }))
+    }
+
+    /// Whether scroller `id` hears `refresh` and scrolls up and down by its
+    /// overflow, whether or not it has anywhere to go: a pull takes it, short
+    /// or empty, as UIKit's scroll view with a refresh control always bounces
+    /// vertically.
+    fn pulls_to_refresh(&self, id: ViewId, limits: &BTreeMap<ViewId, f32>) -> bool {
+        self.host
+            .runner()
+            .handlers_of(id)
+            .contains(&EventKind::Refresh)
+            && self
+                .scroll_bounds_of(id, limits)
+                .is_some_and(|b| scrolls(b.axes.1))
     }
 
     /// The scrollers under a point of the viewport, innermost first, and
@@ -206,6 +229,7 @@ impl<D: DataSource> Presenter<D> {
                     .flatten()
             });
             if let Some(mut s) = self.scroller(id, &limits) {
+                s.axes.1 |= self.pulls_to_refresh(id, &limits);
                 s.axes = (s.axes.0 && open.0, s.axes.1 && open.1);
                 open = (open.0 && !cut.0, open.1 && !cut.1);
                 if s.axes.0 || s.axes.1 {

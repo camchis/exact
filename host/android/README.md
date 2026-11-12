@@ -366,10 +366,12 @@ to the page. A fling hands off the same way, frame by frame. An `overscroll-beha
 chain at its scroller. What no scroller can take stretches the edge of the innermost one that has a node.
 
 **Pull to refresh** (`Refresh.kt`, LLP 1115.001 D12). A scroller with a `refresh` handler is Material 3's pull to
-refresh, Compose's `PullToRefreshBox` with its default indicator: a downward drag at the top that no scroller of the
-drag takes pulls, instead of stretching the edge, a 40 dp disc (`surfaceContainerHigh`, elevation 3 dp) down from the
-scroller's top at half the finger's way, with tension past the 80 dp threshold, and its arc and arrow
-(`onSurfaceVariant`) grow with the pull. The list stays where it is. The finger's way back takes the pull back first.
+refresh, Compose's `PullToRefreshBox` with its default indicator, short or empty too (exact2 gives it to the reader as
+scrolling up and down whatever its range, as UIKit's scroll view with a refresh control always bounces): a downward
+drag at the top that no scroller of the drag takes pulls, instead of stretching the edge, a 40 dp disc
+(`surfaceContainerHigh`, elevation 3 dp) down from the scroller's top at half the finger's way, with tension past the
+80 dp threshold, and its arc and arrow (`onSurfaceVariant`) grow with the pull. The list stays where it is. The
+finger's way back takes the pull back first, and on past it the drag scrolls and flings as any other.
 Let go past the threshold, the reader sends `refresh` (`Native.refresh`, `Presenter::reader_refresh`) and the disc
 settles at the threshold and turns as Material's indeterminate indicator does while the app's `refreshing` is true
 (the statement's bit 5); it goes back up when `refreshing` ends, or 350 ms after the release when the app never set
