@@ -2068,20 +2068,6 @@ price: answers arrive `Later`, outside the action's transaction (LLP 1027.002 D1
   and its assets with it, only when `app.ts` imports it: import its driver even if the app
   uses nothing from it yet. (LLP 1154, 2026-10-31.)
 
-- **An edit to a `file:` package inside the app does not reach the app.** Bun (1.4.2) copies
-  a `file:` package whose path is inside the app's directory (`file:./packages/p`) into
-  `node_modules`, each file keeping its modification time, and every build reads it there:
-  an edit or an added file is not in the copy, and a removed file is still in it, until the
-  next `bun install`, which copies the package again and drops removed files. A `file:`
-  package outside the app's directory, as `exact add` writes for a standard package, is
-  installed as links to each file: an edit reaches the build at once. A file the build opens
-  under `node_modules` (an `exact.json`, a shim, a Swift or Kotlin source it names) is not
-  there when added, and is a broken link when removed, until `bun install`; a file reached
-  from one already opened (a Rust module beside the root, a Contract file a `use` names) is
-  the source's own. `ls -l node_modules/<package>/<file>` shows which you have: `->` is a
-  link, anything else a copy. After changing a copied package, run `bun install` in the app.
-  (#115, 2026-11-11.)
-
 ## Games
 
 - **`exact new --game` refuses `--name` and `--bundle-id`.** Those flags name an app.

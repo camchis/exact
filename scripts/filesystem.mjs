@@ -412,15 +412,11 @@ export function removePrivateTree(path) {
 
 if (import.meta.main && process.argv[2] === '--helper') process.stdout.write(filesystemHelper());
 
-/** This checkout's node_modules, installed from its lock when it has none (a new worktree's) or when an
- * install of ours did not finish. The install is complete when node_modules has no `.exact-install` in it:
- * the directory appears with that marker already inside (made aside, then renamed into place), and only a
- * successful `bun install` removes it, so one killed partway leaves it and is installed again, while one made
- * by hand (`bun install`, deploy's capture) has none. One process installs at a time, holding a lock file of
- * its pid and a token; the others wait. A lock whose process is gone, or older than any install, is taken
- * over by renaming exactly what was read aside, never by deleting a path read earlier. */
-export function installedModules(modules = resolve(root, 'node_modules'), lock = resolve(tmpdir(), `exact-install-${createHash('sha256').update(root).digest('hex').slice(0, 16)}.lock`)) {
-  const marker = resolve(modules, '.exact-install'), mine = `${process.pid} ${randomBytes(8).toString('hex')}`;
+/** `body`'s result, run while holding the install lock `lock`: one process installs into a `node_modules` at a time,
+ * holding a lock file of its pid and a token; the others wait. A lock whose process is gone, or older than any
+ * install, is taken over by renaming exactly what was read aside, never by deleting a path read earlier. */
+export function withInstallLock(lock, body) {
+  const mine = `${process.pid} ${randomBytes(8).toString('hex')}`;
   const read = (path) => { try { return readFileSync(path, 'utf8'); } catch { return null; } };
   // Removes `path` only while it still holds `seen`: renamed aside, compared, and put back when another's.
   const drop = (path, seen) => {
@@ -433,25 +429,37 @@ export function installedModules(modules = resolve(root, 'node_modules'), lock =
     try { if (Date.now() - statSync(lock).mtimeMs > 600_000) return true; process.kill(Number(seen.split(' ')[0]), 0); return false; }
     catch (e) { return e.code === 'ESRCH'; }
   };
-  while (!existsSync(modules) || existsSync(marker)) {
+  for (;;) {
     try { writeFileSync(lock, mine, { flag: 'wx' }); } catch {
       const seen = read(lock);
       if (seen !== null && stale(seen)) drop(lock, seen); else Bun.sleepSync(200);
       continue;
     }
-    try {
-      if (existsSync(modules) && !existsSync(marker)) break;
-      if (!existsSync(modules)) {
-        const made = `${modules}.${process.pid}`;
-        rmSync(made, { recursive: true, force: true });
-        mkdirSync(made); writeFileSync(resolve(made, '.exact-install'), '');
-        renameSync(made, modules);
-      }
-      console.error(`${resolve(root)}: ${existsSync(resolve(modules, '.bin')) ? 'an install of node_modules did not finish' : 'no node_modules'}; bun install --frozen-lockfile there`);
-      if (spawnSync(process.execPath, ['install', '--frozen-lockfile'], { cwd: root, stdio: ['ignore', 2, 2] }).status !== 0) throw new Error(`${resolve(root)}: bun install --frozen-lockfile failed (above); run it there, then this again`);
-      rmSync(marker, { force: true });
-    } finally { drop(lock, mine); }
+    try { return body(); } finally { drop(lock, mine); }
   }
+}
+/** The install lock of the `node_modules` in `dir`. */
+export const installLock = (dir) => resolve(tmpdir(), `exact-install-${createHash('sha256').update(dir).digest('hex').slice(0, 16)}.lock`);
+
+/** This checkout's node_modules, installed from its lock when it has none (a new worktree's) or when an
+ * install of ours did not finish. The install is complete when node_modules has no `.exact-install` in it:
+ * the directory appears with that marker already inside (made aside, then renamed into place), and only a
+ * successful `bun install` removes it, so one killed partway leaves it and is installed again, while one made
+ * by hand (`bun install`, deploy's capture) has none. One process installs at a time (`withInstallLock`). */
+export function installedModules(modules = resolve(root, 'node_modules'), lock = installLock(root)) {
+  const marker = resolve(modules, '.exact-install');
+  if (!existsSync(modules) || existsSync(marker)) withInstallLock(lock, () => {
+    if (existsSync(modules) && !existsSync(marker)) return;
+    if (!existsSync(modules)) {
+      const made = `${modules}.${process.pid}`;
+      rmSync(made, { recursive: true, force: true });
+      mkdirSync(made); writeFileSync(resolve(made, '.exact-install'), '');
+      renameSync(made, modules);
+    }
+    console.error(`${resolve(root)}: ${existsSync(resolve(modules, '.bin')) ? 'an install of node_modules did not finish' : 'no node_modules'}; bun install --frozen-lockfile there`);
+    if (spawnSync(process.execPath, ['install', '--frozen-lockfile'], { cwd: root, stdio: ['ignore', 2, 2] }).status !== 0) throw new Error(`${resolve(root)}: bun install --frozen-lockfile failed (above); run it there, then this again`);
+    rmSync(marker, { force: true });
+  });
   // What is installed is what `bun.lock` says (LLP 1133.001 D9): installed again from it when not, and
   // refused by name when that does not mend it.
   if (!lockMismatches(dirname(modules)).length) return;
