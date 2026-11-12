@@ -58,7 +58,8 @@ component WeatherNow
         list id="places" testId="places"
           for p in hits key=p.id
             button press=choose(p.name, p.latitude, p.longitude) testId=`place-${p.id}`
-              column gap=2
+              text-align="start" display="flex"
+              column flex=1 min-width=0 gap=2 padding="8px 0"
                 text p.name
                 text region(p) font="-exact-footnote" color="-exact-secondary-label"
           if current(found) and hits.length == 0
