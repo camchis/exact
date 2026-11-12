@@ -45,6 +45,8 @@ mod frame;
 #[cfg(all(test, target_os = "macos"))]
 mod hdr_tests;
 mod input;
+#[cfg(all(test, target_os = "macos"))]
+mod p3_tests;
 mod pace;
 mod performance;
 pub use pace::{lower_cap, FrameTiming, HostTiming, ThermalState};
@@ -321,6 +323,20 @@ pub trait Surface {
     fn high_dynamic_range(&self) -> bool {
         false
     }
+    /// Present in Display P3 where the target offers it for its 8-bit SDR
+    /// format, with no EDR. A granted [`Surface::high_dynamic_range`] wins.
+    /// Asked when the target is configured. As with an sRGB target, an `*Srgb`
+    /// view ([`Surface::srgb_target`]) takes linear Display P3 and encodes it
+    /// (Display P3 has sRGB's transfer function); a unorm view takes encoded
+    /// Display P3.
+    fn display_p3(&self) -> bool {
+        false
+    }
+    /// Whether the target is Display P3 ([`Surface::display_p3`]): told when it
+    /// is attached and again after each device restoration, before the next
+    /// draw. `false` doesn't tell ordinary SDR from HDR; a hardware-buffer
+    /// target (Android's buffered canvas) is never Display P3.
+    fn display_p3_granted(&mut self, _granted: bool) {}
     /// Every output pixel of this instance has alpha one under its current
     /// clear/background policy. Evaluated after binding, never by surface type.
     /// Allows a host to present a full-window canvas beneath its UI. On Android
@@ -551,6 +567,8 @@ struct Instance {
     each: Vec<Option<ChildTexture>>,
     /// Its target is extended sRGB (LLP 1100 D12b).
     hdr: bool,
+    /// Its target is Display P3 ([`Surface::display_p3`]).
+    p3: bool,
     alpha_modes: Vec<wgpu::CompositeAlphaMode>,
     headroom: f32,
     /// When its next frame is due under its cap, and when its last drew ([`pace`]).
@@ -680,6 +698,7 @@ impl Module {
                 inst.offscreen_format()
             };
             inst.surface.device_ready(gpu.device.features());
+            inst.surface.display_p3_granted(inst.p3);
             inst.surface.prepare_assets(&gpu.device, &gpu.queue, format);
             inst.dirty = true;
         }
@@ -799,14 +818,16 @@ impl Module {
         };
         let caps = target.get_capabilities(&gpu.adapter);
         let surface = factory();
-        let hdr = target::configure(&*surface, &gpu.adapter, &caps, &mut config);
+        let (hdr, p3) = target::configure(&*surface, &gpu.adapter, &caps, &mut config);
         config.present_mode = wgpu::PresentMode::AutoVsync;
         config.desired_maximum_frame_latency = FRAME_LATENCY;
         swapchains(|| target.configure(&gpu.device, &config));
         let id = self.insert(surface, Some((target, config)))?;
         if let Some(inst) = self.instances.get_mut(&id) {
             inst.hdr = hdr;
+            inst.p3 = p3;
             inst.alpha_modes = caps.alpha_modes;
+            inst.surface.display_p3_granted(p3);
         }
         Some(id)
     }
@@ -866,12 +887,15 @@ impl Module {
             return self.fail::<()>(format!("no canvas {id}")).is_some();
         };
         inst.alpha_modes = caps.alpha_modes.clone();
-        inst.hdr = target::configure(&*inst.surface, &gpu.adapter, &caps, &mut config);
+        let (hdr, p3) = target::configure(&*inst.surface, &gpu.adapter, &caps, &mut config);
+        inst.hdr = hdr;
+        inst.p3 = p3;
         swapchains(|| target.configure(&gpu.device, &config));
         inst.seen = Default::default();
         inst.presentation = Some(SurfaceRef::new(target));
         inst.config = Some(config);
         inst.surface.device_ready(features);
+        inst.surface.display_p3_granted(p3);
         inst.dirty = true;
         true
     }
@@ -913,7 +937,9 @@ impl Module {
             return self.fail::<()>(format!("no canvas {id}")).is_some();
         };
         inst.ring = Some(ring);
+        inst.p3 = false;
         inst.surface.device_ready(features);
+        inst.surface.display_p3_granted(false);
         inst.dirty = true;
         true
     }
@@ -993,6 +1019,7 @@ impl Module {
                 children_generation: 0,
                 each: Vec::new(),
                 hdr: false,
+                p3: false,
                 alpha_modes: Vec::new(),
                 headroom: 1.0,
                 cadence: Default::default(),

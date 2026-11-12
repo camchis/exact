@@ -5,7 +5,7 @@ pub(crate) fn configure(
     adapter: &wgpu::Adapter,
     caps: &wgpu::SurfaceCapabilities,
     config: &mut wgpu::SurfaceConfiguration,
-) -> bool {
+) -> (bool, bool) {
     let views = adapter
         .get_downlevel_capabilities()
         .flags
@@ -29,9 +29,21 @@ pub(crate) fn configure(
         );
         config.format = format;
         config.view_formats = view.into_iter().collect();
+        config.color_space = sdr_color_space(surface.display_p3(), caps.color_spaces(format));
     }
     config.alpha_mode = alpha_mode(surface.opaque(), &caps.alpha_modes);
-    hdr
+    let p3 = config.color_space == wgpu::SurfaceColorSpace::DisplayP3;
+    (hdr, p3)
+}
+
+/// Display P3 where the surface asks and the target offers it for the
+/// format; else wgpu's default, sRGB for these 8-bit formats.
+fn sdr_color_space(p3: bool, offered: wgpu::SurfaceColorSpaces) -> wgpu::SurfaceColorSpace {
+    if p3 && offered.contains(wgpu::SurfaceColorSpaces::DISPLAY_P3) {
+        wgpu::SurfaceColorSpace::DisplayP3
+    } else {
+        wgpu::SurfaceColorSpace::Auto
+    }
 }
 
 /// How the compositor takes a canvas's alpha: ignored when the surface
@@ -111,6 +123,16 @@ mod tests {
         assert_eq!(alpha_mode(false, &all), PreMultiplied);
         assert_eq!(alpha_mode(true, &[Inherit, PreMultiplied]), PreMultiplied);
         assert_eq!(alpha_mode(false, &[Opaque]), Opaque);
+    }
+
+    #[test]
+    fn display_p3_only_where_asked_and_offered() {
+        use wgpu::SurfaceColorSpace::{Auto, DisplayP3};
+        use wgpu::SurfaceColorSpaces as S;
+        assert_eq!(sdr_color_space(true, S::SRGB | S::DISPLAY_P3), DisplayP3);
+        assert_eq!(sdr_color_space(false, S::SRGB | S::DISPLAY_P3), Auto);
+        assert_eq!(sdr_color_space(true, S::SRGB), Auto, "not offered: sRGB");
+        assert_eq!(sdr_color_space(true, S::empty()), Auto);
     }
 
     #[test]
