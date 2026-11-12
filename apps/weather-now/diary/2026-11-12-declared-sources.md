@@ -24,5 +24,9 @@ from "still asking". `failed(now)` and `refresh now` are the whole of the error 
 
 ### Checkpoints
 
-- web build: see the commit that adds the app
-- macOS build without Hermes: see the commit that adds the app
+- web (JS target): smooth; the forecast and a search against Open-Meteo itself, and `app.test.contract`
+- macOS: smooth; the same drive and test (an ad-hoc signature, `EXACT_IDENTITY=-`, since the keychain
+  refused this machine's identity)
+- macOS release, against the same app with an `app.ts` answering both sources: the executable is
+  18,174,192 bytes to 21,278,256 (3.1 MB, 14.6% smaller), the `.app` 19.2 MB to 22.5 MB, and its strings
+  name Hermes 0 times to 136
