@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+import { writePrivacyManifest } from './privacy.mjs';
 // Build the macOS app — or, with --ios, the iOS app: the app's static
 // library (cargo), then the presenter (swift build) linked against
 // it. Usage:
@@ -190,13 +191,14 @@ export function appleRunBinary(app, host = false) {
   return host ? paths.binary : resolve(paths.bundle, 'Contents/MacOS', paths.executable);
 }
 /** Both bare product directories resolve @executable_path/../Frameworks here. */
-export function publishMacFramework(framework, namespace, identity, production = false) {
+export function publishMacFramework(framework, namespace, identity, production = false, manifests = []) {
   mkdirSync(namespace, { recursive: true });
   const stage = mkdtempSync(resolve(namespace, '.frameworks-'));
   try {
     const copy = resolve(stage, 'ExactCore.framework');
     cpSync(framework, copy, { recursive: true, verbatimSymlinks: true });
     stripProductionExecutable(resolve(copy, 'ExactCore'), { production, dsym: resolve(namespace, 'ExactCore.framework.dSYM') });
+    writePrivacyManifest(resolve(copy, 'Resources'), [resolve(copy, 'ExactCore')], { mac: true, apiManifests: manifests });
     run('codesign', ['--force', '--sign', identity ?? '-', '--timestamp=none', copy]);
     placeAppleArtifact(stage, resolve(namespace, 'Frameworks'));
   } finally { rmSync(stage, { recursive: true, force: true }); }
@@ -853,10 +855,10 @@ async function main(args, lockHeld = false) {
   const fixedPlan = production && expected.composition === 'embedded';
   cargoEnv.EXACT_APPLE_LINK = linksByPlan(production, args) ? 'plan' : 'all'; // what the archive links (link.mjs)
   const hostModules = embedOnly || fixedPlan ? null : buildModules(['exact-svg-raster', ...(metal ? ['exact-canvas-vello'] : []), ...(ios ? [] : ['exact-listen'])], 'host-modules.log'); // the listener: macOS's (LLP 1133.005 §8)
-  const buildReceipt = contractLast(() => buildBake(app, ios ? 'ios' : 'macos', target, { env: cargoEnv, profile: cargoProfile, link: !args.includes('--embed'), prepareGpu(product) {
+  const buildReceipt = contractLast(() => buildBake(app, ios ? 'ios' : 'macos', target, { env: cargoEnv, profile: cargoProfile, link: !args.includes('--embed'), prepareGpu(product, privacyManifest) {
     const artifact = gpuArtifacts.find(m => m.built === basename(product));
     if (!artifact) throw new Error(`unknown GPU product: ${product}`);
-    const signed = signedGpuProduct(product, { identity: sha1, app, framework: frameworkBundles ? artifact.framework : null, platform: frameworkPlatform, hardened: !ios && distribution });
+    const signed = signedGpuProduct(product, { identity: sha1, app, privacyManifest, framework: frameworkBundles ? artifact.framework : null, platform: frameworkPlatform, hardened: !ios && distribution });
     preparedGpu.set(artifact.built, signed);
     return signed;
   }, capture(buildReceipt) {
@@ -1303,7 +1305,7 @@ async function main(args, lockHeld = false) {
   const bin = resolve(binDir, paths.executable);
   const hostPaths = appleArtifacts(app, { destination, composition, trust: cargoEnv.EXACT_UPDATE_TRUST, host: true, optimize: production ? optimize : 'speed' });
   const publishProducts = () => {
-    if (!ios && shared) publishMacFramework(shared.framework, paths.namespace, sha1, production);
+    if (!ios && shared) publishMacFramework(shared.framework, paths.namespace, sha1, production, (buildReceipt.binary.privacyManifests ?? []).slice(0, 1));
     if (args.includes('--host')) {
       const hostStage = mkdtempSync(resolve(paths.namespace, '.host-'));
       cleanup.push(hostStage);
