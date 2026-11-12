@@ -1540,14 +1540,26 @@ out (LLP 1157).
   keeps what it showed. A mutation or an action rejects with one when Convex
   refuses it (`message` is Convex's, `data` a `ConvexError`'s payload), when
   the socket is not open (nothing was sent), and when the socket closes before
-  the answer. That last one may have run, and nothing is sent again on the
-  next connection: a write that must not repeat carries its own key. When
+  the answer. That last one may have run, and the module sends nothing again
+  on the next connection by itself. When
   Convex refuses a token it closes the socket. A request sent behind the
   refused `setAuth` rejects with Convex's words, as `live.authError` has them:
   it did not run. When a token expires, Convex refuses it at whichever request
   meets it first, and one sent earlier (an action still running) may have run,
   so each rejects with "Convex refused the token before it answered (…); the
   mutation may have run".
+- **Sending a mutation again.** The failure of a mutation whose connection
+  ended before Convex answered carries `again`, a handle (none if you signed
+  out after sending it). Once `live.status`
+  is `ready` again, `cx.again(handle)` in a mutation's source sends the same
+  request: Convex answers one it has seen with its first answer, so the write
+  happens once, and runs one it never saw as the person signed in now. Keep
+  the handle in state (`catch (e) { return { ok: false, again: e.again ?? -1 } }`)
+  and offer the retry. A handle is good once (a mutation sent again and left
+  unanswered again fails with the next), the module keeps the last hundred,
+  and `cx.setAuth(undefined)` forgets them all, so a mutation is never sent
+  again as the next person. An action has no handle: one that must not repeat
+  carries its own key.
 - **An action's reply** arrives as soon as Convex has it, and the queries may
   show what it wrote a moment later: a mutation's reply waits for them, an
   action's does not. A view that reads both can show them out of step.

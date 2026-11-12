@@ -129,7 +129,7 @@ test('the socket closing ends what waits, and the next connection starts from ve
   sync.closed('the socket closed (1006)');
   await pending.wait;
   expect(pending.read()).toBeUndefined();
-  expect(await unanswered.outcome).toEqual({ ok: false, message: 'The connection to Convex closed before it answered (the socket closed (1006)); the mutation may have run.' });
+  expect(await unanswered.outcome).toEqual({ ok: false, message: 'The connection to Convex closed before it answered (the socket closed (1006)); the mutation may have run.', again: 0 });
   expect(await acknowledged.outcome).toEqual({ ok: true, value: 3 });
   expect([sync.status, sync.error]).toEqual(['closed', 'the socket closed (1006)']);
   // What the socket had delivered is still answered.
