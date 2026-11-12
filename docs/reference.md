@@ -2785,11 +2785,14 @@ each voice ended is the same on every host and under the driver's clock
 | --- | --- |
 | web (both targets) | Web Audio: a one-shot `AudioBufferSourceNode` per voice at `start(when)` with its `playbackRate`, through a `StereoPannerNode` when its `pan` is not 0, aimed at the speaker through the context's output timestamp; a change is `setValueAtTime` then `linearRampToValueAtTime` on the voice's `gain`, `playbackRate` (k-rate: it moves once per 128-frame render quantum) and `pan`, a panner added when a change first gives a pan; the first sound after the page's first tap or key (one before it is dropped and journaled `sound blocked`) |
 | macOS, iOS, tvOS | one `AVAudioEngine` with a C mixer behind an `AVAudioSourceNode`, sample-accurate (a playback rate reads between frames by linear interpolation; a pan follows the `StereoPannerNode`'s equal-power algorithm; a change's ramp is read at every frame), in an arm loaded on demand (`libexact_sound.dylib`; `ExactSound.framework` in an `.ipa`) |
-| Linux, Windows, Android (the Linux host in its reader) | no Contract sound output: the runner keeps the voice record |
+| Android | AAudio with the shared C mixer in `libexact_sound.so`, loaded at the first play; scheduled by the stream's output timestamp, with gain, playback rate, pan, live changes and cancellation |
+| Linux, Windows | no Contract sound output: the runner keeps the voice record |
 
 Under the driver no scheduled sound plays on any host (`output: "agent"`). The
-runner initializes `state.sounds.output` to `"agent"`; Linux, Windows and Android
-leave it there even outside the driver. Outside the driver, macOS, iOS and tvOS
+runner initializes `state.sounds.output` to `"agent"`; Linux and Windows
+leave it there even outside the driver. Android's state reader is available
+only under the driver and retains `"agent"`; it does not expose AAudio's output
+state or latency. Outside the driver, macOS, iOS and tvOS
 replace it with an object whose `kind` is `"avaudioengine"` and whose `state` is `"closed"`,
 `"running"`, `"stopped"` or `"failed"`. Both web targets report an object with
 `kind: "web-audio"` and the audio context's `state` once the output loads; before
@@ -2833,6 +2836,25 @@ has no mixing playback type. This preserves other apps' audio but obeys the
 ring/silent switch in WebKit. The policy applies to `video`, `audio` and GPU audio
 without a `sound` declaration or an `AudioContext`. Without `audio_session`, the
 browser keeps `auto`. `data-audio-session` keeps the manifest's value.
+On Android, Contract effects use the host's single audio-focus owner.
+`"ambient"` uses sonification attributes, mixes without focus and skips effects
+while the ringer is silent or vibrating. `"playback"` uses media/music attributes
+and requests full focus; `"playback-mix"` uses the same attributes without focus
+or ducking. Device volume and Do Not Disturb still apply. All three stop output
+and discard pending effects when the activity leaves the foreground or the
+output becomes noisy (for example, headphones are unplugged). A transient focus
+loss also stops effects; new effects may play after focus returns. A permanent
+loss waits until the activity returns to the foreground.
+
+The Android arm decodes declared WAVs at first play. It uses
+[AAudio's speaker timestamp](https://developer.android.com/ndk/reference/group/audio#aaudiostream_gettimestamp)
+to place frames; startup waits up to 100 ms for that timestamp, then uses the
+stream's buffer size as a latency estimate if none is available. Late effects
+start from their attack. The idle stream closes after its last frames reach the
+speaker and releases its focus claim. A failed open or disconnected stream is
+reported; a play at least one second after the failure tries again. Background
+playback, MIDI output and timed sequence haptics on Android remain unavailable.
+
 The Mac has no session. A development run with `EXACT_SOUND_CHECK=1` taps the
 engine's main mixer and journals (and prints) how far each onset after a
 silence reached the speaker from its time.
