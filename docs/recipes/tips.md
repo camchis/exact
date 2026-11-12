@@ -46,6 +46,7 @@ component App
 - Tips carry nothing the person needs (HIG, Offering help): the web, Android, Linux and
   Windows have no tip system and show none, so put anything essential in the screen itself.
 - The driver's `state` lists each tip under `tips`: its TipKit status, whether it shows,
-  and whether it points at the element or a bar item. What TipKit remembers is the drive's
+  and whether it points at the element or a bar item. TipKit decides on its own clock, not
+  the drive's: just after launch a tip may still be `pending`. What TipKit remembers is the drive's
   store's: a drive without `--storage` starts having seen no tip, one with a named store
   starts with what that store remembers, and `--reset-storage` forgets it.
