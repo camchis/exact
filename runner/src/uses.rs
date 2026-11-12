@@ -563,6 +563,9 @@ fn stdlib_calls(plan: &Plan) -> (bool, bool, bool) {
                         | Stdlib::FormatDecimal
                         | Stdlib::FormatDay,
                     ) => format = true,
+                    // The core formats `en-US`; another locale's time is
+                    // the capability's (LLP 1054.000.003 D6).
+                    Some(Stdlib::FormatTime) if plan.format.is_some() => format = true,
                     Some(
                         Stdlib::Frame
                         | Stdlib::RangeFrame

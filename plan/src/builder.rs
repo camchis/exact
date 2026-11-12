@@ -547,9 +547,16 @@ impl PlanBuilder {
         self.plan.router = Some(slot);
     }
 
-    /// One locale's texts, `(key, text)` sorted by key; the first locale is
-    /// the base. @ref LLP 1060 D3.
-    pub fn locale(&mut self, name: &str, rtl: bool, texts: &[(&str, &str)]) -> LocalesId {
+    /// One locale's texts, `(key, text)` sorted by key, and its format data
+    /// (`""` for none); the first locale is the base. @ref LLP 1060 D3;
+    /// LLP 1054.000.003 D6.
+    pub fn locale(
+        &mut self,
+        name: &str,
+        rtl: bool,
+        format: &str,
+        texts: &[(&str, &str)],
+    ) -> LocalesId {
         let start = self.plan.texts.len() as u32;
         for (key, text) in texts {
             let key = self.str(key);
@@ -557,9 +564,11 @@ impl PlanBuilder {
             self.plan.texts.push(TextsRow { key, text });
         }
         let name = self.str(name);
+        let format = self.str(format);
         self.plan.locales.push(LocalesRow {
             name,
             rtl,
+            format,
             texts: TextsRange {
                 start,
                 len: texts.len() as u32,
@@ -571,6 +580,12 @@ impl PlanBuilder {
     /// The root slot holding the resolved locale. @ref LLP 1060 D4.
     pub fn set_locale(&mut self, slot: SlotsId) {
         self.plan.locale = Some(slot);
+    }
+
+    /// The root slot holding the locale the formatters format in.
+    /// @ref LLP 1054.000.003 D6.
+    pub fn set_format(&mut self, slot: SlotsId) {
+        self.plan.format = Some(slot);
     }
 
     /// A derive.

@@ -9,16 +9,32 @@
 //! `format` with [`formatting`], and the web registers it from
 //! `exact-web-capabilities` only for a plan that calls one of these, so an
 //! app that doesn't carries none of this code. `formatTime` is the core's
-//! (`stdlib.rs`), as `formatClockTime` was. The strings are `Intl`'s in
-//! `en-US`; the oracle table is `runner/tests/it/format.rs`.
+//! (`stdlib.rs`), as `formatClockTime` was, in `en-US`. The strings here are
+//! `Intl`'s in `en-US`, and [`locale`]'s in the locale of the format data a
+//! plan bakes for its strings tables (LLP 1054.000.003 D6); the oracle tables
+//! are `runner/tests/it/format.rs` and `format_locales.rs`.
+
+mod locale;
 
 use crate::stdlib::{format_time, push_number, wall_ms};
 use exact_num::date::{civil, MONTHS, WEEKDAYS};
-use exact_plan::{Stdlib, Value};
+use exact_plan::{Plan, Stdlib, Value};
 
 /// A `format` entry's value; `None` when `f` is not one, or its arguments
-/// don't fit it (a style the compiler would have refused).
-pub fn formatting(f: Stdlib, args: &[Value]) -> Option<Value> {
+/// don't fit it (a style the compiler would have refused). A localized
+/// entry's last argument is the format locale: `""` (or none) is `en-US`,
+/// else a table of `plan` whose format data it reads.
+pub fn formatting(f: Stdlib, args: &[Value], plan: &Plan) -> Option<Value> {
+    if f.localized() {
+        let locale = match args.get(f.arity() - 1) {
+            Some(v) => v.as_str()?,
+            None => "",
+        };
+        if !locale.is_empty() {
+            let (data, cycle) = plan.format_data(locale)?;
+            return locale::formatting(f, args, data, cycle);
+        }
+    }
     let num = |i: usize| args.get(i).and_then(Value::as_number);
     let style = |i: usize| args.get(i).and_then(Value::as_str);
     Some(match f {
@@ -156,6 +172,17 @@ fn day_label(then: f64, now: f64, offset: f64, mode: DayMode) -> Value {
     Value::str(&out)
 }
 
+/// Rust's `{}` of a finite `x ≥ 0`, its shortest round-trip digits, never
+/// exponential, as compact numbers read them: the integer digits (none below
+/// one) and the fraction digits.
+fn js_digits_shortest(x: f64) -> (Vec<u8>, Vec<u8>) {
+    let mut text = String::new();
+    exact_num::push_text!(&mut text, "{}", exact_num::Shortest(x));
+    let (int, frac) = text.split_once('.').unwrap_or((&text, ""));
+    let int = if int == "0" { "" } else { int };
+    (int.as_bytes().to_vec(), frac.as_bytes().to_vec())
+}
+
 /// `Intl.NumberFormat("en-US", { notation: "compact", roundingMode: "trunc",
 /// signDisplay: "negative" })`, from the value's shortest decimal digits as
 /// ICU reads them: `1.2K`, `999K`, `0.29`, `-1.2K`, `0` for `-0`, `10,000T`.
@@ -173,11 +200,11 @@ fn compact(n: f64) -> Value {
     if n == 0.0 {
         return Value::str("0");
     }
-    // Rust's `{}` of an f64: its shortest round-trip digits, never exponential.
-    let mut text = String::new();
-    exact_num::push_text!(&mut text, "{}", exact_num::Shortest(n.abs()));
-    let (int, frac) = text.split_once('.').unwrap_or((&text, ""));
-    let int = if int == "0" { "" } else { int };
+    let (int, frac) = js_digits_shortest(n.abs());
+    let (int, frac) = (
+        std::str::from_utf8(&int).unwrap_or(""),
+        std::str::from_utf8(&frac).unwrap_or(""),
+    );
     let scale = if int.len() >= 4 {
         ((int.len() - 1) / 3).min(4)
     } else {
@@ -197,7 +224,7 @@ fn compact(n: f64) -> Value {
         _ => "",
     };
     let kept = kept.trim_end_matches('0');
-    let mut out = String::with_capacity(text.len() + 4);
+    let mut out = String::with_capacity(int.len() + frac.len() + 8);
     if n < 0.0 {
         out.push('-');
     }
@@ -284,28 +311,7 @@ fn styled(n: f64, style: &str, code: &str) -> Option<Value> {
     if !n.is_finite() {
         return Some(Value::str(""));
     }
-    let (int, mut frac) = js_digits(n.abs());
-    let cut = shift + max;
-    let up = frac.get(cut).is_some_and(|&d| d >= b'5');
-    frac.resize(frac.len().max(cut), b'0');
-    // The kept digits, the point `max` places from the end.
-    let mut digits: Vec<u8> = int.into_iter().chain(frac[..cut].iter().copied()).collect();
-    if up {
-        match digits.iter().rposition(|&d| d != b'9') {
-            Some(i) => {
-                digits[i] += 1;
-                digits[i + 1..].fill(b'0');
-            }
-            None => {
-                digits.fill(b'0');
-                digits.insert(0, b'1');
-            }
-        }
-    }
-    let (int, frac) = digits.split_at(digits.len() - max);
-    let int = &int[int.iter().position(|&d| d != b'0').unwrap_or(int.len() - 1)..];
-    let kept = frac.iter().rposition(|&d| d != b'0').map_or(0, |i| i + 1);
-    let frac = &frac[..kept.max(min)];
+    let (int, frac) = rounded(n, shift, min, max);
     let mut out = String::with_capacity(int.len() * 4 / 3 + frac.len() + 8);
     if n.is_sign_negative() {
         out.push('-');
@@ -328,6 +334,35 @@ fn styled(n: f64, style: &str, code: &str) -> Option<Value> {
         out.push('%');
     }
     Some(Value::str(&out))
+}
+
+/// The integer and fraction digits `Intl` shows of a finite `|n|` with its
+/// point moved `shift` places right and at least `min`, at most `max`
+/// fraction digits ([`styled`]'s rule): the integer part without leading
+/// zeros (`0` for none).
+fn rounded(n: f64, shift: usize, min: usize, max: usize) -> (Vec<u8>, Vec<u8>) {
+    let (int, mut frac) = js_digits(n.abs());
+    let cut = shift + max;
+    let up = frac.get(cut).is_some_and(|&d| d >= b'5');
+    frac.resize(frac.len().max(cut), b'0');
+    // The kept digits, the point `max` places from the end.
+    let mut digits: Vec<u8> = int.into_iter().chain(frac[..cut].iter().copied()).collect();
+    if up {
+        match digits.iter().rposition(|&d| d != b'9') {
+            Some(i) => {
+                digits[i] += 1;
+                digits[i + 1..].fill(b'0');
+            }
+            None => {
+                digits.fill(b'0');
+                digits.insert(0, b'1');
+            }
+        }
+    }
+    let (int, frac) = digits.split_at(digits.len() - max);
+    let int = &int[int.iter().position(|&d| d != b'0').unwrap_or(int.len() - 1)..];
+    let kept = frac.iter().rposition(|&d| d != b'0').map_or(0, |i| i + 1);
+    (int.to_vec(), frac[..kept.max(min)].to_vec())
 }
 
 /// The integer and fraction digits of a finite `x ≥ 0` as JavaScript's

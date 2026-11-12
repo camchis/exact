@@ -16,6 +16,7 @@ mod font_axes;
 mod font_keyframes;
 mod foresee;
 mod format;
+mod format_locales;
 mod frame_origin;
 mod frames_agent;
 mod height_binding;
