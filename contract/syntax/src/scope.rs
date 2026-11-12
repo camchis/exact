@@ -976,22 +976,6 @@ impl Rewriter<'_> {
 
     fn expr(&mut self, e: &mut Expr) -> R {
         match e {
-            Expr::Number(..) | Expr::Str(..) | Expr::Bool(..) | Expr::None(_) | Expr::Ident(..) => {
-                Ok(())
-            }
-            Expr::List(items, _) => self.exprs(items),
-            Expr::Template(parts, _) => {
-                for part in parts {
-                    if let TemplatePart::Expr(e) = part {
-                        self.expr(e)?;
-                    }
-                }
-                Ok(())
-            }
-            Expr::Some(inner, _)
-            | Expr::Member(inner, _, _)
-            | Expr::NamedArg(_, inner, _)
-            | Expr::Unary(_, inner, _) => self.expr(inner),
             Expr::Call(name, args, span) => {
                 if let Some(seen) = self.seen.as_deref_mut() {
                     seen.called.insert(name.clone());
@@ -1018,46 +1002,17 @@ impl Rewriter<'_> {
                 }
                 self.exprs(args)
             }
-            Expr::Binary(_, a, b, _) => {
-                self.expr(a)?;
-                self.expr(b)
-            }
-            Expr::Ternary(c, a, b, _) => {
-                self.expr(c)?;
-                self.expr(a)?;
-                self.expr(b)
-            }
-            Expr::Match {
-                subject,
-                var,
-                some,
-                none,
-                ..
-            } => {
-                self.expr(subject)?;
-                let mark = self.bind([var.clone()]);
-                self.expr(some)?;
-                self.unbind(mark);
-                self.expr(none)
-            }
-            Expr::Arrow { params, body, .. } => {
-                let mark = self.bind(params.iter().cloned());
-                self.expr(body)?;
-                self.unbind(mark);
-                Ok(())
-            }
-            Expr::Let {
-                name, value, body, ..
-            } => {
-                self.expr(value)?;
-                let mark = self.bind([name.clone()]);
-                self.expr(body)?;
-                self.unbind(mark);
-                Ok(())
-            }
             Expr::Typed(inner, ty, _) => {
                 self.expr(inner)?;
                 self.ty(ty)
+            }
+            _ => {
+                for (child, binds) in e.scoped_operands_mut() {
+                    let mark = self.bind(binds.iter().map(String::from));
+                    self.expr(child)?;
+                    self.unbind(mark);
+                }
+                Ok(())
             }
         }
     }
