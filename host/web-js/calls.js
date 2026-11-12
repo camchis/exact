@@ -11,8 +11,10 @@
 //
 // Each faced tool is offered to the browser's agent through WebMCP where the page has `document.modelContext`
 // (https://webmachinelearning.github.io/webmcp/, D8): registered with an input schema from the plan's types and the
-// face's words, its annotations from LLP 1111 D3 (`readOnlyHint` for `reads`, `consequentialHint` for `writes` and
-// `destroys`), withdrawn while `available when` is false, and its `execute` a call through the `web` door.
+// face's words, an output schema of the call's envelope, its annotations (`readOnlyHint` for `reads`,
+// `consequentialHint` for a `destroys` and for a `writes` but an `additive closed` one, `untrustedContentHint` for a
+// string `returns`), withdrawn while `available when` is false, and its `execute` a call through the `web` door, which
+// the caller's abort cancels.
 import { clock, data, After, Clocked, Mutations, Origin, say, time as refreshTime, drive, order } from "./rt.js";
 import { Counting, heldTickets } from "./held.js";
 
@@ -60,8 +62,28 @@ function schema(type, face = {}) {
     additionalProperties: false, ...words };
 }
 
+/** WebMCP's `outputSchema` (D8): LLP 1111 D4's envelope, which `execute` resolves with for every outcome, its `value`
+ * typed from `returns` (`type`, or null for none). An outcome other than `ok` is data in the result, not a rejection:
+ * the caller of a rejected `execute` learns only "OperationError" (WebMCP §3, "tool execution error"). */
+function output(type) {
+  const words = description => ({ type: "string", description });
+  const properties = {
+    outcome: { ...words("ok: it ran and its work settled. failed: the app reports that it failed. refused: it did not run, or it stopped because it needs a person. timeout: its work had not settled 10 s after it started."),
+      enum: ["ok", "failed", "superseded", "timeout", "interrupted", "refused"] },
+    certainty: { ...words("none: the action did not run. applied: it ran and its work settled. uncertain: it ran, and its effect may or may not have landed; read before calling again."),
+      enum: ["none", "applied", "uncertain"] },
+    reason: words("Why it was refused or failed, as one word (unavailable, arguments, busy, cancelled, …); empty when there is none."),
+    stale: { type: "boolean", description: "Something else changed what it reports while it ran." },
+    skipped: { type: "array", items: { type: "string" }, description: "The commands it did not run because a call has no person: focus, scrolling, haptics." },
+    value: type ? { anyOf: [schema(type), { type: "null" }], description: "What the tool returns; null when it was refused." } : { type: "null" },
+    message: words("A sentence for the agent, empty when there is nothing to add."),
+  };
+  return { type: "object", properties, required: Object.keys(properties), additionalProperties: false };
+}
+
 /** `table`: tool name → [action, its parameters as a record type, consequence, [additive, idempotent, closed],
- * description, fails, returns, available (each a thunk or null), face (an object or null)]. */
+ * description, fails, returns, available (each a thunk or null), face (an object or null), the type `returns` has (or
+ * null)]. */
 export function tools(table) {
   const waiting = [], ended = [];
   let current = null, ids = 0, poll = 0, wake = null;
@@ -83,16 +105,15 @@ export function tools(table) {
   };
   const owns = () => { const own = current?.own; return !!own && ([...own.tickets].some(answer) || Mutations.some(m => !own.mutations.has(m) && (m.due < Infinity || m.wait?.length))); };
 
-  const end = (outcome, certainty, reason = "", value = null, message = "") => {
-    const c = current;
-    current = null;
+  const finish = (c, outcome, certainty, reason = "", value = null, message = "") => {
     say(`tool ${c.name} ${outcome} ${certainty}`);
     if (!message && certainty === "uncertain") message = "It may or may not have taken effect: read before calling again.";
     ended.push({ id: c.id, tool: c.name, door: c.door, origin: "tool", cold: c.cold, outcome, certainty, reason, stale: false, skipped: c.skipped,
-      value: outcome === "refused" ? null : value, message, at: time() });
+      cancelled: c.cancelled, value: outcome === "refused" ? null : value, message, at: time() });
     while (ended.length > KEPT) ended.shift();
     c.done?.(ended.at(-1));
   };
+  const end = (...ending) => { const c = current; current = null; finish(c, ...ending); };
   const refuse = (reason, message) => { say(`tool ${current.name}: refused, ${reason} (${message})`); end("refused", "none", reason, null, message); };
   const faceRefused = (face, door, digest) => {
     if (door === "agent") return null;
@@ -177,11 +198,29 @@ export function tools(table) {
     let args = req.args ?? {};
     if (typeof args === "string") try { args = JSON.parse(args); } catch { args = null; }
     const c = { id: ++ids, name: req.tool, args, door: req.door ?? "agent", digest: req.digest ?? null, cold: !!req.cold, arrived: clock.now,
-      dispatched: null, skipped: [], done };
+      dispatched: null, skipped: [], cancelled: false, done };
     say(`tool:system:${c.door} ${c.name}: arrived`);
     waiting.push(c);
     queueMicrotask(step);
     return { call: c.id, tool: c.name, state: "waiting" };
+  };
+  // The caller cancelled call `id`: one still waiting is dropped, `refused` `none` (`cancelled`); one dispatched runs to
+  // its end, since its commit has landed and what it started is the app's to finish (the runner's `cancel_call`).
+  const cancel = id => {
+    const i = waiting.findIndex(c => c.id === id);
+    if (i >= 0) {
+      const [c] = waiting.splice(i, 1);
+      c.cancelled = true;
+      say(`tool:system:${c.door} ${c.name}: cancelled before it ran`);
+      finish(c, "refused", "none", "cancelled", null, "Its caller cancelled it before it ran.");
+      return { call: id, state: "ended" };
+    }
+    if (current?.id === id) {
+      if (!current.cancelled) say(`tool:system:${current.door} ${current.name}: its caller cancelled; it runs to its end`);
+      current.cancelled = true;
+      return { call: id, state: "running" };
+    }
+    return ended.some(e => e.id === id) ? { call: id, state: "ended" } : { error: `no call ${id}` };
   };
   const open = (c, state) => ({ id: c.id, tool: c.name, door: c.door, origin: "tool", state });
   (globalThis.exact ??= {}).calls = {
@@ -193,6 +232,8 @@ export function tools(table) {
     }),
     /** The agent's `call`: queued, its id answered. */
     call: req => call(req),
+    /** The caller's cancellation (`cancel` above). */
+    cancel,
     /** The agent's poll: the ended envelope, else the call's state. */
     called: id => ended.find(e => e.id === id) ?? (current?.id === id ? { call: id, state: "running" } : waiting.some(c => c.id === id)
       ? { call: id, state: "waiting" } : { error: `no call ${id}` }),
@@ -205,7 +246,7 @@ export function tools(table) {
     // refusal that stands (a name another script holds) is not retried at every commit.
     const offered = new Map(), turnedDown = new Set();
     const offer = () => {
-      for (const [name, [, params, consequence, , description, , , available, face]] of Object.entries(table)) {
+      for (const [name, [, params, consequence, [additive, , closed], description, , , available, face, returns]] of Object.entries(table)) {
         if (!face || (face.doors && !face.doors.includes("web"))) continue;
         const on = !(available && available() === false);
         if (!on) turnedDown.delete(name);
@@ -224,12 +265,20 @@ export function tools(table) {
           if (offered.get(name) === signal) { offered.delete(name); turnedDown.add(name); }
         };
         Promise.resolve(context.registerTool({
-          name, title: face.title ?? name, description, inputSchema: input,
-          annotations: { readOnlyHint: consequence === "reads", consequentialHint: consequence !== "reads" },
-          execute: input => new Promise(resolve => {
+          name, title: face.title ?? name, description, inputSchema: input, outputSchema: output(returns),
+          // `consequentialHint`: "significant, real-world, or non-reversible" (§4.2.1), so every write but one that only
+          // adds to the app's own data. `untrustedContentHint`: a string `returns` may carry text the author did not
+          // write, such as a note or a review (§6.4.4); a number or a bool cannot.
+          annotations: { readOnlyHint: consequence === "reads", consequentialHint: consequence === "destroys" || (consequence === "writes" && !(additive && closed)),
+            untrustedContentHint: returns === "s" },
+          // The caller's abort (§4.2.2) cancels the call: dropped while it waits, run to its end once dispatched.
+          execute: (input, options) => new Promise(resolve => {
             const r = call({ tool: name, args: input ?? {}, door: "web", digest: face.digest }, resolve);
-            if (r.error) resolve({ outcome: "refused", certainty: "none", message: r.error });
-          }).then(e => e.outcome === "ok" ? e.value ?? { outcome: "ok" } : { outcome: e.outcome, certainty: e.certainty, reason: e.reason, message: e.message }),
+            if (r.error) return resolve({ outcome: "refused", certainty: "none", reason: "unavailable", stale: false, skipped: [], value: null, message: r.error });
+            const abort = options?.signal;
+            if (abort?.aborted) cancel(r.call);
+            else abort?.addEventListener("abort", () => cancel(r.call), { once: true });
+          }).then(({ outcome, certainty, reason, stale, skipped, value, message }) => ({ outcome, certainty, reason, stale, skipped, value, message })),
         }, { signal: signal.signal })).then(() => say(`webmcp ${name}: registered`), refused);
       }
     };

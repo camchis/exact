@@ -43,36 +43,49 @@ test('faced tools on the web door are registered, described, withdrawn while una
     tools({
       waitFor: [() => (ms, size) => waited.push([ms, size]), { ms: 'n', size: ['e', ['small', 'large']] }, 'writes', flags,
         'Wait for ms milliseconds.', null, () => waited.length, () => open,
-        face(['apple', 'android', 'web'], { title: 'Wait For', parameters: { ms: { title: 'Milliseconds', type: 'integer' }, size: { title: 'Size' } } })],
-      look: [() => () => {}, { q: 's' }, 'reads', flags, 'Look something up.', null, null, null, face(undefined)],
-      broken: [() => () => {}, {}, 'destroys', flags, 'Always fails.', () => true, null, null, face(['web'])],
-      native: [() => () => {}, {}, 'writes', flags, 'Native only.', null, null, null, face(['apple'])],
-      bare: [() => () => {}, {}, 'writes', flags, 'No face.', null, null, null, null],
+        face(['apple', 'android', 'web'], { title: 'Wait For', parameters: { ms: { title: 'Milliseconds', type: 'integer', description: 'How long, in milliseconds.' },
+          size: { title: 'Size' } } }), 'n'],
+      look: [() => () => {}, { q: 's' }, 'reads', flags, 'Look something up.', null, null, null, face(undefined), null],
+      broken: [() => () => {}, {}, 'destroys', flags, 'Always fails.', () => true, null, null, face(['web']), null],
+      note: [() => () => {}, {}, 'writes', [true, false, true], 'Add a note.', null, () => 'Rain at noon', null, face(['web']), 's'],
+      native: [() => () => {}, {}, 'writes', flags, 'Native only.', null, null, null, face(['apple']), null],
+      bare: [() => () => {}, {}, 'writes', flags, 'No face.', null, null, null, null, null],
     });
     await settle();
-    expect(browser.registered.map(r => r.tool.name)).toEqual(['waitFor', 'look', 'broken']);
-    expect(rt.journal.filter(l => l.startsWith('webmcp'))).toEqual(['webmcp waitFor: registered', 'webmcp look: registered', 'webmcp broken: registered']);
+    expect(browser.registered.map(r => r.tool.name)).toEqual(['waitFor', 'look', 'broken', 'note']);
+    expect(rt.journal.filter(l => l.startsWith('webmcp'))).toEqual(['webmcp waitFor: registered', 'webmcp look: registered', 'webmcp broken: registered',
+      'webmcp note: registered']);
 
-    const [wait] = browser.named('waitFor'), [look] = browser.named('look'), [broken] = browser.named('broken');
+    const [wait] = browser.named('waitFor'), [look] = browser.named('look'), [broken] = browser.named('broken'), [note] = browser.named('note');
     expect(wait.tool).toMatchObject({
       title: 'Wait For', description: 'Wait for ms milliseconds.',
-      inputSchema: { type: 'object', properties: { ms: { type: 'integer', title: 'Milliseconds' }, size: { type: 'string', enum: ['small', 'large'], title: 'Size' } },
-        required: ['ms', 'size'], additionalProperties: false },
-      annotations: { readOnlyHint: false, consequentialHint: true },
+      inputSchema: { type: 'object', properties: { ms: { type: 'integer', title: 'Milliseconds', description: 'How long, in milliseconds.' },
+        size: { type: 'string', enum: ['small', 'large'], title: 'Size' } }, required: ['ms', 'size'], additionalProperties: false },
+      annotations: { readOnlyHint: false, consequentialHint: true, untrustedContentHint: false },
     });
     expect(look.tool).toMatchObject({ title: 'look', inputSchema: { properties: { q: { type: 'string' } }, required: ['q'] },
-      annotations: { readOnlyHint: true, consequentialHint: false } });
-    expect(broken.tool.annotations).toEqual({ readOnlyHint: false, consequentialHint: true });
+      annotations: { readOnlyHint: true, consequentialHint: false, untrustedContentHint: false } });
+    expect(broken.tool.annotations).toEqual({ readOnlyHint: false, consequentialHint: true, untrustedContentHint: false });
+    // A write that only adds to the app's own data is not consequential; a string it returns may carry text the
+    // author did not write.
+    expect(note.tool.annotations).toEqual({ readOnlyHint: false, consequentialHint: false, untrustedContentHint: true });
 
-    expect(await wait.tool.execute({ ms: 250, size: 'small' })).toBe(1);
+    // The output schema is the envelope, its value typed from `returns`; every result below is one.
+    const envelope = { outcome: 'ok', certainty: 'applied', reason: '', stale: false, skipped: [], value: null, message: '' };
+    expect(wait.tool.outputSchema).toMatchObject({ type: 'object', required: Object.keys(envelope), additionalProperties: false,
+      properties: { value: { anyOf: [{ type: 'number' }, { type: 'null' }] }, certainty: { enum: ['none', 'applied', 'uncertain'] } } });
+    expect(look.tool.outputSchema.properties.value).toEqual({ type: 'null' });
+    expect(note.tool.outputSchema.properties.value.anyOf[0]).toEqual({ type: 'string' });
+    expect(await wait.tool.execute({ ms: 250, size: 'small' })).toEqual({ ...envelope, value: 1 });
     expect(waited).toEqual([[250, 'small']]);
-    expect(await look.tool.execute({ q: 'x' })).toEqual({ outcome: 'ok' });
-    expect(await broken.tool.execute({})).toEqual({ outcome: 'failed', certainty: 'uncertain', reason: '',
+    expect(await look.tool.execute({ q: 'x' })).toEqual(envelope);
+    expect(await note.tool.execute({})).toEqual({ ...envelope, value: 'Rain at noon' });
+    expect(await broken.tool.execute({})).toEqual({ ...envelope, outcome: 'failed', certainty: 'uncertain',
       message: 'It may or may not have taken effect: read before calling again.' });
-    expect(await wait.tool.execute({ ms: 'soon', size: 'small' })).toEqual({ outcome: 'refused', certainty: 'none', reason: 'arguments',
+    expect(await wait.tool.execute({ ms: 'soon', size: 'small' })).toEqual({ ...envelope, outcome: 'refused', certainty: 'none', reason: 'arguments',
       message: 'ms: a finite number, not "soon"' });
     expect(globalThis.exact.calls.state().calls.map(c => [c.tool, c.door, c.outcome])).toEqual([
-      ['waitFor', 'web', 'ok'], ['look', 'web', 'ok'], ['broken', 'web', 'failed'], ['waitFor', 'web', 'refused']]);
+      ['waitFor', 'web', 'ok'], ['look', 'web', 'ok'], ['note', 'web', 'ok'], ['broken', 'web', 'failed'], ['waitFor', 'web', 'refused']]);
 
     open = false;
     await commit();
@@ -101,7 +114,7 @@ test('a refused registration is journalled, and offered again only after the too
   const lines = () => rt.journal.filter(l => l.startsWith('webmcp'));
   try {
     let open = true;
-    tools({ look: [() => () => {}, {}, 'reads', flags, 'Look.', null, null, () => open, face(['web'])] });
+    tools({ look: [() => () => {}, {}, 'reads', flags, 'Look.', null, null, () => open, face(['web']), null] });
     await settle();
     expect(lines()).toEqual(['webmcp look: refused: InvalidStateError: Duplicate tool name']);
     // A refusal that stands is not retried at every commit.
@@ -124,6 +137,54 @@ test('a refused registration is journalled, and offered again only after the too
     expect(unhandled).toEqual([]);
   } finally {
     process.off('unhandledRejection', listen);
+    Object.assign(globalThis, old);
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('a call its caller aborts while it waits never runs; one aborted after dispatch runs to its end', async () => {
+  const old = { document: globalThis.document, exact: globalThis.exact };
+  const browser = fake();
+  const { dir, tools, rt, held, settle, commit } = await load(browser.registerTool);
+  try {
+    // `slow` owns a request until the test lets it go; `quick` records that it ran.
+    const ticket = {}, ran = [];
+    tools({
+      slow: [() => () => held.Counting.add(ticket), {}, 'writes', flags, 'Slow.', null, () => 'done', null, face(['web']), 's'],
+      quick: [() => () => ran.push('quick'), {}, 'writes', flags, 'Quick.', null, null, null, face(['web']), null],
+    });
+    await settle();
+    const [slow] = browser.named('slow'), [quick] = browser.named('quick');
+    const finish = async () => { held.Counting.delete(ticket); await commit(); };
+    const record = id => globalThis.exact.calls.state().calls.find(c => c.id === id);
+
+    const first = slow.tool.execute({}, { signal: new AbortController().signal });
+    await settle();
+    const waits = new AbortController(), second = quick.tool.execute({}, { signal: waits.signal });
+    await settle();
+    expect(globalThis.exact.calls.state().calls.map(c => [c.tool, c.state])).toEqual([['slow', 'running'], ['quick', 'waiting']]);
+    waits.abort();
+    expect(await second).toEqual({ outcome: 'refused', certainty: 'none', reason: 'cancelled', stale: false, skipped: [], value: null,
+      message: 'Its caller cancelled it before it ran.' });
+    expect(record(2)).toMatchObject({ outcome: 'refused', reason: 'cancelled', cancelled: true });
+    expect(rt.journal).toContain('tool:system:web quick: cancelled before it ran');
+    await finish();
+    expect(await first).toMatchObject({ outcome: 'ok', certainty: 'applied', value: 'done' });
+    expect(ran).toEqual([]);
+
+    // Dispatched, the call's commit has landed: an abort leaves it to finish, and its record says the caller left.
+    const runs = new AbortController(), third = slow.tool.execute({}, { signal: runs.signal });
+    await settle();
+    expect(record(3).state).toBe('running');
+    runs.abort();
+    expect(globalThis.exact.calls.cancel(3)).toEqual({ call: 3, state: 'running' });
+    expect(rt.journal.filter(l => l.includes('its caller cancelled'))).toEqual(['tool:system:web slow: its caller cancelled; it runs to its end']);
+    await finish();
+    expect(await third).toMatchObject({ outcome: 'ok', certainty: 'applied', value: 'done' });
+    expect(record(3)).toMatchObject({ outcome: 'ok', cancelled: true });
+    expect(globalThis.exact.calls.cancel(3)).toEqual({ call: 3, state: 'ended' });
+    expect(globalThis.exact.calls.cancel(9)).toEqual({ error: 'no call 9' });
+  } finally {
     Object.assign(globalThis, old);
     rmSync(dir, { recursive: true, force: true });
   }

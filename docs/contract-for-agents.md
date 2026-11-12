@@ -25,6 +25,7 @@ capabilities.
 - [Composition and lifetime](#composition-and-lifetime)
 - [Data requests and side effects](#data-requests-and-side-effects)
   - [Native sign-in](#native-sign-in-exactsign-in)
+  - [Tools: what a call answers](#tools-what-a-call-answers)
 - [Views, layout, and interaction](#views-layout-and-interaction)
   - [Tabular numbers](#tabular-numbers)
   - [Sound, MIDI and media](#sound-midi-and-media)
@@ -1617,6 +1618,55 @@ answers from a script on the agent's clock. macOS and Linux run it; every
 other target answers `NotSupportedError`, which `processStatus()` says
 ahead. The options, events and limits are `docs/reference.md`'s "Child
 processes".
+
+### Tools: what a call answers
+
+A `tool` line offers a root action to callers outside the app: the agent
+driver, and, through its face in `app.json` `intents.tools`, Siri and
+Shortcuts (App Intents) and a browser's agent
+([WebMCP](https://webmachinelearning.github.io/webmcp/)). Every door
+answers one envelope (LLP 1111 D4), and `state.intents.calls` keeps the
+last twenty with their `door`:
+
+- `outcome`: `ok`, `failed`, `superseded`, `timeout`, `interrupted` or
+  `refused`. `certainty`: `none` (it did not run), `applied` (it ran and
+  its work settled) or `uncertain` (it ran, and its effect may or may not
+  have landed: read before calling again).
+- `reason`, one word where there is one: `unavailable` (not offered on that
+  door, `available when` false, a face that changed), `arguments`, `busy`
+  (5 s behind another call or a wake, what it reports still being answered,
+  storage still writing), `cancelled`, `refused-commit`, `background`,
+  `person-required`.
+- `value` is what `returns` reads (null when refused), and `message` a
+  sentence for the caller. The record adds `cancelled`.
+
+**A cancelled call.** A browser's agent aborting `execute`, or the system
+cancelling an intent's task, cancels the call (the door sends
+`{"op":"cancel","id":<call>}`). One still waiting never runs: `refused`,
+`none`, `cancelled`. One already dispatched runs to its end, since its
+commit has landed and what it started is the app's to finish; its record
+says `cancelled: true`, and the journal that the caller left.
+
+**On the web**, each faced tool is registered with `document.modelContext`:
+
+- `readOnlyHint` for `reads`; `consequentialHint` for `destroys` and for
+  every `writes` except `writes additive closed`, which only adds to the
+  app's own data; `untrustedContentHint` when `returns` is a string, whose
+  text may not be the author's (a note, a review).
+- `outputSchema` is the envelope, its `value` typed from `returns`, and
+  `execute` resolves with it for every outcome. It never rejects: an agent
+  learns nothing of a rejection but "OperationError".
+- A face parameter's `title` and `description` are its input schema's
+  (`"page": { "title": "Page", "description": "The page you have read up
+  to.", "type": "integer" }`); App Intents shows the same two words.
+- A route with no `activate=` that would wait for the reader is `idle` in
+  an app with a faced tool on the web door, so the agent finds the tools
+  once the page has loaded. A declared `activate` is kept.
+- `document.modelContext` exists only in a secure context: on `https`, on
+  `localhost` and on `127.0.0.1`, not on a LAN address over `http`
+  (Chrome 156 with `--enable-features=WebMCPTesting`: none at
+  `http://10.0.0.4:<port>`). To try a LAN host, serve it over HTTPS or
+  start Chrome with `--unsafely-treat-insecure-origin-as-secure=<origin>`.
 
 ## Views, layout, and interaction
 

@@ -92,5 +92,27 @@ final class ContentIndexTests: XCTestCase {
         XCTAssertEqual(body["taken"] as? Bool, true)
         wait(for: [refused], timeout: 5)
     }
+
+    /// A task the system cancelled before its intent posted the call posts
+    /// the cancellation first (`withTaskCancellationHandler`), from any
+    /// thread: the call never reaches a session and is refused `cancelled`.
+    func testACallItsCallerCancelledFirstIsRefusedCancelled() {
+        let refused = expectation(description: "the door answers")
+        let body = NSMutableDictionary(dictionary: ["tool": "logPages", "args": ["page": 1], "door": "apple", "digest": ""])
+        body["reply"] = { (answer: [String: Any]) in
+            XCTAssertEqual(answer["outcome"] as? String, "refused")
+            XCTAssertEqual(answer["certainty"] as? String, "none")
+            XCTAssertEqual(answer["reason"] as? String, "cancelled")
+            refused.fulfill()
+        }
+        let posted = expectation(description: "the cancellation is posted")
+        DispatchQueue.global().async {
+            NotificationCenter.default.post(name: Notification.Name("exact.tools.cancel"), object: body)
+            posted.fulfill()
+        }
+        wait(for: [posted], timeout: 5)
+        NotificationCenter.default.post(name: Notification.Name("exact.tools.call"), object: body)
+        wait(for: [refused], timeout: 5)
+    }
 }
 #endif

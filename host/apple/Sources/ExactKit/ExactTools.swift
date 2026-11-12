@@ -5,7 +5,9 @@
 // calls `ExactTools.call` directly. Either way the call is handed to the
 // session's runner, which runs it as an invocation of origin `tool`
 // (runner/src/runner/modules/calls.rs), and the door polls it by id until it
-// ends.
+// ends. The module posts `exact.tools.cancel` with the same dictionary when
+// the system cancels the intent's task, and the door passes that on to the
+// runner, which drops a call still waiting and lets one that runs finish.
 //
 // A call that launched the app with no scene boots the session with none,
 // as a wake does (LLP 1133.017 D7): `boot`, which the app's host sets.
@@ -37,7 +39,15 @@ public enum ExactTools {
             body["taken"] = true
             let args = body["args"] as? [String: Any] ?? [:]
             let door = body["door"] as? String ?? "apple", digest = body["digest"] as? String
-            DispatchQueue.main.async { call(tool: tool, args: args, door: door, digest: digest, reply: reply) }
+            DispatchQueue.main.async {
+                call(tool: tool, args: args, door: door, digest: digest, cancelled: { body["cancelled"] as? Bool == true }, reply: reply)
+            }
+        }
+        // Posted from the task's cancellation handler, on any thread; the call reads the mark on the main thread. A
+        // task cancelled before it posted its call posts this first, so the mark is set before the call is taken.
+        NotificationCenter.default.addObserver(forName: Notification.Name("exact.tools.cancel"), object: nil, queue: nil) { note in
+            guard let body = note.object as? NSMutableDictionary else { return }
+            DispatchQueue.main.async { body["cancelled"] = true }
         }
         ExactContentIndex.install()
     }
@@ -46,13 +56,16 @@ public enum ExactTools {
     /// envelope: `outcome` (`ok`, `failed`, `superseded`, `timeout`,
     /// `refused`), `certainty`, `reason`, `value` and `message`. `digest` is
     /// the face's the caller was compiled with (D8), checked against the
-    /// plan's. Main thread.
+    /// plan's. `cancelled` says whether the caller has cancelled it, which
+    /// the runner is told. Main thread.
     public static func call(tool: String, args: [String: Any], door: String = "apple", digest: String? = nil,
-                            reply: @escaping ([String: Any]) -> Void) {
+                            cancelled: @escaping () -> Bool = { false }, reply: @escaping ([String: Any]) -> Void) {
         let started = Date()
         let refuse = { (reason: String, message: String) in
             reply(["outcome": "refused", "certainty": "none", "reason": reason, "message": message])
         }
+        let dropped = { refuse("cancelled", "Its caller cancelled it before it ran.") }
+        if cancelled() { return dropped() }
         guard let session = ExactApp.shared.sessions.first(where: { $0.state != .destroyed }) else {
             return refuse("unavailable", "The app has no session to call.")
         }
@@ -64,6 +77,7 @@ public enum ExactTools {
         }
         #endif
         func hand() {
+            if cancelled() { return dropped() }
             guard session.state != .destroyed else { return refuse("unavailable", "The app's session ended.") }
             guard session.booted else {
                 if Date().timeIntervalSince(started) > bootBound { return refuse("busy", "The app did not start in time.") }
@@ -76,7 +90,12 @@ public enum ExactTools {
                 return refuse("unavailable", answer["error"] as? String ?? "The app refused the call.")
             }
             let handed = Date()
+            var told = false
             func poll() {
+                if !told, cancelled() {
+                    told = true
+                    _ = session.agent(text(["op": "cancel", "id": id]))
+                }
                 let polled = json(session.agent(text(["op": "called", "id": id])))
                 if polled["outcome"] != nil { return reply(polled) }
                 if polled["error"] != nil || Date().timeIntervalSince(handed) > endBound {
