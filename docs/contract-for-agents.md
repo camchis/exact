@@ -4163,10 +4163,15 @@ and a window driven by the agent's virtual clock leave FPS unavailable.
 `processMemoryBytes`, `gameHeapBytes`, `textureMemoryBytes` and
 `geometryMemoryBytes` are optional byte counts. `audioState`, `thermalState`
 and `quality` are optional strings; `idle` is an optional boolean. Hosts and
-surfaces report only measurements they actually support. The initial game
-renderer reports render dimensions, scale, samples, draw counts, frame pacing,
-and CPU tick/feed/encode durations; GPU, memory and audio measurements remain
-unavailable. The 16 KiB snapshot limit is separate from the public surface
+surfaces report only measurements they actually support. The game renderer
+reports render dimensions, scale, samples, draw counts, frame pacing, CPU
+tick/feed/encode durations, and on every host: `quality`, the resolved rung
+(`low`, `mid`, `high`) once a binding resolved it; `maxFps`, the frame cap in
+force, `none` when the canvas draws at the display's rate; and `idle`, true
+while the canvas rests between changes (`none` under the agent's virtual
+clock). `thermalState` is `nominal`, `fair`, `serious` or `critical` where the
+host reads the device's (Apple), `none` elsewhere. GPU, memory and audio
+measurements remain unavailable. The 16 KiB snapshot limit is separate from the public surface
 record's limit.
 
 A GPU HUD can show its last successful publication while its world loads:

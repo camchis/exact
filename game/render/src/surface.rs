@@ -672,9 +672,16 @@ impl<G: Game, P: Executor, const ASSETS: bool, H: crate::Hooks> Surface
         }
     }
     fn take_performance(&mut self, now_ms: f64) -> Option<String> {
+        self.perf.reporting.as_ref()?;
+        let live = performance::Live {
+            thermal: self.timing.thermal_state,
+            quality: self.rung.map(|rung| rung.level.keyword()),
+            max_fps: self.max_fps(),
+            idle: self.resting,
+        };
         let report = self.perf.reporting.as_mut()?;
         report.clock(self.seekable);
-        report.take(now_ms)
+        report.take(now_ms, &live)
     }
     fn published(&mut self) -> Option<String> {
         self.sim.as_mut().and_then(Sim::take_published)

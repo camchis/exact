@@ -713,8 +713,9 @@ reports zero. The first snapshot, virtual-clock snapshots and the first after a
 clock-mode change leave these fields unavailable. A clock-mode change discards the
 open measurement window. Delayed snapshots use their actual elapsed time.
 The cadence comparison honors the canvas frame cap and excludes virtual time and
-the first frame after rest. CPU encoding is distinct from queue submission and GPU
-execution; unsupported timing, memory and audio
+the first frame after rest. `thermalState`, `quality`, `maxFps` and `idle` are
+read when the snapshot is taken, not over the window. CPU encoding is distinct
+from queue submission and GPU execution; unsupported timing, memory and audio
 fields stay unavailable. No simulation state, save or hash contains these readings.
 
 ### Texture families
