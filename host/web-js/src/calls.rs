@@ -6,7 +6,7 @@ use exact_plan::{DerivesId, Plan};
 use std::fmt::Write as _;
 
 /// Each tool by name: `[action, its parameters as a record type,
-/// consequence, [additive, idempotent, closed], description, fails,
+/// consequence, [additive, idempotent, closed, sends], description, fails,
 /// returns, available, face, the type returns has]`, a clause a thunk of its
 /// derive (the actions and derives are declared after this call) or null,
 /// the face its JSON or null, the type null without `returns`. Returns the
@@ -17,8 +17,8 @@ pub fn tools(plan: &Plan, body: &mut String) -> String {
     }
     let text = |s: &str| serde_json::to_string(s).unwrap();
     let thunk = |d: Option<DerivesId>| d.map_or("null".into(), |d| format!("()=>d_{}()", d.0));
-    let rows: Vec<String> = (plan.tools.iter())
-        .map(|t| {
+    let rows: Vec<String> = (plan.tools.iter().enumerate())
+        .map(|(i, t)| {
             let action = plan.action(t.action);
             let params: Vec<String> = (action.params.iter())
                 .map(|p| {
@@ -38,7 +38,7 @@ pub fn tools(plan: &Plan, body: &mut String) -> String {
                 surface_type_json(plan, plan.derives[d.0 as usize].ty)
             });
             format!(
-                "{}:[()=>a_{},{{{}}},{},[{},{},{}],{},{},{},{},{face},{returns}]",
+                "{}:[()=>a_{},{{{}}},{},[{},{},{},{}],{},{},{},{},{face},{returns}]",
                 text(plan.str(t.name)),
                 t.action.0,
                 params.join(","),
@@ -46,6 +46,7 @@ pub fn tools(plan: &Plan, body: &mut String) -> String {
                 t.additive,
                 t.idempotent,
                 t.closed,
+                exact_runner::tools::sends(plan, i),
                 text(plan.str(t.description)),
                 thunk(t.fails),
                 thunk(t.returns),

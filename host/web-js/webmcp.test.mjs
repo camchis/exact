@@ -189,3 +189,65 @@ test('a call its caller aborts while it waits never runs; one aborted after disp
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('only a registration still held is journalled, and a withdrawal\'s own rejection is no refusal', async () => {
+  const old = { document: globalThis.document, exact: globalThis.exact };
+  const unhandled = [], listen = e => unhandled.push(e);
+  process.on('unhandledRejection', listen);
+  try {
+    // The browser accepts at once, and the tool is withdrawn before that answer is heard.
+    {
+      const browser = fake();
+      const { dir, tools, rt } = await load(browser.registerTool);
+      try {
+        let open = true;
+        tools({ look: [() => () => {}, {}, 'reads', flags, 'Look.', null, null, () => open, face(['web']), null] });
+        await Promise.resolve();
+        expect(browser.named('look')).toHaveLength(1);
+        open = false;
+        for (const f of rt.After) f();
+        for (let i = 0; i < 8; i++) await Promise.resolve();
+        expect(browser.named('look')[0].options.signal.aborted).toBe(true);
+        expect(rt.journal.filter(l => l.startsWith('webmcp'))).toEqual(['webmcp look: withdrawn']);
+      } finally { rmSync(dir, { recursive: true, force: true }); }
+    }
+    // The browser has not answered when the tool is withdrawn, and rejects with the signal's reason (§4.2,
+    // registerTool's abort steps): that is the withdrawal, not a refusal, and the tool is offered again when available.
+    {
+      const browser = fake(({ options }) => new Promise((_, reject) => options.signal.addEventListener('abort', () => reject(options.signal.reason))));
+      const { dir, tools, rt, settle, commit } = await load(browser.registerTool);
+      try {
+        let open = true;
+        tools({ look: [() => () => {}, {}, 'reads', flags, 'Look.', null, null, () => open, face(['web']), null] });
+        await settle();
+        open = false;
+        await commit();
+        open = true;
+        await commit();
+        expect(browser.named('look')).toHaveLength(2);
+        expect(rt.journal.filter(l => l.startsWith('webmcp'))).toEqual(['webmcp look: withdrawn']);
+      } finally { rmSync(dir, { recursive: true, force: true }); }
+    }
+    expect(unhandled).toEqual([]);
+  } finally {
+    process.off('unhandledRejection', listen);
+    Object.assign(globalThis, old);
+  }
+});
+
+test('a reads tool whose reach sends is not read-only (LLP 1111 D3)', async () => {
+  const old = { document: globalThis.document, exact: globalThis.exact };
+  const browser = fake();
+  const { dir, tools, settle } = await load(browser.registerTool);
+  try {
+    tools({
+      look: [() => () => {}, {}, 'reads', [false, false, true, false], 'Look.', null, null, null, face(['web']), null],
+      search: [() => () => {}, {}, 'reads', [false, false, true, true], 'Search.', null, null, null, face(['web']), null],
+    });
+    await settle();
+    expect(browser.registered.map(r => [r.tool.name, r.tool.annotations.readOnlyHint])).toEqual([['look', true], ['search', false]]);
+  } finally {
+    Object.assign(globalThis, old);
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

@@ -11,10 +11,10 @@
 //
 // Each faced tool is offered to the browser's agent through WebMCP where the page has `document.modelContext`
 // (https://webmachinelearning.github.io/webmcp/, D8): registered with an input schema from the plan's types and the
-// face's words, an output schema of the call's envelope, its annotations (`readOnlyHint` for `reads`,
-// `consequentialHint` for a `destroys` and for a `writes` but an `additive closed` one, `untrustedContentHint` for a
-// string `returns`), withdrawn while `available when` is false, and its `execute` a call through the `web` door, which
-// the caller's abort cancels.
+// face's words, an output schema of the call's envelope, its annotations (`readOnlyHint` for a `reads` that sends
+// nothing, `consequentialHint` for a `destroys` and for a `writes` but an `additive closed` one, `untrustedContentHint`
+// for a string `returns`), withdrawn while `available when` is false, and its `execute` a call through the `web` door,
+// which the caller's abort cancels.
 import { clock, data, After, Clocked, Mutations, Origin, say, time as refreshTime, drive, order } from "./rt.js";
 import { Counting, heldTickets } from "./held.js";
 
@@ -81,7 +81,7 @@ function output(type) {
   return { type: "object", properties, required: Object.keys(properties), additionalProperties: false };
 }
 
-/** `table`: tool name → [action, its parameters as a record type, consequence, [additive, idempotent, closed],
+/** `table`: tool name → [action, its parameters as a record type, consequence, [additive, idempotent, closed, sends],
  * description, fails, returns, available (each a thunk or null), face (an object or null), the type `returns` has (or
  * null)]. */
 export function tools(table) {
@@ -246,7 +246,7 @@ export function tools(table) {
     // refusal that stands (a name another script holds) is not retried at every commit.
     const offered = new Map(), turnedDown = new Set();
     const offer = () => {
-      for (const [name, [, params, consequence, [additive, , closed], description, , , available, face, returns]] of Object.entries(table)) {
+      for (const [name, [, params, consequence, [additive, , closed, sends], description, , , available, face, returns]] of Object.entries(table)) {
         if (!face || (face.doors && !face.doors.includes("web"))) continue;
         const on = !(available && available() === false);
         if (!on) turnedDown.delete(name);
@@ -264,12 +264,16 @@ export function tools(table) {
           say(`webmcp ${name}: refused: ${e?.name}: ${e?.message}`);
           if (offered.get(name) === signal) { offered.delete(name); turnedDown.add(name); }
         };
+        // Only a registration still held is journalled as registered: one withdrawn before the browser answered is
+        // not offered, whatever its promise says.
+        const registered = () => { if (offered.get(name) === signal && !signal.signal.aborted) say(`webmcp ${name}: registered`); };
         Promise.resolve(context.registerTool({
           name, title: face.title ?? name, description, inputSchema: input, outputSchema: output(returns),
-          // `consequentialHint`: "significant, real-world, or non-reversible" (§4.2.1), so every write but one that only
-          // adds to the app's own data. `untrustedContentHint`: a string `returns` may carry text the author did not
-          // write, such as a note or a review (§6.4.4); a number or a bool cannot.
-          annotations: { readOnlyHint: consequence === "reads", consequentialHint: consequence === "destroys" || (consequence === "writes" && !(additive && closed)),
+          // `readOnlyHint`: a `reads` tool whose reach sends nothing, since what a source does with a send is the module's
+          // (LLP 1111 D3). `consequentialHint`: "significant, real-world, or non-reversible" (§4.2.1), so every write but
+          // one that only adds to the app's own data. `untrustedContentHint`: a string `returns` may carry text the author
+          // did not write, such as a note or a review (§6.4.4); a number or a bool cannot.
+          annotations: { readOnlyHint: consequence === "reads" && !sends, consequentialHint: consequence === "destroys" || (consequence === "writes" && !(additive && closed)),
             untrustedContentHint: returns === "s" },
           // The caller's abort (§4.2.2) cancels the call: dropped while it waits, run to its end once dispatched.
           execute: (input, options) => new Promise(resolve => {
@@ -279,7 +283,7 @@ export function tools(table) {
             if (abort?.aborted) cancel(r.call);
             else abort?.addEventListener("abort", () => cancel(r.call), { once: true });
           }).then(({ outcome, certainty, reason, stale, skipped, value, message }) => ({ outcome, certainty, reason, stale, skipped, value, message })),
-        }, { signal: signal.signal })).then(() => say(`webmcp ${name}: registered`), refused);
+        }, { signal: signal.signal })).then(registered, refused);
       }
     };
     After.push(offer);

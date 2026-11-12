@@ -159,13 +159,18 @@ fn call(r: &mut Runner<Later>, tool: &str, args: &str) {
 #[test]
 fn the_tool_line_is_the_plans_tools_row() {
     let plan = contract::compile(APP).unwrap();
-    let rows: Vec<String> = (plan.tools.iter())
-        .map(|t| {
+    let rows: Vec<String> = (plan.tools.iter().enumerate())
+        .map(|(i, t)| {
             format!(
                 "{} {} {:?} {} {} {}",
                 plan.str(t.name),
                 plan.str(t.consequence),
-                [t.additive, t.idempotent, t.closed],
+                [
+                    t.additive,
+                    t.idempotent,
+                    t.closed,
+                    exact_runner::tools::sends(&plan, i)
+                ],
                 plan.str(plan.action(t.action).name),
                 t.returns.is_some(),
                 t.fails.is_some()
@@ -175,10 +180,20 @@ fn the_tool_line_is_the_plans_tools_row() {
     assert_eq!(
         rows,
         [
-            "bump writes [false, false, true] bump true true",
-            "look reads [false, false, false] look false false",
+            "bump writes [false, false, true, true] bump true true",
+            "look reads [false, false, false, false] look false false",
         ]
     );
+    // A `reads` tool whose reach sends, here through an action its action
+    // calls, is not read-only (LLP 1111 D3).
+    let peeks = APP.replacen(
+        "  action bump",
+        "  tool peek reads \"Peek.\" = peek\n  action peek\n    turn()\n  action bump",
+        1,
+    );
+    let plan = contract::compile(&peeks).unwrap_or_else(|e| panic!("{e:?}"));
+    let peek = plan.tools.iter().position(|t| plan.str(t.name) == "peek");
+    assert!(exact_runner::tools::sends(&plan, peek.unwrap()));
     for (line, id) in [
         ("  tool x reads \"X.\" = nothing\n", "tool-action"),
         (

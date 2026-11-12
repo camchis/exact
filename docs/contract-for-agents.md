@@ -1649,10 +1649,12 @@ says `cancelled: true`, and the journal that the caller left.
 
 **On the web**, each faced tool is registered with `document.modelContext`:
 
-- `readOnlyHint` for `reads`; `consequentialHint` for `destroys` and for
-  every `writes` except `writes additive closed`, which only adds to the
-  app's own data; `untrustedContentHint` when `returns` is a string, whose
-  text may not be the author's (a note, a review).
+- `readOnlyHint` for a `reads` tool whose reach (its action, the actions
+  it calls, the `then`s of what it sends) has no `send`; `consequentialHint`
+  for `destroys` and for every `writes` except `writes additive closed`,
+  which only adds to the app's own data; `untrustedContentHint` when
+  `returns` is a string, whose text may not be the author's (a note, a
+  review).
 - `outputSchema` is the envelope, its `value` typed from `returns`, and
   `execute` resolves with it for every outcome. It never rejects: an agent
   learns nothing of a rejection but "OperationError".
