@@ -423,6 +423,22 @@ class ScrollTouchTest {
         assertNull(pull())
     }
 
+    // What review of the first version found.
+
+    @Test fun aTouchThatEndedBeforeItsAnswerScrollsThoughALaterTouchBegan() {
+        down(400f); move(380f); move(340f); move(300f); up(300f)
+        // The next touch comes down before exact2 has answered for the first.
+        down(400f)
+        answer(reply(scroller(1, 0f)))
+        assertEquals(100f - slop, thread.moved[1]!!, 0.01f)
+        assertEquals("its fling stopped where the next touch came down",
+            listOf("start 1", "move 1", "move 1", "move 1", "end 1 flings", "rest 1"), Host.told)
+        assertEquals("exact2 is told to cancel nothing: the first ended, the second is its own", listOf(0, 2, 2, 2, 1, 0), thread.touches)
+        answer(reply(scroller(1, 0f)))
+        move(380f); move(340f)
+        assertEquals("the second scrolls on from there", 100f - slop + 60f - slop, thread.moved[1]!!, 0.01f)
+    }
+
     private fun ExactView.scrolling(): Scrolling =
         ExactView::class.java.getDeclaredField("scrolling").apply { isAccessible = true }.get(this) as Scrolling
 

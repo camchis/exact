@@ -137,8 +137,15 @@ internal class Scrolling(private val view: ExactView) {
     private var flingAt = 0
     /** Where the drag's innermost scroller was when the drag began, along its axis ([snapRest]'s start). */
     private var dragFrom = 0f
-    /** What came of the touch that is down before exact2's answer for it ([touch]). */
+    /** What came of the touch that is down before exact2's answer for it ([touch]), and its down. */
     private val early = ArrayList<MotionEvent>()
+    private var down: MotionEvent? = null
+    /** A touch that ended before exact2's answer for it came, while a later one began: its serial, its down and what
+     * followed. Answers come in the order the downs were asked about, so these are taken in order ([owed]). */
+    private class Owed(val serial: Int, val events: List<MotionEvent>)
+    private val owing = ArrayDeque<Owed>()
+    /** An earlier touch is being taken now ([owed]): exact2 heard all of it already, so nothing is cancelled there. */
+    private var replaying = false
     /** The scroller whose drag, and then the fling it threw, exact2 is told of ([dragged], [lifted], [rested]): the
      * innermost the drag moves. */
     private var held: Scroller? = null
@@ -154,7 +161,14 @@ internal class Scrolling(private val view: ExactView) {
      */
     fun touch(e: MotionEvent): Boolean {
         if (e.actionMasked == MotionEvent.ACTION_DOWN) {
-            forget()
+            val ended = early.any { it.actionMasked == MotionEvent.ACTION_UP || it.actionMasked == MotionEvent.ACTION_CANCEL }
+            val first = down
+            if (mode == WATCHING && !answered && ended && first != null) {
+                // The touch before this one is over and still waits for its answer: it is taken when that comes.
+                owing.addLast(Owed(serial, listOf(first) + early))
+                early.clear(); down = null
+            } else forget()
+            down = MotionEvent.obtain(e)
             tracker?.recycle()
             tracker = VelocityTracker.obtain().also { it.addMovement(e) }
             pointer = e.getPointerId(0); tool = e.getToolType(0)
@@ -244,10 +258,45 @@ internal class Scrolling(private val view: ExactView) {
         while (early.isNotEmpty()) next(serial)
     }
 
+    /**
+     * The answer [w] for touch [o], which ended before it came while a later touch began: [o] is taken now, from its
+     * down to its end, as it would have been had its answer come at once, and a fling it threw stops where the later
+     * touch came down. The later touch, which has done nothing yet but wait for its own answer, is set aside meanwhile.
+     */
+    private fun owed(o: Owed, w: IntArray) {
+        val held = ArrayList(early); early.clear()
+        val heldDown = down; down = null
+        val heldTracker = tracker
+        val at = floatArrayOf(downX, downY, lastX, lastY)
+        val heldPointer = pointer; val heldTool = tool; val heldMode = mode
+        replaying = true
+        try {
+            val first = o.events[0]
+            tracker = VelocityTracker.obtain().also { it.addMovement(first) }
+            pointer = first.getPointerId(0); tool = first.getToolType(0)
+            downX = first.x; downY = first.y; lastX = first.x; lastY = first.y
+            mode = WATCHING
+            if (w.size >= 3) {
+                answered(w)
+                for (e in o.events.drop(1)) take(e)
+            }
+            if (mode == FLINGING) { halt(); mode = IDLE }
+        } finally {
+            replaying = false
+            for (e in o.events) e.recycle()
+            tracker?.recycle()
+            tracker = heldTracker; early.addAll(held); down = heldDown
+            downX = at[0]; downY = at[1]; lastX = at[2]; lastY = at[3]
+            pointer = heldPointer; tool = heldTool
+            mode = heldMode; answered = false; chain = emptyList(); claims = 0
+        }
+    }
+
     /** What came of the touch before exact2's answer, let go of. */
     private fun forget() {
         for (e in early) e.recycle()
         early.clear()
+        down?.recycle(); down = null
     }
 
     /**
@@ -256,6 +305,8 @@ internal class Scrolling(private val view: ExactView) {
      * so neither does a lift that came before it: nothing scrolls or flings in a window that is not shown.
      */
     fun stopped() {
+        for (o in owing) for (e in o.events) e.recycle()
+        owing.clear()
         if (mode == DRAGGING) lifted(0f, false)
         pulling?.let { pulled(it, false) }
         dismissal.lifted(0f)
@@ -271,7 +322,13 @@ internal class Scrolling(private val view: ExactView) {
      * nothing itself: what came of the touch meanwhile is taken after it ([next], [caughtUp]).
      */
     fun under(serial: Int, w: IntArray) {
-        if (serial != this.serial || mode != WATCHING || w.size < 3) return
+        if (serial != this.serial) { owing.firstOrNull { it.serial == serial }?.let { owing.remove(it); owed(it, w) }; return }
+        if (mode != WATCHING || w.size < 3) return
+        answered(w)
+    }
+
+    /** The claims and the scrollers of exact2's answer [w], for the touch being taken. */
+    private fun answered(w: IntArray) {
         claims = w[0]
         val links = ArrayList<Link>(w[1])
         // After the claims and the count, the hosted field under the touch ([Fields.under]); then the scrollers.
@@ -334,7 +391,7 @@ internal class Scrolling(private val view: ExactView) {
         // crossed the slop went far past it (a quick swipe, or moves held back until a late answer).
         lastX = if (sideways) downX + sign(x - downX) * slop else x
         lastY = if (sideways) y else downY + sign(y - downY) * slop
-        view.forward(3, x, y, tool, 0L)
+        if (!replaying) view.forward(3, x, y, tool, 0L)
         dragged()
     }
 

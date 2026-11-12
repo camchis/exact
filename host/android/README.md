@@ -352,7 +352,9 @@ answer for its down. A frame that answers late loses nothing: what came of the t
 finger, a finger that lifted, the lift itself) is kept and taken in order when the answer comes, as it would have been
 had it come at once (`Scrolling.next`, `caughtUp`). A hosted field that held the touch gets each held event after the
 scroll has seen it, so a field that asks to keep its touch keeps it and one the scroll takes is cancelled where it is.
-A touch whose activity stops, or whose view leaves its window, before the answer is forgotten: nothing scrolls or
+A touch that ends before its answer while the next one comes down is taken when its answer comes, from its down to its
+end, the later touch set aside meanwhile, and a fling it throws stops where the later touch came down. A touch whose
+activity stops, or whose view leaves its window, before the answer is forgotten: nothing scrolls or
 flings for it after.
 
 A finger that lands on a list while it flings stops it and has it, as on the platform's lists, and exact2 hears
