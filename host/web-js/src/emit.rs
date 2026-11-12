@@ -132,6 +132,8 @@ struct Em<'a> {
     flow: bool,
     /// Whether a virtualized list is in the plan (`list.js` is imported).
     list: bool,
+    /// Whether an ordinary scroller takes `scrollFollowEnd` (`follow.js` is imported).
+    follow: bool,
     /// Whether a `video` or `audio` is in the plan (`media.js` is installed).
     media: bool,
     /// Whether an image draws a symbol (`symbols.js`), and whether a
@@ -239,6 +241,7 @@ pub fn emit(plan: &Plan, site_attrs: bool, dev_reload: bool) -> Result<Output, S
         editor: false,
         flow: false,
         list: false,
+        follow: false,
         media: false,
         symbols: (false, false),
         heights: Default::default(),
@@ -787,6 +790,7 @@ pub fn emit(plan: &Plan, site_attrs: bool, dev_reload: bool) -> Result<Output, S
             (!commands.is_empty(), commands_import.as_str()),
             (paint, "import{paintUse as $paint}from\"./paint.js\";"),
             (em.list, "import{vl as $vl}from\"./list.js\";"),
+            (em.follow, "import\"./follow.js\";"),
             (em.media, "import{mediaUse as $media}from\"./media.js\";"),
             (links, "import{linkUse as $links}from\"./links.js\";"),
             (midi, "import{midi as $midi}from\"./midi.js\";"),
@@ -1110,6 +1114,20 @@ impl Em<'_> {
             let _ = write!(self.out, "{register}({e});");
         }
         self.element_extras(&parts.tag, &e, &attrs, &parts.props);
+        // An ordinary scroller's `scrollFollowEnd`, constant or bound (follow.js); a list's is list.js's.
+        let bound_follow = row
+            .bindings
+            .iter()
+            .map(|b| plan.binding(b))
+            .any(|b| b.kind == BindingKind::Prop && b.id == PropId::ScrollFollowEnd as u16);
+        if !virtualized && (bound_follow || parts.props.get("scrollFollowEnd").is_some()) {
+            self.follow = true;
+            if let Some(v) = parts.props.get("scrollFollowEnd") {
+                let p = self.uses.rt("P");
+                let v = serde_json::to_string(v).unwrap();
+                let _ = write!(self.out, "{p}({e},\"scrollFollowEnd\",()=>{v});");
+            }
+        }
         // Its surface's inputs, named or positional (LLP 1009 D2).
         if let Some(sf) = row.surface {
             let sf = &plan.surfaces[sf.0 as usize];
