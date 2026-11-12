@@ -898,7 +898,7 @@ public final class ExactSession {
             sampler?.reset(); frameHealth.reset() // a new runner numbers its transactions afresh (LLP 1079 D3)
             // A fresh boot over a running app (the dev menu's reload from the baked plan) starts the views over; the library already replaced its host.
             routerOp = nil
-            generation += 1
+            generation += 1; replaceBackgroundActions()
             if booted { awaitingTree = true; resetHeld(); viewsEpoch += 1; forgetAppearances(); presenter.launchAutofocusReleased = false } // a fresh boot's autofocus waits again
             booted = true; app.liveBooted(self)
             text.commitFonts()
@@ -996,7 +996,7 @@ public final class ExactSession {
         text = candidate.text
         text.commitFonts()
         updateToken = candidate.token
-        generation += 1
+        generation += 1; replaceBackgroundActions()
         return batch
     }
 

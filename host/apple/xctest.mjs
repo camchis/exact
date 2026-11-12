@@ -55,6 +55,11 @@ export function compileFixtures(root, run, env, dir, prefix, appId) {
   contract([resolve(root, 'host/apple/tests/fixtures/nested-panel-tabs.contract'), '-o', env[`${prefix}_NESTED_PANEL_TABS_PLAN`] = resolve(dir, 'nested-panel-tabs.plan')]);
   // NavigationMoreIOSTests': more tabs than an iPhone's tab bar shows, so UIKit lists some under More.
   contract([resolve(root, 'host/apple/tests/fixtures/more-tabs.contract'), '-o', env[`${prefix}_MORE_TABS_PLAN`] = resolve(dir, 'more-tabs.plan')]);
+  // NotificationActionTests': a post's declared actions and the root's handler.
+  contract([resolve(root, 'host/apple/tests/fixtures/notification-actions.contract'), '-o', env[`${prefix}_NOTIFICATION_ACTIONS_PLAN`] = resolve(dir, 'notification-actions.plan')]);
+  const noActions = resolve(dir, 'notification-no-actions.contract');
+  writeFileSync(noActions, readFileSync(resolve(root, 'host/apple/tests/fixtures/notification-actions.contract'), 'utf8').replace(/, actions=\[.*\]/, ''));
+  contract([noActions, '-o', env[`${prefix}_NOTIFICATION_NO_ACTIONS_PLAN`] = resolve(dir, 'notification-no-actions.plan')]);
   contract([resolve(root, 'host/apple/tests/fixtures/feedback-race.contract'), '-o', env[`${prefix}_FEEDBACK_RACE_PLAN`] = resolve(dir, 'feedback-race.plan')]);
   contract([resolve(root, 'host/apple/tests/fixtures/async-advance.contract'), '-o', env[`${prefix}_ASYNC_ADVANCE_PLAN`] = resolve(dir, 'async-advance.plan')]);
   contract([resolve(root, 'host/apple/tests/fixtures/save-text.contract'), '-o', env[`${prefix}_SAVE_TEXT_PLAN`] = resolve(dir, 'save-text.plan')]);

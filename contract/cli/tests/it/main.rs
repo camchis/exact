@@ -146,6 +146,7 @@ mod navigation_detent;
 mod navigation_split;
 mod negative_margin;
 mod notify;
+mod notify_actions;
 mod observe_commands;
 mod orientationlock;
 mod overlay;
