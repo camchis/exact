@@ -344,6 +344,14 @@ it may be a tap, a press or a gesture of exact2's own. Once the finger has moved
   press fires. No more of that touch reaches exact2;
 - else it stays exact2's.
 
+The drag takes the way the finger went past the slop, as RecyclerView's does. Whose a touch is waits for exact2's
+answer for its down. A frame that answers late loses nothing: what came of the touch meanwhile (its moves, a second
+finger, a finger that lifted, the lift itself) is kept and taken in order when the answer comes, as it would have been
+had it come at once (`Scrolling.next`, `caughtUp`). A hosted field that held the touch gets each held event after the
+scroll has seen it, so a field that asks to keep its touch keeps it and one the scroll takes is cancelled where it is.
+A touch whose activity stops, or whose view leaves its window, before the answer is forgotten: nothing scrolls or
+flings for it after.
+
 A finger that lands on a list while it flings stops it and has it, as on the platform's lists, and exact2 hears
 nothing of that touch.
 

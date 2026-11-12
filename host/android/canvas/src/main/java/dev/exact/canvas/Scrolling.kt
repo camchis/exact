@@ -16,6 +16,7 @@ import android.widget.OverScroller
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.roundToInt
+import kotlin.math.sign
 
 /**
  * A finger scrolls (LLP 1115.001 D7.1 to D7.3). The gesture and its physics are the reader's, with the platform's own
@@ -117,38 +118,52 @@ internal class Scrolling(private val view: ExactView) {
     private var flingAt = 0
     /** Where the drag's innermost scroller was when the drag began, along its axis ([snapRest]'s start). */
     private var dragFrom = 0f
+    /** What came of the touch that is down before exact2's answer for it ([touch]). */
+    private val early = ArrayList<MotionEvent>()
 
     /**
      * A touch event: whether it was taken here (a scroll's), so that exact2 does not hear it. A down, and every move
      * until the touch is known to be a scroll, goes on to exact2: it may be a tap, a press, or a gesture of its own.
+     *
+     * Nothing of a touch is decided before exact2's answer for its down ([under]) says what is under it. What comes
+     * before the answer is kept ([early]) and taken when it comes, event by event and in order, as it would have been
+     * had the answer come at once ([next], [caughtUp]): a frame that answers late loses none of the finger's way, its
+     * turns at a scroller's end, a finger that lifted, or the lift itself.
      */
     fun touch(e: MotionEvent): Boolean {
-        when (e.actionMasked) {
-            MotionEvent.ACTION_DOWN -> {
-                tracker?.recycle()
-                tracker = VelocityTracker.obtain().also { it.addMovement(e) }
-                pointer = e.getPointerId(0); tool = e.getToolType(0)
-                downX = e.x; downY = e.y; lastX = e.x; lastY = e.y
-                serial++
-                if (mode == FLINGING) {
-                    // A finger on a list that is flinging stops it and has it, as the platform's lists do: no press.
-                    halt()
-                    // The drag that catches it begins where it was caught ([snapRest]'s start).
-                    if (active.any { it.port.contains(e.x, e.y) }) {
-                        mode = DRAGGING
-                        dragFrom = active.first().at(sideways)
-                        return true
-                    }
+        if (e.actionMasked == MotionEvent.ACTION_DOWN) {
+            forget()
+            tracker?.recycle()
+            tracker = VelocityTracker.obtain().also { it.addMovement(e) }
+            pointer = e.getPointerId(0); tool = e.getToolType(0)
+            downX = e.x; downY = e.y; lastX = e.x; lastY = e.y
+            serial++
+            if (mode == FLINGING) {
+                // A finger on a list that is flinging stops it and has it, as the platform's lists do: no press.
+                halt()
+                // The drag that catches it begins where it was caught ([snapRest]'s start).
+                if (active.any { it.port.contains(e.x, e.y) }) {
+                    mode = DRAGGING
+                    dragFrom = active.first().at(sideways)
+                    return true
                 }
-                mode = WATCHING; answered = false; chain = emptyList(); claims = 0
-                return false
             }
+            mode = WATCHING; answered = false; chain = emptyList(); claims = 0
+            return false
+        }
+        if (mode == WATCHING && !answered) { early.add(MotionEvent.obtain(e)); return false }
+        return take(e)
+    }
+
+    /** [e], a touch event after the down, once exact2 has answered for the touch: whether the scroll took it. */
+    private fun take(e: MotionEvent): Boolean {
+        when (e.actionMasked) {
             MotionEvent.ACTION_MOVE -> {
                 tracker?.addMovement(e)
                 val i = e.findPointerIndex(pointer)
                 if (i < 0) return mode == DRAGGING
                 val x = e.getX(i); val y = e.getY(i)
-                if (mode == WATCHING && answered) decide(x, y)
+                if (mode == WATCHING) decide(x, y)
                 if (mode != DRAGGING) return false
                 val d = if (sideways) lastX - x else lastY - y
                 lastX = x; lastY = y
@@ -163,14 +178,16 @@ internal class Scrolling(private val view: ExactView) {
                 return true
             }
             MotionEvent.ACTION_POINTER_UP -> {
-                if (mode != DRAGGING) return false
                 val i = e.actionIndex
                 if (e.getPointerId(i) == pointer) {
+                    // The finger followed lifts and one still down is followed, as ScrollView's onSecondaryPointerUp
+                    // has it. Not yet a scroll, the slop is measured from where that finger is now.
                     val other = if (i == 0) 1 else 0
                     pointer = e.getPointerId(other); lastX = e.getX(other); lastY = e.getY(other)
+                    if (mode == WATCHING) { downX = lastX; downY = lastY }
                     tracker?.clear()
                 }
-                return true
+                return mode == DRAGGING
             }
             else -> {
                 val lifted = e.actionMasked == MotionEvent.ACTION_UP
@@ -184,8 +201,47 @@ internal class Scrolling(private val view: ExactView) {
     }
 
     /**
+     * The next event of the touch that came before exact2's answer for it ([early]), taken now that the answer has
+     * come: whether the scroll has the touch from it on. A touch a hosted field held for itself is let go of one event
+     * at a time through this ([Fields.under]), each taken here before the field has it, as a live one is: once the
+     * scroll has it, the field had the touch only up to there and is cancelled. False for an answer that is not
+     * touch [serial]'s.
+     */
+    fun next(serial: Int): Boolean {
+        if (serial != this.serial || !answered) return false
+        val e = early.removeFirstOrNull() ?: return mode == DRAGGING
+        try { return take(e) } finally { e.recycle() }
+    }
+
+    /** exact2's answer for touch [serial] was given, and anything that held the touch for it has had it: what is
+     * left of what came before it is taken, in order. */
+    fun caughtUp(serial: Int) {
+        if (serial != this.serial || !answered) return
+        while (early.isNotEmpty()) next(serial)
+    }
+
+    /** What came of the touch before exact2's answer, let go of. */
+    private fun forget() {
+        for (e in early) e.recycle()
+        early.clear()
+    }
+
+    /**
+     * The activity stopped, or the view left its window: a fling ends where it is, and a touch that is down, or
+     * that exact2 has not answered for yet, is over with what came of it. An answer that comes after moves nothing,
+     * so neither does a lift that came before it: nothing scrolls or flings in a window that is not shown.
+     */
+    fun stopped() {
+        forget()
+        tracker?.recycle(); tracker = null
+        released()
+        mode = IDLE
+    }
+
+    /**
      * exact2's answer for touch [serial] ([Native.under]): the claims, a count, and eleven words a scroller. The
-     * statement that tells each scroller's place is published before this arrives ([Owner.under]).
+     * statement that tells each scroller's place is published before this arrives ([Owner.under]). It decides
+     * nothing itself: what came of the touch meanwhile is taken after it ([next], [caughtUp]).
      */
     fun under(serial: Int, w: IntArray) {
         if (serial != this.serial || mode != WATCHING || w.size < 3) return
@@ -247,7 +303,10 @@ internal class Scrolling(private val view: ExactView) {
         active = chain.filter { if (sideways) it.x else it.y }.map { it.s }
         dragFrom = active.firstOrNull()?.at(sideways) ?: 0f
         mode = DRAGGING
-        lastX = x; lastY = y
+        // The drag takes the way the finger went past the slop, as RecyclerView's does: all of it when the move that
+        // crossed the slop went far past it (a quick swipe, or moves held back until a late answer).
+        lastX = if (sideways) downX + sign(x - downX) * slop else x
+        lastY = if (sideways) y else downY + sign(y - downY) * slop
         view.forward(3, x, y, tool, 0L)
     }
 

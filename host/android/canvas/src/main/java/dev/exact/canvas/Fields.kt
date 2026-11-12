@@ -687,26 +687,33 @@ internal class Fields(context: Context) : FrameLayout(context) {
         return true
     }
 
-    /** exact2's answer for touch [serial]: the hosted field under it, or 0. The field's, the touch goes to the field
-     * from its down; anything else's (the field is under a bar, a sheet), it goes to exact2 as any touch does. */
-    fun under(serial: Int, field: Int) {
+    /**
+     * exact2's answer for touch [serial]: the hosted field under it, or 0. The field's, the touch goes to the field
+     * from its down; anything else's (the field is under a bar, a sheet), it goes to exact2 as any touch does.
+     * [scrolls] takes each held event after the down before the field or exact2 has it, as a live event is taken
+     * ([Scrolling.next]): once it says the scroll has the touch, what is left is not theirs, and the scroll has
+     * cancelled the touch where it was ([cancel]).
+     */
+    fun under(serial: Int, field: Int, scrolls: () -> Boolean = { false }) {
         if (serial != this.serial || state != HOLDING) return
         val f = target
         val events = ArrayList(held)
         held.clear()
-        if (f != null && f.id == field && fields[field] === f) {
+        val own = f != null && f.id == field && fields[field] === f
+        if (own) {
             state = OWNED
-            Exact.fieldInput(f.id, f.generation) // a finger down in it: real input, which lets a held state go
-            for (e in events) {
+            Exact.fieldInput(f!!.id, f.generation) // a finger down in it: real input, which lets a held state go
+        } else { state = NONE; target = null }
+        var scrolled = false
+        for ((k, e) in events.withIndex()) {
+            scrolled = scrolled || (k > 0 && scrolls())
+            if (scrolled) { e.recycle(); continue }
+            if (own) {
                 send(e)
                 if (e.actionMasked == MotionEvent.ACTION_UP || e.actionMasked == MotionEvent.ACTION_CANCEL) { state = NONE; target = null }
-            }
-        } else {
-            state = NONE; target = null
-            val v = view
-            if (v != null) for (e in events) v.fingers.relay(e)
+            } else view?.fingers?.relay(e)
+            e.recycle()
         }
-        for (e in events) e.recycle()
     }
 
     /** A scroll took the touch ([Scrolling]): the field's touch is cancelled, or what was held is let go. Whether
