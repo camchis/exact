@@ -248,7 +248,8 @@ extension NavigationHost {
         for (id, cover) in wanted where covers[id] != cover { changes.append((id, cover)) }
         for id in covers.keys where wanted[id] == nil && presenter.views[id] != nil { changes.append((id, nil)) }
         covers = wanted
-        guard !changes.isEmpty else { return }
+        let locals = reportLocalInsets()
+        guard !changes.isEmpty || locals else { return }
         // A scroller's least content height is the port its cover leaves
         // (`scrollFloor`); the kernel sends no new content size when only that changed.
         for (id, _) in changes { presenter.views[id]?.fitScroll() }
@@ -274,12 +275,45 @@ extension NavigationHost {
             DispatchQueue.main.async { [weak self] in self?.deliverCovers() }
             return
         }
+        let views = presenter.views
+        presenter.session?.localInsets(localInsets.take { views[$0] != nil })
         var changes: [(UInt32, HostCover?)] = []
         for (id, cover) in covers where delivered[id] != cover { changes.append((id, cover)) }
         for id in delivered.keys where covers[id] == nil && presenter.views[id] != nil { changes.append((id, nil)) }
         delivered = covers
         guard !changes.isEmpty else { return }
         presenter.onCovers?(changes)
+    }
+
+    /// @ref LLP 1123 D9 — each route's own safe area, which its content reads
+    /// as `var(--exact-safe-area-inset-*)`: its controller's view's, the bars,
+    /// the status bar and the home indicator in it, on the sides only as far
+    /// as the route's box reaches them, as its covers are. A route out of a
+    /// window keeps the last it had, UIKit's zero there being no measurement,
+    /// and so does one while its stack's transition runs, as its cover does;
+    /// one that has none yet takes what it has from its first frame. And the
+    /// session root's while the containers take the whole view, where `env()`
+    /// is 0 but the screen's insets are not. Whether any changed.
+    func reportLocalInsets() -> Bool {
+        var wanted: [UInt32?: [CGFloat]] = [:]
+        for c in controllers.values where presenter.views[c.node.id] === c.node {
+            let last = localInsets.wanted[c.node.id]
+            guard let view = c.viewIfLoaded, view.window != nil, c.node.window != nil,
+                  last == nil || c.navigationController?.transitionCoordinator == nil else {
+                wanted[c.node.id] = last
+                continue
+            }
+            let box = c.node.convert(c.node.bounds, to: view)
+            let safe = view.safeAreaInsets
+            wanted[c.node.id] = [safe.top, max(0, safe.right - max(0, view.bounds.maxX - box.maxX)),
+                                 safe.bottom, max(0, safe.left - max(0, box.minX))]
+        }
+        if wantsWholeView, let view = presenter.session?.view, view.window != nil {
+            let safe = view.safeAreaInsets
+            wanted[nil] = [safe.top, safe.right, safe.bottom, safe.left]
+        }
+        defer { localInsets.wanted = wanted }
+        return localInsets.wanted != wanted
     }
 
     // MARK: The development check (LLP 1075.003 §3.5)

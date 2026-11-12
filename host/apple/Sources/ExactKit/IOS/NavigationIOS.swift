@@ -502,8 +502,8 @@ final class NavigationHost: NSObject, UINavigationControllerDelegate, UIGestureR
     var stacks: [ObjectIdentifier: NavigationStack] = [:]
     var stackCount = 0
     var covers: [UInt32: HostCover] = [:]
-    /// The covers the kernel was last told (`deliverCovers`).
-    var delivered: [UInt32: HostCover] = [:]
+    /// The covers the kernel was last told (`deliverCovers`), and each route's local insets (LLP 1123 D9).
+    var delivered: [UInt32: HostCover] = [:], localInsets = LocalInsetsReport()
     /// Whether this boot's first batch looked for the tablist the boot
     /// covered (`adoptBootCover`); every boot covers its own.
     private(set) var bootCoverSeen = false
@@ -1452,8 +1452,8 @@ final class NavigationHost: NSObject, UINavigationControllerDelegate, UIGestureR
         for c in controllers.values { end(c) }
         retireTabs()
         if let primaryNavigation { retireStack(primaryNavigation) }
-        if !covers.isEmpty || !delivered.isEmpty {
-            covers = [:]
+        if !covers.isEmpty || !delivered.isEmpty || !localInsets.wanted.isEmpty {
+            covers = [:]; localInsets.wanted = [:]
             presenter.afterBatch { [weak self] in self?.deliverCovers() }
         }
         primaryNavigation?.delegate = nil

@@ -5252,12 +5252,27 @@ device's under `viewport-fit="cover"` and 0 under `auto`, even on iOS when a roo
 `tablist` or navigation stack takes the whole screen; there a box at the root that
 pads with them stays under the status bar
 ([pitfall](agent-pitfalls.md#native-presentation-and-navigation-ios)).
+`var(--exact-safe-area-inset-top|right|bottom|left)` is the safe area where the box
+is, a term in the same places as `env()` (LLP 1123 D9). Inside a route, a tab or a
+sheet it is that container's own, as UIKit's `safeAreaInsets` has it: the status
+bar, the navigation bar and a large title, the tab bar, the home indicator, a
+sheet's edges. Outside every route it is what the page itself reaches under: on
+iOS the status bar and the home indicator whenever a root stack or `tablist` takes
+the whole screen, even where `env()` is 0. On the web and a host that draws no bars
+it is `env()`'s, and a web sheet's top is 0. The host already clears a route's content of its bars, so read it for what
+reaches past that: a background under the navigation bar, without hard-coding its
+height, is `margin-top="calc(-1 * var(--exact-safe-area-inset-top))"
+padding-top="var(--exact-safe-area-inset-top)"` on a box at the route's top (the
+box starts under the bar and its content below it, and the boxes beside it stay);
+a box outside every route clears the status bar with
+`top="var(--exact-safe-area-inset-top)"`. It takes no fallback, and it follows the
+bars as the host lays them out (a rotation, a bar shown or hidden).
 Sizes, padding and radii clamp negative results to zero; margins and insets keep
 them. `env(titlebar-area-x|y|width|height)` is the title bar beside a Mac window's
 traffic lights under `viewport-fit="cover"` (in the tall title row an app without routes
 gets from `"display_override": ["window-controls-overlay"]` in `app.json`) and is undefined
 elsewhere, so give it a fallback (`contract vocab titlebar-area`). Unsupported: `em`, a unitless number where a length goes
-(write `0px`, not `0`), `var()`, more than 32 values or 32 levels (LLP 1001 §2,
+(write `0px`, not `0`), a `var()` naming neither a design token nor one of those four, more than 32 values or 32 levels (LLP 1001 §2,
 "Comparisons").
 
 `translate` takes one or two lengths, each in px or a percentage of the box's own

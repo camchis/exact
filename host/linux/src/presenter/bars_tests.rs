@@ -4,6 +4,7 @@
 use super::look::{nav_height, top_height};
 use super::*;
 use crate::presenter::top::SurfacePainter;
+use exact_kernel::HostCover;
 use exact_runner::{DataError, Value};
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -1117,4 +1118,32 @@ fn a_bar_measured_again_while_held_lets_its_ripple_go() {
     p.reader_bars(1.0);
     assert!(p.bars.ripple.is_none() && p.bars.pressed.is_none());
     assert!(!p.needs_animation_frame());
+}
+
+/// @ref LLP 1123 D9 — a barred route is a content owner: its content reads
+/// the room the bars take of it as `var(--exact-safe-area-inset-*)`, and a
+/// host with no bars reads the page's insets, 0.
+#[test]
+fn a_barred_routes_content_reads_the_room_its_bars_take() {
+    let source = APP.replace(
+        "                  box testId=\"home-footer\"",
+        "                  box testId=\"home-inset\" position=\"absolute\" top=0 left=0 height=\"var(--exact-safe-area-inset-top)\" width=\"var(--exact-safe-area-inset-bottom)\"\n                  box testId=\"home-footer\"",
+    );
+    let inset = |p: &Presenter<Nothing>| {
+        let frame = p.host().kernel().node(id(p, "home-inset")).unwrap().frame;
+        (frame.height, frame.width)
+    };
+    let mut bare = boot(&source);
+    assert_eq!(bare.after_commit(), None);
+    assert_eq!(inset(&bare), (0.0, 0.0), "no shell, no bars");
+    let (p, _) = barred(&source);
+    let route = id(&p, "route-home");
+    let kernel = p.host().kernel();
+    let slot = kernel.arena().slot_of(route).unwrap();
+    let Some(HostCover::Edges([top, _, bottom, _])) = kernel.arena().cover(slot) else {
+        panic!("the bars inset the route");
+    };
+    assert!(top > 0.0 && bottom > 0.0, "{top} {bottom}");
+    assert_eq!(inset(&p), (top, bottom), "the room the route is inset by");
+    assert_eq!(kernel.local_insets(route), Some([top, 0.0, bottom, 0.0]));
 }

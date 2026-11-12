@@ -184,9 +184,10 @@ A length attribute's string is CSS's own text, read by the kernel: a px or
 other absolute length, a percentage, a viewport length, `auto`,
 `env(safe-area-inset-*)`, `env(viewport-segment-* x y)`,
 `env(titlebar-area-x|y|width|height)`, a layout region's
-`env(-exact-<region>-inset-*)`, or a `calc()`, `min()`, `max()` or `clamp()` of
-these (`clamp(15px, env(safe-area-inset-bottom), 60px)`; LLP 1001 §2). Anything
-else is `lower-attr-value`, with the kernel's reason.
+`env(-exact-<region>-inset-*)`, the safe area where the box is,
+`var(--exact-safe-area-inset-*)` (LLP 1123 D9), or a `calc()`, `min()`, `max()`
+or `clamp()` of these (`clamp(15px, env(safe-area-inset-bottom), 60px)`; LLP
+1001 §2). Anything else is `lower-attr-value`, with the kernel's reason.
 
 The layout regions (LLP 1123 D10) are the platform's own spacing, measured from
 the layout viewport, inside the safe area by default: `layout-margins` (UIKit's

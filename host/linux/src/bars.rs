@@ -20,7 +20,10 @@
 //! - a route the shell shows in a sheet (a `modal` one, or one pushed
 //!   inside it, LLP 1115.001 D10) has no bar: its header stays in the page,
 //!   and it is inset by the sheet's drag handle at its top and the system's
-//!   bar under the sheet's foot (`presenter/stage.rs`).
+//!   bar under the sheet's foot (`presenter/stage.rs`);
+//! - each route so inset is a content owner whose local insets are that
+//!   room, and the page's side insets, which its content reads as
+//!   `var(--exact-safe-area-inset-*)` (LLP 1123 D9).
 //!
 //! The room is the shell's to say ([`Host::set_bar_room`]: it depends on
 //! the window, the system's insets and the keyboard, which the presenter
@@ -148,6 +151,7 @@ impl<D: DataSource> Host<D> {
             );
         }
         let (mut routes, mut tabs, mut stacks) = (Vec::new(), None, Vec::new());
+        let mut all_routes: Vec<ViewId> = Vec::new();
         if let (Some(root), Some((above, below, foot))) = (root, room) {
             let back = kernel
                 .node(root)
@@ -220,11 +224,29 @@ impl<D: DataSource> Host<D> {
                     }
                 }
             }
+            all_routes = all.iter().flatten().copied().collect();
             stacks = all;
             tabs = found;
         }
+        // A route the bars or a sheet inset owns that room (LLP 1123 D9).
+        let env = kernel.env();
+        let locals: BTreeMap<ViewId, [f32; 4]> = (wanted.iter())
+            .filter_map(|(id, cover)| match cover {
+                HostCover::Edges([top, _, bottom, _]) if all_routes.contains(id) => Some((
+                    *id,
+                    [
+                        top.max(env.top),
+                        env.right,
+                        bottom.max(env.bottom),
+                        env.left,
+                    ],
+                )),
+                _ => None,
+            })
+            .collect();
         let bars = &mut self.navigation.bars;
         (bars.root, bars.routes, bars.tabs, bars.stacks) = (root, routes, tabs, stacks);
+        let held_locals = std::mem::replace(&mut bars.locals, locals);
         let before = std::mem::replace(&mut bars.covers, wanted);
         self.navigation.lifted = (self.navigation.bars.covers.iter())
             .filter(|(_, cover)| **cover == HostCover::Whole)
@@ -249,6 +271,16 @@ impl<D: DataSource> Host<D> {
                     Ok(()) => changed = true,
                     Err(e) => eprintln!("exact: bars: {e:?}"),
                 }
+            }
+        }
+        let locals = &self.navigation.bars.locals;
+        let gone = held_locals.keys().filter(|id| !locals.contains_key(id));
+        let told = gone.map(|id| (*id, None));
+        let told = told.chain(locals.iter().map(|(id, insets)| (*id, Some(*insets))));
+        for (id, insets) in told.collect::<Vec<_>>() {
+            // A node gone took its insets with it
+            if kernel.node(id).is_some() {
+                changed |= kernel.set_local_insets(id, insets).unwrap_or(false);
             }
         }
         changed
