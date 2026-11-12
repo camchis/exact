@@ -1288,6 +1288,7 @@ package final class Presenter {
             #endif
         }
         shortcuts.sync()
+        presentTips()
         statusItems.sync()
         if structureChanged { selection.structureChanged() }
         // The key-view loop is read only by a key event (Tab): it is marked

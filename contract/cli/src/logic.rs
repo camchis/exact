@@ -268,8 +268,9 @@ pub fn web_linked(plan: &exact_plan::Plan, inputs: &serde_json::Value) -> String
     // A grouped list is its authored nodes on the web, and the browser does
     // its own I/O and plays CSS's transitions (LLP 1047.001 D2); its file
     // input is the media picker, `auth` below is the sign-in sheet, and its
-    // numerals roll in the runtime's text (LLP 1077 D15), and its date and
-    // time controls are the browser's own (LLP 1115.001.000 D2).
+    // numerals roll in the runtime's text (LLP 1077 D15), its date and
+    // time controls are the browser's own (LLP 1115.001.000 D2), and it
+    // shows no tips (LLP 1035.006.000 D4).
     let names: Vec<&str> = uses
         .iter()
         .filter(|c| {
@@ -283,6 +284,7 @@ pub fn web_linked(plan: &exact_plan::Plan, inputs: &serde_json::Value) -> String
                     | Capability::Numerals
                     | Capability::Dates
                     | Capability::Sqlite
+                    | Capability::Tips
             )
         })
         .map(|c| c.name())
@@ -334,7 +336,8 @@ pub fn web_linked(plan: &exact_plan::Plan, inputs: &serde_json::Value) -> String
             | Capability::AuthSession
             | Capability::Numerals
             | Capability::Dates
-            | Capability::Sqlite => {}
+            | Capability::Sqlite
+            | Capability::Tips => {}
         }
     }
     entry

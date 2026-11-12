@@ -74,13 +74,13 @@ export const compiledTargets = (app, trust = process.env.EXACT_UPDATE_TRUST ?? '
 
 /** The capabilities with a Swift half, by name, and the product of
  * `Package.swift` (its `capabilities` table) each is. */
-const SWIFT_CAPABILITIES = [['grouped_lists', 'ExactGroupedLists'], ['markdown', 'ExactMarkdown'], ['surfaces', 'ExactSurfaces'], ['drag', 'ExactDrag'], ['media_picker', 'ExactMediaPicker'], ['auth_session', 'ExactAuthSession'], ['numerals', 'ExactNumerals']];
+const SWIFT_CAPABILITIES = [['grouped_lists', 'ExactGroupedLists'], ['markdown', 'ExactMarkdown'], ['surfaces', 'ExactSurfaces'], ['drag', 'ExactDrag'], ['media_picker', 'ExactMediaPicker'], ['auth_session', 'ExactAuthSession'], ['numerals', 'ExactNumerals'], ['tips', 'ExactTips']];
 
 /** The capabilities a development build links only as production would
  * (LLP 1047.001.000 F): each links a framework that costs every iOS launch
- * its images (PhotosUI, AuthenticationServices, ~300 each; SwiftUI), and the
- * agent's substitutes answer without the first two. */
-const BY_USE_IN_DEVELOPMENT = ['media_picker', 'auth_session', 'numerals'];
+ * its images (PhotosUI, AuthenticationServices, ~300 each; SwiftUI; TipKit),
+ * and the agent's substitutes answer without the first two. */
+const BY_USE_IN_DEVELOPMENT = ['media_picker', 'auth_session', 'numerals', 'tips'];
 
 /** What the archive links (LLP 1047.001 D2, D4, D6; LLP 1047 D8): for a
  * production build, the plan's use-set, as the bake's graph names it, the
@@ -108,7 +108,7 @@ export function appleComposition(graph, production, ahead = [], granted = false)
  * composition links none of them (LLP 1047.001.000 §6, the check's first
  * form). SafariServices belongs to @exact/in-app-browser in ExactAppModules,
  * not a SwiftPM capability product. */
-const CAPABILITY_FRAMEWORKS = [['SafariServices', ['@exact/in-app-browser']], ['PhotosUI', ['ExactMediaPicker']], ['AuthenticationServices', ['ExactAuthSession']], ['SwiftUI', ['ExactNumerals']], ['WidgetKit', ['ExactSnapshot']], ['ActivityKit', ['ExactSnapshot']]];
+const CAPABILITY_FRAMEWORKS = [['SafariServices', ['@exact/in-app-browser']], ['PhotosUI', ['ExactMediaPicker']], ['AuthenticationServices', ['ExactAuthSession']], ['SwiftUI', ['ExactNumerals', 'ExactTips']], ['TipKit', ['ExactTips']], ['WidgetKit', ['ExactSnapshot']], ['ActivityKit', ['ExactSnapshot']]];
 
 export function appleLaunchFrameworks(destination, product) {
   return destination === 'ios' && ['ExactIOS', 'ExactHostIOS'].includes(product) ? ['SafariServices'] : [];

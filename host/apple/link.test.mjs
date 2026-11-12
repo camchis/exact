@@ -307,6 +307,9 @@ test('production links what the plan uses, the manifest names and the grants ope
   assert.deepEqual(appleComposition(graph, false, ['auth_session']).products.at(-1), 'ExactAuthSession');
   assert.deepEqual(appleComposition({ uses: ['numerals'] }, false).products.at(-1), 'ExactNumerals');
   assert.ok(!appleComposition(graph, false).products.includes('ExactNumerals'));
+  // TipKit and SwiftUI cost every launch: a tip links them in development too only by use.
+  assert.deepEqual(appleComposition({ uses: ['tips'] }, false).products.at(-1), 'ExactTips');
+  assert.ok(!appleComposition(graph, false).products.includes('ExactTips'));
   assert.equal(appleComposition(undefined, false).link, 'all');
 });
 

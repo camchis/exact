@@ -1108,7 +1108,7 @@ package final class Presenter {
         keyboardToolbars.finishBackendChange()
         afterBatch { [weak self] in
             guard let self else { return }
-            syncAccessibility(changed: named.union(ariaMoved), disabledRoots: disabledRoots)
+            syncAccessibility(changed: named.union(ariaMoved), disabledRoots: disabledRoots); presentTips()
         }
         #if os(iOS)
         syncScrollsToTop()
