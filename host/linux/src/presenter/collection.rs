@@ -495,6 +495,18 @@ impl<D: DataSource> Presenter<D> {
         } else {
             Vec::new()
         };
+        let revealed: Vec<ViewId> = (self.commands.iter())
+            .filter(|c| c.name == "scrollIntoView")
+            .filter_map(|c| c.args.first()?.as_str())
+            .filter_map(|name| {
+                let kernel = self.host.kernel();
+                let key = *kernel.find_by_id(name).first()?;
+                kernel.node_by_key(key).map(|n| n.id)
+            })
+            .collect();
+        let owned: BTreeSet<ViewId> = (bound.iter().copied())
+            .filter(|v| self.gliding(*v) || revealed.iter().any(|t| self.is_inside(*t, *v)))
+            .collect();
         for view in bound {
             if collections.contains(&view) {
                 continue;
@@ -565,7 +577,11 @@ impl<D: DataSource> Presenter<D> {
             }
             let before_request = *offset;
             let mut target = current;
+            // The app's scroll owns the offset until it settles: a glide
+            // under way, or a `scrollIntoView` this commit asks for of
+            // something in it, which runs after it (LLP 1070.000 §15).
             if follow
+                && !owned.contains(&view)
                 && (!cursor.follow_end || current.1 >= cursor.maximum.map_or(0., |m| m.1) - 1.)
             {
                 target.1 = bounds.max.1;
