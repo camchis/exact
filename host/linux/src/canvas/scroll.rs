@@ -118,6 +118,14 @@ impl<D: DataSource + Default> CanvasHost<D> {
         self.p.reader_fling_ended(id);
     }
 
+    /// The reader's pull to refresh of scroller `id` was let go past its
+    /// threshold ([`crate::presenter::Presenter::reader_refresh`]).
+    pub fn refresh(&mut self, id: u32) {
+        if let Some(error) = self.p.reader_refresh(id) {
+            self.p.host_mut().log(error);
+        }
+    }
+
     /// What the reader is told of the scrollers it knows, when that is not
     /// what it was last told
     /// ([`crate::presenter::Presenter::reader_scrollers`] has the words).

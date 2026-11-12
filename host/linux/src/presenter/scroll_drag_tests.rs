@@ -211,3 +211,71 @@ fn a_new_touch_ends_a_scroll_whose_end_never_came() {
     assert_eq!(p.advance(400.), None);
     assert_eq!(log(&p), "sE");
 }
+
+/// A list that refreshes: its pull sends `refresh`, and the app's
+/// `refreshing` holds while the reload runs.
+const REFRESH: &str = r#"component App
+  state log = ""
+  state loading = false
+  action reload
+    log = log + "r"
+    loading = true
+  action done
+    loading = false
+  view
+    column width=400 height=400
+      scroll testId="list" width=400 height=300 refresh=reload refreshing=loading
+        box width=400 height=1000
+      button "Done" press=done testId="done"
+      text log testId="log"
+"#;
+
+/// Scroller `list`'s flags in what the reader is told at a down there.
+fn flags(p: &mut Presenter<()>, list: ViewId) -> i32 {
+    let words = p.reader_under(200., 100., 1.);
+    words[3..]
+        .chunks_exact(11)
+        .find(|e| e[0] == list as i32)
+        .unwrap()[1]
+}
+
+/// Scroller `list`'s flags in the statement after a frame, when there is one.
+fn stated(p: &mut Presenter<()>, list: ViewId) -> Option<i32> {
+    let words = p.reader_scrollers(&[], 1.)?;
+    Some(words.chunks(9).find(|s| s[0] == list as i32).unwrap()[1])
+}
+
+#[test]
+fn a_pull_sends_refresh_and_the_reader_is_told_refreshing() {
+    let mut p = boot(REFRESH);
+    let list = id(&p, "list");
+    assert_eq!(
+        flags(&mut p, list) & 48,
+        16,
+        "it hears refresh, not refreshing"
+    );
+    assert_eq!(p.reader_refresh(list), None);
+    assert_eq!(log(&p), "r");
+    assert_eq!(stated(&mut p, list).map(|f| f & 48), Some(48));
+    let done = id(&p, "done");
+    assert_eq!(p.host.dispatch_at(done, Event::Press, p.host.now()), None);
+    assert_eq!(p.after_commit(), None);
+    assert_eq!(
+        stated(&mut p, list).map(|f| f & 48),
+        Some(16),
+        "refreshing ended: told again"
+    );
+}
+
+#[test]
+fn a_scroller_that_hears_no_refresh_is_never_pulled() {
+    let mut p = boot(&REFRESH.replace(" refresh=reload", ""));
+    let list = id(&p, "list");
+    assert_eq!(flags(&mut p, list) & 48, 0);
+    assert_eq!(p.reader_refresh(list), None);
+    assert_eq!(log(&p), "");
+    // Nor one the reader was never told of.
+    let mut p = boot(REFRESH);
+    assert_eq!(p.reader_refresh(id(&p, "list")), None);
+    assert_eq!(log(&p), "");
+}

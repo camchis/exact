@@ -69,6 +69,7 @@ class ScrollTouchTest {
                 if (ended) ends.add(floatArrayOf(vx, vy, restX, restY))
             }
             @JvmStatic @Implementation fun flingEnded(id: Int) { told.add("rest $id") }
+            @JvmStatic @Implementation fun refresh(id: Int) { told.add("refresh $id") }
         }
     }
 
@@ -354,6 +355,72 @@ class ScrollTouchTest {
             up(540f)
             assertTrue("dismiss $dismiss", text.isFocused)
         }
+    }
+
+    // Pull to refresh: a scroller that hears `refresh` (flag bit 4), refreshing while bit 5 is set.
+
+    private val main get() = org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper())
+    private fun pull(): Refresh? = (view.parent as FrameLayout).let { p -> (0 until p.childCount).map { p.getChildAt(it) } }.filterIsInstance<Refresh>().singleOrNull()
+    private fun refreshable(refreshing: Boolean = false) = scroller(1, 0f).also { it[1] = 2 or 16 or (if (refreshing) 32 else 0) }
+    private fun statement(refreshing: Boolean) =
+        view.scrolling().told(intArrayOf(1, 2 or 16 or (if (refreshing) 32 else 0), 0, 0, 0, 0, 0, 0, 500f.toBits()))
+
+    @Test fun aPullPastTheThresholdSendsRefreshAndTurnsUntilRefreshingEnds() {
+        down(300f); answer(reply(refreshable()))
+        move(320f); move(400f); move(500f)
+        assertNull("the list does not move", thread.moved[1])
+        val r = pull()!!
+        assertTrue(r.fraction > 1f)
+        up(500f)
+        assertEquals("refresh 1", Host.told.last())
+        assertTrue(r.spinning)
+        statement(refreshing = true)
+        main.idleFor(java.time.Duration.ofSeconds(2))
+        assertTrue("refreshing keeps it turning past the wait for an app that starts nothing", r.spinning && pull() === r)
+        assertEquals("it rests at the threshold", 1f, r.fraction, 0.001f)
+        statement(refreshing = false)
+        main.idleFor(java.time.Duration.ofSeconds(1))
+        assertNull("it went back up and away", pull())
+    }
+
+    @Test fun aRefreshTheAppNeverStartsEndsAfterItsWait() {
+        down(300f); answer(reply(refreshable()))
+        move(320f); move(400f); move(500f); up(500f)
+        assertEquals("refresh 1", Host.told.last())
+        assertTrue(pull()!!.spinning)
+        main.idleFor(java.time.Duration.ofSeconds(2))
+        assertNull(pull())
+    }
+
+    @Test fun aPullShortOfTheThresholdSendsNothing() {
+        down(300f); answer(reply(refreshable()))
+        move(320f); move(360f)
+        assertTrue(pull()!!.fraction in 0.01f..0.99f)
+        up(360f)
+        main.idleFor(java.time.Duration.ofSeconds(1))
+        assertFalse(Host.told.contains("refresh 1"))
+        assertNull(pull())
+    }
+
+    @Test fun aPullTakesTheFingerBackBeforeTheListScrolls() {
+        down(300f); answer(reply(refreshable()))
+        move(320f); move(400f)
+        move(250f)
+        assertEquals(150f - (100f - slop), thread.moved[1]!!, 0.01f)
+        assertEquals(0f, pull()!!.fraction)
+    }
+
+    @Test fun aListThatIsRefreshingStretchesInstead() {
+        down(300f); answer(reply(refreshable(refreshing = true)))
+        move(320f); move(400f); move(500f); up(500f)
+        assertNull(pull())
+        assertFalse(Host.told.contains("refresh 1"))
+    }
+
+    @Test fun aListThatHearsNoRefreshIsNeverPulled() {
+        down(300f); answer(reply(scroller(1, 0f)))
+        move(320f); move(400f); move(500f); up(500f)
+        assertNull(pull())
     }
 
     private fun ExactView.scrolling(): Scrolling =

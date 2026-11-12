@@ -318,13 +318,14 @@ their own (a group: ops 20 and 21) is translated on the UI thread in the frame t
 far, mounts and retires rows behind it, and its next stream draws the rows where it then has them; the reader places
 the node by the difference. This is what a driver's `scroll` always did, now for the scroller under the finger.
 
-Five calls cross, all in the view's pixels:
+Six calls cross, all in the view's pixels:
 
 | Call | Direction | What it says |
 |---|---|---|
 | `Native.under(x, y)` (`CanvasHost::under`, `Presenter::reader_under`) | reader asks, at a touch's down | Which scrollers are under the point, innermost first, then the page itself where the document is larger than the viewport (id 0). For each: its id, the axes it takes a drag from here on, its revision, its offset, its farthest offset and the box it shows in. Also the axes exact2's own gestures claim there: a swipe row sideways, a reorder grip or a height handle up and down, a transform drag both, a `pan` whatever its `touch-action` does not give to scrolling. And, from D8 on, the hosted text field the touch is for (below) |
 | `Native.scrolled(id, dx, dy, rev)` (`CanvasHost::scrolled`, `Presenter::reader_scrolled`) | reader tells | It moved scroller `id` by that much, knowing revision `rev` of it. exact2 clamps the move to the scroller's travel |
 | `Native.scrollDrag(id, ended, vx, vy, rest, restX, restY)` (`CanvasHost::drag_began`, `drag_ended`; `presenter/scroll_drag.rs`) | reader tells | A finger began dragging scroller `id`, the innermost the drag moves, before the drag's first move; or let go of it, before the fling's first frame, with `VelocityTracker`'s velocity (px/s, positive as the offset grows) and where the scroller will rest (`OverScroller`'s end, or where it is when nothing is thrown). The app hears `scrolldragstart` and `scrolldragend`. From the start the scroller's moves owe no `scrollend` until the lift with nothing thrown, or until the fling stops |
+| `Native.refresh(id)` (`CanvasHost::refresh`, `Presenter::reader_refresh`) | reader tells | A pull to refresh of scroller `id` was let go of past its threshold: the app hears `refresh` |
 | `Native.flingEnded(id)` (`CanvasHost::fling_ended`, `Presenter::reader_fling_ended`) | reader tells | The fling a drag of scroller `id` threw stopped: at rest, caught by a finger, or ended by the app's scroll. Its `scrollend` is due now |
 | `Native.scrollers()` (`CanvasHost::scrollers`, `Presenter::reader_scrollers`) | exact2 tells, with each stream | For every scroller it has told the reader of: its id, its axes, its revision, where it is, the offset its rows were last painted at, and its farthest offset. Null when nothing of it changed; a scroller it leaves out is gone, and the reader forgets it |
 
@@ -361,6 +362,18 @@ nothing of that touch.
 Each move goes to the innermost; what it cannot take, because it is at its end, goes to the next one out, and so on
 to the page. A fling hands off the same way, frame by frame. An `overscroll-behavior` other than `auto` ends the
 chain at its scroller. What no scroller can take stretches the edge of the innermost one that has a node.
+
+**Pull to refresh** (`Refresh.kt`, LLP 1115.001 D12). A scroller with a `refresh` handler is Material 3's pull to
+refresh, Compose's `PullToRefreshBox` with its default indicator: a downward drag at the top that no scroller of the
+drag takes pulls, instead of stretching the edge, a 40 dp disc (`surfaceContainerHigh`, elevation 3 dp) down from the
+scroller's top at half the finger's way, with tension past the 80 dp threshold, and its arc and arrow
+(`onSurfaceVariant`) grow with the pull. The list stays where it is. The finger's way back takes the pull back first.
+Let go past the threshold, the reader sends `refresh` (`Native.refresh`, `Presenter::reader_refresh`) and the disc
+settles at the threshold and turns as Material's indeterminate indicator does while the app's `refreshing` is true
+(the statement's bit 5); it goes back up when `refreshing` ends, or 350 ms after the release when the app never set
+it, as the iOS host ends UIKit's control. Short of the threshold, it goes back up. A pull while `refreshing` is true
+stretches the edge, and `refreshing` with no pull shows nothing, as on iOS. Under "remove animations" the disc moves
+at once and its arc stands still.
 
 **The keyboard** (`Dismissal.kt`, LLP 1115.001 D12). A drag does to the software keyboard what the innermost scroller
 it moves says in `keyboardDismissMode` (bits 6 and 7 of its flags). Unsaid, nothing, as the platform's lists leave the
@@ -399,8 +412,8 @@ Not built of D7:
   a scroller nested in a list's row, and the page itself are drawn inside their surroundings, so they move when
   exact2's paint arrives; the frame waits up to 2 ms for it, as it does for a drag's moves. They have no stretch at
   their ends either. Giving each a node needs the recorder to open a group inside a row's recording.
-- Pull-to-refresh and a sheet's part in the hand-off are later stages. A hosted `EditText`
-  takes part as a child of a ScrollView does (below).
+- A sheet's part in the hand-off is a later stage. A hosted `EditText` takes part as a child of a ScrollView
+  does (below).
 - A mouse's wheel and a trackpad do not scroll (`onGenericMotionEvent`), and nothing scrolls for TalkBack.
 - A pressable under the finger shows its press at the down, not after the platform's tap delay, so a row may flash
   as a scroll starts.

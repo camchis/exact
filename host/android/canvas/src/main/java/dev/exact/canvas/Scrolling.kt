@@ -44,7 +44,8 @@ internal class Scrolling(private val view: ExactView) {
     /** One scroller as exact2 told it, in the view's pixels. */
     class Scroller(val id: Int) {
         /** Bit 0: it scrolls sideways; bit 1: up and down; bit 2: its rows are a node the reader moves; bit 3: no indicator;
-         * bits 6 and 7: what a drag of it does to the keyboard ([dismiss]). */
+         * bit 4: it hears `refresh`; bit 5: its `refreshing` is true; bits 6 and 7: what a drag of it does to the
+         * keyboard ([dismiss]). */
         var flags = 0
             set(value) {
                 field = value
@@ -78,6 +79,12 @@ internal class Scrolling(private val view: ExactView) {
         var snapList = false
         val barless get() = flags and 8 != 0
         val node get() = flags and 4 != 0
+        val refreshes get() = flags and 16 != 0
+        val refreshing get() = flags and 32 != 0
+        /** Its pull to refresh, while that shows ([Refresh]). */
+        var pull: Refresh? = null
+        /** Its `refreshing` was seen true since its pull sent `refresh`. */
+        var seen = false
         /** Its `keyboardDismissMode`: 0 nothing, [Dismissal.ON_DRAG] or [Dismissal.INTERACTIVE]. */
         val dismiss get() = (flags shr 6) and 3
         fun at(sideways: Boolean) = if (sideways) nowX + pendX else nowY + pendY
@@ -99,6 +106,9 @@ internal class Scrolling(private val view: ExactView) {
     /** Its settle onto a snap position ([OverScroller.startScroll]) eases out as ViewPager's does. */
     private val fling = OverScroller(view.context) { t -> val u = t - 1f; u * u * u * u * u + 1f }
     private val dismissal = Dismissal(view)
+    /** The scroller a pull to refresh is pulling, and how far the finger has pulled it, px. */
+    private var pulling: Scroller? = null
+    private var pulled = 0f
     private var tracker: VelocityTracker? = null
 
     /** The touch that is down: counted, so an answer for one that ended is not taken for the next. */
@@ -247,6 +257,7 @@ internal class Scrolling(private val view: ExactView) {
      */
     fun stopped() {
         if (mode == DRAGGING) lifted(0f, false)
+        pulling?.let { pulled(it, false) }
         dismissal.lifted(0f)
         forget()
         tracker?.recycle(); tracker = null
@@ -330,11 +341,51 @@ internal class Scrolling(private val view: ExactView) {
     /** The finger moved [delta] px along the drag's axis (toward the end positive), at ([x], [y]). */
     private fun drag(delta: Float, x: Float, y: Float) {
         var d = delta
+        // A pull to refresh, and a stretched edge, take the finger's way back before anything scrolls.
+        pulling?.let { s -> if (d > 0f) { val back = minOf(d, pulled); pulled -= back; d -= back; s.pull?.pull(pulled) } }
         val edged = edged()
-        // A stretched edge takes the finger's way back before anything scrolls.
         if (edged != null) d -= relax(edged, d, x, y)
         val rest = if (d != 0f) move(d) else 0f
+        if (rest < 0f && refresh(rest)) return
         if (rest != 0f && edged != null) pull(edged, rest, x, y)
+    }
+
+    /**
+     * [rest] px toward the start that no scroller of the drag could take, so each is at its start: the innermost that
+     * hears `refresh` and is not refreshing is pulled, as Material's pull to refresh takes what the list leaves before
+     * its edge would stretch. Whether one was.
+     */
+    private fun refresh(rest: Float): Boolean {
+        if (sideways) return false
+        val s = pulling ?: active.firstOrNull { it.refreshes }?.takeIf { !it.refreshing && it.pull == null } ?: return false
+        pulling = s
+        pulled -= rest
+        val r = s.pull ?: Refresh(view.context).also { r ->
+            s.pull = r
+            (view.parent as? ViewGroup)?.addView(r, FrameLayout.LayoutParams(s.port.width().roundToInt(), s.port.height().roundToInt()))
+        }
+        r.translationX = view.left + s.port.left
+        r.translationY = view.top + s.port.top
+        r.pull(pulled)
+        return true
+    }
+
+    /** The pull of [s] was let go of ([lifted]) or taken by the system: past the threshold, `refresh` is sent and the
+     * indicator turns until the app's `refreshing` ends ([told]); short of it, or taken, it goes. */
+    private fun pulled(s: Scroller, lifted: Boolean) {
+        pulling = null; pulled = 0f
+        val r = s.pull ?: return
+        if (!lifted || r.fraction < 1f) { unpull(s); return }
+        s.seen = false
+        r.refreshing()
+        tell { Native.refresh(s.id) }
+        view.postDelayed({ if (s.pull === r && !s.seen && !s.refreshing) unpull(s) }, UNSTARTED_MS)
+    }
+
+    /** [s]'s pull to refresh goes back up, and away. */
+    private fun unpull(s: Scroller) {
+        val r = s.pull ?: return
+        r.hide { (r.parent as? ViewGroup)?.removeView(r); if (s.pull === r) s.pull = null }
     }
 
     /**
@@ -404,6 +455,8 @@ internal class Scrolling(private val view: ExactView) {
             }
             s.rev = w[i + 2]
             s.told = true
+            // A refresh this reader's pull began ends when the app's `refreshing` that followed it does.
+            s.pull?.takeIf { it.spinning && !it.leaving }?.let { if (s.refreshing) s.seen = true else if (s.seen) unpull(s) }
             i += 9
         }
         // A scroller the statement no longer has is gone (its node went, or a driver took it over): what the reader
@@ -414,6 +467,8 @@ internal class Scrolling(private val view: ExactView) {
             scrollers.remove(s.id)
             sent.removeAll { it.s === s }
             s.bar?.let { (it.parent as? ViewGroup)?.removeView(it) }
+            s.pull?.let { (it.parent as? ViewGroup)?.removeView(it) }; s.pull = null
+            if (pulling === s) { pulling = null; pulled = 0f }
             if (mode == FLINGING && s in active) { halt(); mode = IDLE }
         }
     }
@@ -439,6 +494,7 @@ internal class Scrolling(private val view: ExactView) {
             v = -(if (sideways) t.getXVelocity(pointer) else t.getYVelocity(pointer))
         }
         dismissal.lifted(if (sideways) 0f else -v)
+        pulling?.let { s -> lifted(v, false); mode = IDLE; pulled(s, lifted); return }
         val edged = edged()
         val stretched = edged != null && STRETCH && edged.edges.any { it != null && it.distance != 0f }
         if (edged != null) { for (e in edged.edges) e?.onRelease(); if (stretched) stretching() }
@@ -754,7 +810,10 @@ internal class Scrolling(private val view: ExactView) {
 
     private companion object {
         /** The bits of a scroller's flags its statement is the authority on, and a hit answer only before one. */
-        const val SAID = 8 or 192
+        const val SAID = 8 or 16 or 32 or 192
+        /** How long after a pull sent `refresh` an app that set no `refreshing` keeps the indicator turning: the iOS
+         * host's wait for UIKit's control (`ScrollViewIOS.swift`). */
+        const val UNSTARTED_MS = 350L
         const val IDLE = 0
         /** A touch is down and exact2 has it; whether it becomes a scroll is not known yet. */
         const val WATCHING = 1

@@ -104,6 +104,10 @@ const BARLESS: i32 = 8;
 /// `keyboardDismissMode`; unsaid, Android's: nothing (LLP 1115.001 D12).
 const DISMISS_ON_DRAG: i32 = 64;
 const DISMISS_INTERACTIVE: i32 = 128;
+/// Bits 4 and 5: it hears `refresh`, and its `refreshing` is true: the
+/// reader's pull to refresh (`scroll_drag.rs`).
+const REFRESH: i32 = 16;
+const REFRESHING: i32 = 32;
 
 fn scrolls(o: Overflow) -> bool {
     matches!(o, Overflow::Scroll | Overflow::Auto)
@@ -572,11 +576,29 @@ impl<D: DataSource> Presenter<D> {
             Some("interactive") => DISMISS_INTERACTIVE,
             _ => 0,
         };
+        let refresh = if s.id == PAGE
+            || !self
+                .host
+                .runner()
+                .handlers_of(s.id)
+                .contains(&EventKind::Refresh)
+        {
+            0
+        } else if node
+            .as_ref()
+            .and_then(|n| n.props.bool(exact_kernel::PropId::Refreshing))
+            == Some(true)
+        {
+            REFRESH | REFRESHING
+        } else {
+            REFRESH
+        };
         (if s.axes.0 { X } else { 0 })
             | (if s.axes.1 { Y } else { 0 })
             | (if s.node { NODE } else { 0 })
             | (if barless { BARLESS } else { 0 })
             | dismiss
+            | refresh
     }
 }
 

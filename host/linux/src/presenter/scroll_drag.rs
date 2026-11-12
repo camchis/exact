@@ -72,6 +72,26 @@ impl<D: DataSource> Presenter<D> {
         self.scroll_end_release(id);
     }
 
+    /// The reader's pull to refresh of scroller `id` let go past its
+    /// threshold: its `refresh`, as UIKit's refresh control sends it. The app's
+    /// `refreshing` keeps the indicator turning (`reader_scrollers`' bit 5).
+    /// Errors are the action's.
+    pub fn reader_refresh(&mut self, id: ViewId) -> Option<String> {
+        if id == PAGE
+            || !self.reader_knows(id)
+            || self.host.route_visibility(id).1
+            || !self
+                .host
+                .runner()
+                .handlers_of(id)
+                .contains(&EventKind::Refresh)
+        {
+            return None;
+        }
+        let error = self.host.dispatch_at(id, Event::Refresh, self.host.now());
+        error.or(self.after_commit())
+    }
+
     /// Dispatch a drag's event at `id`, a scroller the reader knows that
     /// hears it and is shown.
     fn scroll_drag(&mut self, id: ViewId, event: Event) -> Option<String> {

@@ -35,6 +35,17 @@ macro_rules! canvas_jni_scroll {
             ints(env, &words)
         }
 
+        /// The reader's pull to refresh of scroller `id` was let go past its
+        /// threshold (`CanvasHost::refresh`).
+        #[no_mangle]
+        pub unsafe extern "system" fn Java_dev_exact_canvas_Native_refresh(
+            _env: *mut $crate::canvas::jni_sys::JNIEnv,
+            _class: $crate::canvas::jni_sys::jclass,
+            id: $crate::canvas::jni_sys::jint,
+        ) {
+            with(|h| h.refresh(id as u32));
+        }
+
         /// A finger began dragging scroller `id`, or (`ended`) let go of it
         /// (`CanvasHost::drag_began`, `drag_ended`; px/s, px), and whether it
         /// throws a fling.
