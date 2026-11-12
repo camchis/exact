@@ -267,3 +267,53 @@ fn a_link_with_no_press_shows_its_active_paint() {
     assert!(!p.host().pressed(key(&p, "bare")));
     assert_eq!(opened.borrow().len(), 2);
 }
+
+/// A link that shrinks while held (its `-exact-press-scale`) is followed
+/// when a finger lifts where it went down, near its edge: the lift is
+/// judged against the box it had unpressed, as any press's is.
+#[test]
+fn a_shrinking_link_is_followed_from_its_unpressed_box() {
+    const LINK: &str = r##"component App
+  view
+    column width=400 height=400 background-color="#ffffff"
+      link href="https://example.com/a" -exact-press-scale=0.5 background-color="#00ff00" width=300 height=120 testId="link"
+        text "Away"
+"##;
+    let (mut p, error) = Presenter::boot_with(
+        &contract::compile(LINK)
+            .unwrap_or_else(|e| panic!("{e}"))
+            .encode(),
+        (),
+        (400., 400.),
+        1.,
+        PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../../apps/caltrain")),
+        PainterChoice::Cpu,
+    )
+    .unwrap();
+    assert!(error.is_none(), "{error:?}");
+    p.set_pointer_kind(crate::presenter::PointerKind::Touch);
+    let opened = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
+    let sink = opened.clone();
+    p.set_url_opener(move |url| {
+        sink.borrow_mut().push(url.to_owned());
+        Ok(())
+    });
+    let b = rect(&mut p, "link");
+    let edge = (b.0 + b.2 - 4., b.1 + 4.);
+    p.pointer_down(edge.0, edge.1, 0.).unwrap();
+    p.clock(300.);
+    p.frame();
+    assert_ne!(
+        p.hit(edge.0, edge.1),
+        Some(
+            p.host()
+                .kernel()
+                .node_by_key(p.host().kernel().find_by_test_id("link")[0])
+                .unwrap()
+                .id
+        ),
+        "held, the link has shrunk away from the finger"
+    );
+    p.pointer_up(edge.0, edge.1, 300.).unwrap();
+    assert_eq!(*opened.borrow(), ["https://example.com/a"], "followed once");
+}

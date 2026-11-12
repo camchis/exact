@@ -164,10 +164,9 @@ impl<D: DataSource> Presenter<D> {
                         .is_none_or(|(key, _)| {
                             self.input_live(key)
                                 && self.host.kernel().node_by_key(key).is_some_and(|n| {
-                                    self.host
-                                        .runner()
-                                        .handlers_of(n.id)
-                                        .contains(&EventKind::Press)
+                                    n.props.link().is_some()
+                                        || (self.host.runner().handlers_of(n.id))
+                                            .contains(&EventKind::Press)
                                 })
                         })
                     && match contact.candidate {
@@ -692,13 +691,13 @@ impl<D: DataSource> Presenter<D> {
             let (key, origin) = (node.key, node.style.transform_origin.clone());
             self.box_of(id).map(|b| (key, b.unpressed(origin)))
         });
-        // A pressed box that shows its press activates where the lift is in
-        // it; a link with no `press` is followed by the lift's hit instead.
+        // A pressed box that shows its press (a scale shrinks it) activates
+        // where the lift is in the box it had unpressed, a link as a press.
         let press_activates = feedback.is_some_and(|(key, _)| {
-            self.host.kernel().node_by_key(key).is_some_and(|node| {
-                crate::host::press::shows(&node)
-                    && (self.host.runner().handlers_of(node.id)).contains(&EventKind::Press)
-            })
+            self.host
+                .kernel()
+                .node_by_key(key)
+                .is_some_and(|node| crate::host::press::shows(&node))
         });
         if let Some((key, _)) = feedback {
             self.host.press_feedback(key, true, now_ms);
@@ -1222,7 +1221,13 @@ impl<D: DataSource> Presenter<D> {
                         self.focus_for_press(hit, (x, y), now_ms, self.contact_is_direct());
                     }
                     self.press_point = Some((x, y));
+                    // Read before the press, whose handler may remove it: a
+                    // link is followed after its press, as `press_at` has it.
+                    let link = self.link_at(hit, x, y);
                     self.activate(id, now_ms);
+                    if let Some(href) = link {
+                        self.follow(hit, &href, now_ms);
+                    }
                 }
             }
             Ok(false)
