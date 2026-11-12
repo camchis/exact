@@ -307,10 +307,14 @@ impl<N: Copy + PartialEq> Walk<N> {
             if facts & fact::HEADING != 0 {
                 self.headings.push(child);
             } else if facts & fact::SEARCH != 0 {
+                // The bar has one place for a search field: a second is
+                // unplaced, so a header with no title keeps it in the page.
+                self.unplaced |= self.search.is_some();
                 self.search.get_or_insert(child);
             } else if facts & fact::TABLIST != 0 {
                 // Its tabs press, but they are the title's segments, never
-                // bar items.
+                // bar items. One tablist, as one search field.
+                self.unplaced |= self.segments.is_some();
                 self.segments.get_or_insert(child);
             } else if facts & (fact::PRESS | fact::MENU) != 0
                 // A disabled button around the heading is walked for it, as a box is.

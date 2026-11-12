@@ -108,6 +108,9 @@ test('a header of buttons alone is marked a bar, and one that also holds a text 
     alone: () => [el('div', {}, plus()), el('div'), el('p', { role: 'status' }, 'Live')],
     text: () => [el('div', { 'data-exact-text': '' }, 'Inbox'), plus()],
     empty: () => [el('div')],
+    // The bar has one place for a search field: a second keeps the header in the page.
+    search: () => [plus(), el('input', { type: 'search' })],
+    searches: () => [plus(), el('input', { type: 'search' }), el('input', { type: 'search' })],
   };
   for (const [id, made] of Object.entries(kids)) {
     doc.root.append(el('main', { navigationKey: '1' }, el('div', { navigationKey: '1', id }, el('header', {}, ...made()))));
@@ -115,5 +118,5 @@ test('a header of buttons alone is marked a bar, and one that also holds a text 
   globalThis.document = doc;
   try { markBars(doc.root); } finally { globalThis.document = saved; }
   const bars = Object.fromEntries(Object.keys(kids).map((id) => [id, doc.getElementById(id).children[0].hasAttribute('data-exact-bar')]));
-  expect(bars).toEqual({ alone: true, text: false, empty: false });
+  expect(bars).toEqual({ alone: true, text: false, empty: false, search: true, searches: false });
 });

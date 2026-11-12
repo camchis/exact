@@ -304,6 +304,37 @@ fn a_header_of_buttons_alone_is_a_bar_with_no_title() {
     assert_eq!(bars::header_shape_words(&unsaid, 0), None);
 }
 
+/// The bar has one place for a search field and one for a tablist: a header
+/// with no heading and two of either keeps them in the page, as the compiler
+/// warns, rather than losing the second.
+#[test]
+fn a_header_with_no_heading_and_two_search_fields_or_tablists_is_no_bar() {
+    let one = |extra: Vec<Node>| {
+        let mut children = vec![
+            button(13, &[]),
+            Node(14, NodeType::TextInput, SEARCH, vec![]),
+        ];
+        children.extend(extra);
+        kernel(view(
+            10,
+            vec![Node(11, NodeType::View, HEADER, children), view(15, vec![])],
+        ))
+    };
+    assert!(
+        one(vec![])
+            .header_shape(10, None, false, &pressed)
+            .is_some(),
+        "one field: the bar holds it"
+    );
+    let two_fields = one(vec![Node(16, NodeType::TextInput, SEARCH, vec![])]);
+    assert_eq!(two_fields.header_shape(10, None, false, &pressed), None);
+    let two_tablists = one(vec![
+        Node(30, NodeType::View, TABLIST, vec![button(32, &[])]),
+        Node(31, NodeType::View, TABLIST, vec![button(33, &[])]),
+    ]);
+    assert_eq!(two_tablists.header_shape(10, None, false, &pressed), None);
+}
+
 #[test]
 fn a_pressable_around_the_heading_is_the_title_and_a_tablist_its_segments() {
     let kernel = kernel(view(

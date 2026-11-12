@@ -453,7 +453,7 @@ function barItems(route, header) {
   // `fact::DISABLED`, dimmed whether or not it presses; a `button` element carries no `role` unless it has another one (element.rs); until input is ready, the glue disables every control itself (glue.js)
   // `fact::BOX`: a plain box, a `div` that is no text or a semantic box (element.rs `element`)
   const box = (el) => el.localName === "div" ? !el.hasAttribute("data-exact-text") : /^(main|header|nav|section|footer|article|aside)$/.test(el.localName);
-  let headings = 0, tap = null, placed = 0, unplaced = false;
+  let headings = 0, tap = null, placed = 0, unplaced = false, searches = 0, tablists = 0;
   const items = [], walk = (node) => {
     for (const child of node.children) {
       if (layer(child)) {
@@ -461,6 +461,8 @@ function barItems(route, header) {
       }
       if (child.matches(`[role=tablist], input[type="search"], ${authored}`)) {
         placed++;
+        // The bar has one place for a search field and one for a tablist: a second is unplaced.
+        if (child.matches('input[type="search"]') && searches++ || child.matches("[role=tablist]") && tablists++) unplaced = true;
         continue;
       }
       // a layer, the bar's segments, its search field, or what its author wrote `appearance: none` on (iOS projects none of it): no item
