@@ -1528,7 +1528,10 @@ out (LLP 1157).
   its socket with `exactIdleTimeout`, so the host ends one that carries nothing
   for a minute (`convex(url, functions, { idleTimeoutMs })` says another), in
   real time, whatever the driver's clock. It ends as `closed`, which the
-  recipe's `reconnect` opens again.
+  recipe's `reconnect` opens again. So does a connection with no results by
+  Convex's second ping, about half a minute after it opened, whatever
+  `idleTimeoutMs` says: the module cannot tell opening frames that were lost
+  from a first answer that late.
 - **A query's lifetime.** Its identity is its function and arguments. One a
   screen no longer asks for is dropped at the second change after its last
   ask. One asked while the socket is closed, with nothing delivered for it,

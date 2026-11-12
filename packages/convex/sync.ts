@@ -140,6 +140,8 @@ export class Sync {
   private generation = -1;
   private chunks: string[] = [];
   private chunkId = '';
+  /** The pings since this connection opened, while no `Transition` has arrived. */
+  private silent = 0;
 
   constructor(private codec: Codec) {}
 
@@ -159,6 +161,7 @@ export class Sync {
     this.status = 'open';
     this.version = { querySet: 0, identity: 0, ts: ZERO_TS };
     this.chunks = [];
+    this.silent = 0;
     const frames: Frame[] = [{
       type: 'Connect', sessionId: this.sessionId, connectionCount: this.connectionCount, lastCloseReason: this.lastCloseReason,
       ...(this.maxObservedTs ? { maxObservedTimestamp: this.maxObservedTs } : {}),
@@ -223,7 +226,12 @@ export class Sync {
     const message = JSON.parse(text) as Frame;
     if (this.chunks.length && message.type !== 'TransitionChunk') throw new ProtocolError(`Convex sent ${String(message.type)} inside a chunked Transition`);
     switch (message.type) {
-      case 'Ping': return [];
+      case 'Ping':
+        // Convex answers a connection's first frames at once and pings a quiet one every 15 s. A second ping
+        // with no `Transition` yet is taken as frames that never left (a refused commit takes them back,
+        // unsaid): the module cannot tell that from a first answer Convex is half a minute late with.
+        if (this.status === 'open' && (this.silent += 1) >= 2) throw new ProtocolError('Convex sent no results on this connection; connecting again');
+        return [];
       case 'TransitionChunk': {
         // A large `Transition` in parts, in order (`web_socket_manager.ts`, `assembleTransition`).
         const { chunk, partNumber, totalParts, transitionId } = message as unknown as { chunk: string; partNumber: number; totalParts: number; transitionId: string };

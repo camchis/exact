@@ -185,6 +185,25 @@ test('a connection opened with a token authenticates before its query set, and a
   expect(sync.opened().map(f => f.type)).toEqual(['Connect', 'ModifyQuerySet']);
 });
 
+test('a connection Convex has pinged twice and sent no results is ended, to connect again', () => {
+  const sync = new Sync(JSON_ONLY);
+  sync.connecting('session-1');
+  sync.ask(0, 'messages:list', {});
+  sync.opened();
+  expect(sync.frame(JSON.stringify({ type: 'Ping' }))).toEqual([]);
+  let thrown: unknown;
+  try { sync.frame(JSON.stringify({ type: 'Ping' })); } catch (e) { thrown = e; }
+  expect(thrown).toBeInstanceOf(ProtocolError);
+  expect([(thrown as ProtocolError).message, (thrown as ProtocolError).fatal]).toEqual(['Convex sent no results on this connection; connecting again', false]);
+  // A connection Convex has answered may stay quiet as long as it likes, and each connection counts its own.
+  sync.closed((thrown as Error).message);
+  sync.connecting('session-1');
+  sync.opened();
+  sync.frame(JSON.stringify({ type: 'Ping' }));
+  sync.frame(transition(version(0, 0, T0), version(1, 0, T1), [updated(0, [])]));
+  for (let i = 0; i < 3; i++) expect(sync.frame(JSON.stringify({ type: 'Ping' }))).toEqual([]);
+});
+
 test('a chunked Transition is applied once whole', () => {
   const { sync, first } = opened();
   const whole = transition(version(0, 0, T0), version(1, 0, T1), [updated(0, [HELLO])]);
