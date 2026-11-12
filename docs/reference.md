@@ -1084,6 +1084,9 @@ module.exports = {
 Match both identifiers to Exact's app id. Link the EAS project and install
 `expo-modules-autolinking` as a development dependency for EAS's config
 resolver (`bun add --dev expo-modules-autolinking`; commit the lockfile).
+EAS CLI reads it from the app's `node_modules` on the machine that runs
+`eas build`, so run `bun install` there first: without it, `eas build -p ios`
+fails in its entitlements step, before anything is sent to EAS.
 Exact does not need Expo or React Native at run time. Pin EAS CLI in the app's
 dev dependencies too (`bun add --dev --exact eas-cli`). This `eas.json` uses file secrets for signing; set
 `EXACT_REF` to the immutable Exact commit used by the app:
@@ -1117,8 +1120,10 @@ See [EAS custom builds](https://docs.expo.dev/custom-builds/schema/) and
 
 Save the following as `.ci/prepare-native.sh` in the app repository. The
 recipes run it with `ios` or `android`. It installs only that platform's
-Rust targets and Hermes bundles, with no simulator. Bun, git, curl and
-unzip come from the selected image. For a clean local worker, install Bun
+Rust targets and Hermes bundles, with no simulator, and fetches the crates
+Exact's lock names: Exact's tools build offline, and a worker's empty Cargo
+registry stops the first of them. Bun, git, curl and unzip come from the
+selected image. For a clean local worker, install Bun
 1.4.2 first and omit the final two EAS `set-env` calls.
 
 ```sh
@@ -1141,11 +1146,14 @@ case "$1" in
 esac
 rustup toolchain install "$pin" --profile minimal --target "$triple"
 cargo +"$pin" run --locked --manifest-path "$EXACT/vendor/ibex/crates/hermes-lean-sys-installer/Cargo.toml" -- --target "$triple"
+cargo +"$pin" fetch --locked --manifest-path "$EXACT/Cargo.toml"
 set-env EXACT "$EXACT"
 set-env PATH "$PATH"
 ```
 
 The installer also installs the host Hermes bundle used to bake TypeScript.
+`setup --check` reports a registry that lacks any of Exact's locked crates
+on its `Cargo crates` row.
 If the launcher or Cargo manifests still name a developer's checkout, run
 `EXACT=../exact bun exact.mjs update` locally and commit its changes before
 submitting the job. An app's `host.ios` and `host.android` entries must be
@@ -1156,12 +1164,34 @@ can be read without a simulator; see [the CI archive path](#build-an-ios-app-on-
 Cache Cargo's registry and git downloads, `$CARGO_HOME/hermes-lean-sys`,
 Gradle's `GRADLE_USER_HOME` (default `~/.gradle`), and `~/.cache/exact` when
 useful. Restore app and Exact `target/` only under keys that distinguish
-OS/architecture, toolchain, lockfiles and build mode. A cache hit does not
-promise reuse: fresh checkout mtimes can invalidate Cargo fingerprints,
-and production Apple builds do not use the development module cache.
-`CARGO_LOG=cargo::core::compiler::fingerprint=info` explains rebuilds. Do not
-rewrite source mtimes to force reuse. A clean build must work without these
-caches. Do not cache signing keys or provisioning profiles.
+OS/architecture, toolchain, lockfiles and build mode, and keep both
+checkouts at the same absolute paths between runs: Cargo's fingerprints
+include the location of a path crate outside the app's workspace. A cache
+hit does not promise reuse; production Apple builds do not use the
+development module cache, and
+`CARGO_LOG=cargo::core::compiler::fingerprint=info` explains rebuilds. A
+clean build must work without these caches. Do not cache signing keys or
+provisioning profiles.
+
+Cargo rebuilds a path crate when one of its source files is newer than its
+last build, and a fresh clone dates every file at the clone, so a restored
+`target/` alone still rebuilds every Exact crate. Dating the clone's files
+at its commit's time lets Cargo reuse the restored output. Add these lines
+to `.ci/prepare-native.sh` directly after the `git checkout`:
+
+```sh
+when=$(TZ=UTC git -C "$EXACT" log -1 --date=format-local:%Y-%m-%dT%H:%M:%SZ --format=%cd)
+git -C "$EXACT" ls-files -z | (cd "$EXACT" && xargs -0 touch -h -d "$when")
+```
+
+This is sound only while each file so dated has the bytes it had when the
+cache was saved, because Cargo then compares nothing but times: a changed
+file with an old time is not rebuilt, and the build ships its stale output.
+So restore that `target/` only under a key that names the Exact commit
+(`EXACT_REF`), with no fallback key that restores another commit's cache,
+and date only the files the checkout wrote, before any step changes the
+clone. Leave the app's own files their checkout times unless the key names
+the app's commit too.
 
 ### Import an iOS signing identity on a CI worker
 

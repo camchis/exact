@@ -876,6 +876,15 @@ export function androidReleaseEnvironment(env = process.env, bundle = false) {
     ...(env.EXACT_KEYSTORE ? { EXACT_KEYSTORE: resolve(env.EXACT_KEYSTORE) } : {}) };
 }
 
+/** Why a production Android build cannot start, or null. Android is the Linux bake, which refuses production trust with
+ * an update store (`deploy.store.linux` not "0") and no stream to join (bake/src/receipt.rs): said here, before minutes
+ * of Cargo, as the Apple build says its own. */
+export function androidStreamRefusal(name, manifest, env = process.env) {
+  if (env.EXACT_UPDATE_TRUST !== 'production' || env.EXACT_BAKE_ANALYSIS === '1' || manifest.deploy?.store?.linux === '0') return null;
+  if (env.EXACT_UPDATE_RECEIPT || env.EXACT_UPDATE_GENESIS === '1') return null;
+  return `${name}: this Android build bakes production trust, and Android uses the Linux bake, whose update store is on (deploy.store.linux is not "0"), so the build belongs to an update stream. For a binary without Exact updates, set deploy.store.linux to "0" in app.json (deploy.store.android does not turn the bake's store off). To ship into a stream, set EXACT_UPDATE_RECEIPT to its authenticated publisher receipt (scripts/deploy.mjs), or EXACT_UPDATE_GENESIS=1 to start a new one.`;
+}
+
 /** Whether an APK carries GPU libraries beside the app's (LLP 1009 D6): the primary module or a `gpu.modules` entry. */
 export const carriesGpu = (app) => app.hasGpu || gpuModules(app.manifest).length > 0;
 
@@ -1183,6 +1192,9 @@ if (import.meta.main && process.argv[2] === 'reverse') {
   if (args.includes('--no-install') && args.includes('--run')) throw new Error('--no-install takes no --run');
   if (bundle) process.env.EXACT_UPDATE_TRUST = 'production';
   const apkWanted = (bundle || args.includes('--apk')) && !args.includes('--headless');
+  const app = resolveApp(name);
+  const unstreamed = androidStreamRefusal(app.name, app.manifest);
+  if (unstreamed) { console.error(unstreamed); process.exit(1); }
   // The pinned toolchain's targets: the app's workspace builds with it, and rustup in the app's own directory, which
   // pins none, would answer for its default.
   // Without rustup (a toolchain installed by hand) Cargo names a missing target itself.
@@ -1191,7 +1203,6 @@ if (import.meta.main && process.argv[2] === 'reverse') {
     console.error(`the pinned toolchain ${PINNED_RUST} has no ${ANDROID_TARGET} target: rustup target add ${ANDROID_TARGET} --toolchain ${PINNED_RUST}`);
     process.exit(1);
   }
-  const app = resolveApp(name);
   // A TypeScript app's library links the Android Hermes bundle: said before minutes of compiling, not at the link.
   const typescript = androidUsesHermes(app, apkWanted ? 'android' : 'linux'), hermes = androidHermesDir();
   if (!hermes && typescript) {
