@@ -264,8 +264,20 @@ pub(super) struct Core {
 /// through: the platform's, unless the embedder names another.
 pub(super) type StreamHost = Arc<dyn Fn() -> ibex2::host::Host + Send + Sync>;
 
-/// The ordered owner (the boot's bindings) and the independent ones.
-fn owners(bindings: Option<ibex2::host::Bindings>) -> Vec<Option<ibex2::host::Bindings>> {
+/// The ordered owner (the boot's bindings) and the independent ones. The
+/// boot endowed its bindings with the data module's grants, before the plan
+/// was read; their fetch takes `grants`, the app's, which add the origins
+/// its declared sources carry (LLP 1162.001 D3).
+fn owners(
+    bindings: Option<ibex2::host::Bindings>,
+    grants: &str,
+) -> Vec<Option<ibex2::host::Bindings>> {
+    let bindings = bindings.map(|mut b| {
+        if let Ok(set) = ibex2::grant::GrantSet::parse(&exact_runner::io_grants(grants)) {
+            b.fetch = b.fetch.with_grants(set);
+        }
+        b
+    });
     std::iter::once(bindings)
         .chain(std::iter::repeat_with(|| None).take(INDEPENDENT))
         .collect()
@@ -281,7 +293,7 @@ impl Core {
         wake: Wake,
     ) -> Self {
         Self::with_owners_lanes(
-            owners(bindings),
+            owners(bindings, grants),
             grants,
             wake,
             Arc::new(ibex2::host::Host::new),
@@ -294,7 +306,7 @@ impl Core {
         // Additional transports are constructed on their own threads, not
         // while the presenter is trying to publish its first frame.
         Self::with_owners_on(
-            owners(bindings),
+            owners(bindings, grants),
             grants,
             wake,
             Arc::new(ibex2::host::Host::new),
@@ -304,7 +316,7 @@ impl Core {
     /// [`Core::start`], or, switched on, the machine (LLP 1120): Apple's.
     #[allow(dead_code)] // Apple's executor's; Linux's and the render host's are `start_on`
     pub(super) fn start_switched(b: Option<ibex2::host::Bindings>, g: &str, w: Wake) -> Self {
-        Self::with_owners(owners(b), g, w)
+        Self::with_owners(owners(b, g), g, w)
     }
 
     /// [`Core::start`] with every transport the other owners, scoped grants
@@ -317,7 +329,7 @@ impl Core {
         wake: Wake,
         host: StreamHost,
     ) -> Self {
-        Self::with_owners_on(owners(bindings), grants, wake, host)
+        Self::with_owners_on(owners(bindings, grants), grants, wake, host)
     }
 
     fn with_owners(owners: Vec<Option<ibex2::host::Bindings>>, grants: &str, wake: Wake) -> Self {

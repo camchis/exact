@@ -8,6 +8,7 @@ mod arguments;
 mod canvas2d;
 mod change_tasks;
 mod children;
+mod declared_source;
 mod each;
 mod failed_readers;
 mod flow_agent;

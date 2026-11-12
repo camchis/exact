@@ -288,8 +288,9 @@ pub fn uses(plan: &Plan) -> Uses {
     if plan.router.is_some() {
         uses = uses.with(Capability::Router);
     }
-    // Kept answers and surface records both need the host's store.
-    if plan.resources.iter().any(|r| r.reader || r.keep) {
+    // Kept answers and surface records both need the host's store, and a
+    // declared source its network (LLP 1162.001 D3).
+    if plan.resources.iter().any(|r| r.reader || r.keep) || !plan.fetches.is_empty() {
         uses = uses.with(Capability::Io);
     }
     // A segment length is a value, not a row: any string of the plan's

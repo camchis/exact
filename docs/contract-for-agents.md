@@ -909,6 +909,7 @@ Choose the mechanism from its lifetime:
 | Requirement | Mechanism |
 | --- | --- |
 | Value follows query arguments | `resource result = source(args) as shape T` |
+| One HTTP request read into a shape (a `GET`, a GraphQL query), with no data module | a `source` declared in `app.contract` ([Declared sources](#declared-sources)) |
 | Source needs changing context while the same kept answer is suitable at boot | `resource result = source(identity) with context as shape T` |
 | Ask nothing until a condition holds (nothing selected, a query too short, a page not open) | `resource result = source(args) when cond as shape T`: idle while `cond` is false, asked again, forced, when it turns true |
 | Explicit command with a reply | `mutation reply as shape T`, then `send reply = source(args)` |
@@ -1125,6 +1126,57 @@ for (let i = 0; i < nodes.length; i++) {
 
 The function that yields is `async`, and so is every caller that awaits it.
 On the web the page has no such budget, and a yield lets it paint mid-parse.
+
+### Declared sources
+
+A source that is one HTTP request read into a shape is declared in the root
+file, `app.contract`, and needs no data module (LLP 1162.001). Its lines are
+`fetch()`'s ([the recipe](recipes/declared-source.md) has whole examples):
+
+```contract
+shape Current
+  temperature_2m: number
+
+source weather(latitude: number, longitude: number) as shape Current
+  url "https://api.open-meteo.com/v1/forecast?latitude={latitude}&longitude={longitude}&current=temperature_2m"
+  pointer "/current"
+
+component App
+  resource now = weather(52.52, 13.41) as shape Current
+  view
+    text `${now.temperature_2m}°`
+```
+
+| Line | Meaning |
+| --- | --- |
+| `url "…"` | Required. `{param}` is the argument as text (a `string`, `number` or `bool`), percent-encoded as RFC 6570 encodes it. The origin is written out before any `{…}`. |
+| `method "…"` | `GET` (the default), `POST`, `PUT`, `PATCH` or `DELETE`. |
+| `header "Name" "value"` | One header. The value may name a parameter, `{param}`, and a secret the data module keeps, `{secret:name}`; a header the browser sets itself (`Cookie`, `Origin`, …) is refused. |
+| `body json` | The parameters as one JSON object by name, `Content-Type: application/json`. |
+| `graphql "…"` | A `POST` of `{"query": document, "variables": {param: value, …}}`; no `method` or `body` beside it. |
+| `pointer "…"` | Where the answer is in the reply: an RFC 6901 JSON Pointer, `"/data/items"`; the whole reply when it is left out. |
+
+- **The grant is the origin.** A declared source reaches its URL's origin and nothing
+  else, on every host, with no `grants` line; an update that declares a new origin is a
+  new binary, as a new grant is. A `{secret:name}` needs `secret.keep name` in the data
+  module's grants; while the secret is absent nothing is sent and the resource fails
+  with `refused`.
+- **The answer is read field by field.** A field the shape doesn't declare is left out
+  (unlike a data module's answer, which is held to its shape exactly), an absent or
+  `null` `option` field is `none`, and anything else missing fails it with `shape`.
+  Rename or compute in a `derive`.
+- **A failure** is a TypeScript `fetch`'s that is let through: `offline`, `timeout` or
+  `refused`, or `error` for a status outside 200–299, a reply that is not JSON, or a
+  GraphQL `errors` (its first error's `extensions.code` is `failure(x).reason`).
+- **Reads and writes.** A resource's request is a read: it overlaps others and a `GET`
+  keeps the GET cache; `refresh` asks past it. A `send` to a declared source with
+  another method, or a GraphQL mutation, is a write. Nothing is asked at build: a
+  declared resource shows its `else`, or its shape's zero, until the launch's answer.
+- **What stays in a data module:** token refresh, pagination across requests, offline
+  queues and retries, an optimistic `overlay`, streams and sockets, uploads, form bodies,
+  and an origin from `app.json`'s `env`. An app with both keeps `app.ts`, and with it
+  the JavaScript engine on native hosts; an app whose sources are all declared has
+  neither.
 
 ### Optimistic writes: the overlay
 

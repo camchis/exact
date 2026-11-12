@@ -1444,7 +1444,9 @@ cargo run -q -p contract -- types path/to/app.contract -o path/to/app.contract.d
 
 In `app.ts`, use `import type { Sources, Answer } from './app.contract.d.ts'`.
 Annotate the provider map as `Sources`; each function takes `(args, store, storage)` and
-returns its declared result or a Promise of it. An `Answer` dispatcher can call
+returns its declared result or a Promise of it. A `source` declared in `app.contract`
+is the runner's to answer, so `Sources` leaves it out ([Declared
+sources](contract-for-agents.md#declared-sources)). An `Answer` dispatcher can call
 `sources[source](args, store, storage)` without casts. `bun install --frozen-lockfile` installs the pinned `tsc`.
 An answer is held to its shape exactly, on every executor: each declared field
 present (an `undefined` one is missing, as `JSON.stringify` leaves it out), none

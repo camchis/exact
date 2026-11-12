@@ -442,6 +442,9 @@ impl<D: DataSource> Runner<D> {
         } else if self.plan.module_named(source).is_some() {
             // A native module's send (LLP 1133.002 D13): the runner's substitute.
             self.module_send(target, source, args)
+        } else if self.plan.fetch_named(source).is_some() {
+            // A source declared in Contract (LLP 1162.001 D6).
+            self.fetch_answer(source, args)
         } else {
             let answer = self.answer_mutation(target, source, args);
             let answer = self.single_answer(target, answer);

@@ -53,7 +53,7 @@ fn a_scoped_request_rides_its_workers_transport() {
     let ordered = host().endow(ibex2::grant::GrantSet::parse(grants).unwrap());
     let (wake, woke) = channel();
     let core = Core::with_owners_on(
-        owners(Some(ordered)),
+        owners(Some(ordered), grants),
         grants,
         Box::new(move || {
             let _ = wake.send(());
@@ -98,4 +98,46 @@ fn a_scoped_request_rides_its_workers_transport() {
     let outcome = collect(&core, &woke, 1).remove(0).1;
     assert!(matches!(outcome, Outcome::Failed { .. }), "{outcome:?}");
     assert_eq!(served.lock().unwrap().len(), 16, "nothing was sent");
+}
+
+/// The boot endows the ordered owner with the data module's grants before
+/// the plan is read; the core's grants add the origins the plan's declared
+/// sources carry (LLP 1162.001 D3), and the ordered owner admits them too.
+#[test]
+fn the_ordered_owner_takes_the_apps_grants_with_its_declared_origins() {
+    let module = "net.fetch https://example.test";
+    let app = "net.fetch https://example.test\nnet.fetch https://declared.test";
+    let served = Arc::new(Mutex::new(Vec::new()));
+    let host: StreamHost = {
+        let served = served.clone();
+        Arc::new(move || {
+            let served = served.clone();
+            ibex2::host::Host::with_transport(Box::new(Counted { id: 0, served }))
+        })
+    };
+    let ordered = host().endow(ibex2::grant::GrantSet::parse(module).unwrap());
+    let (wake, woke) = channel();
+    let core = Core::with_owners_on(
+        owners(Some(ordered), app),
+        app,
+        Box::new(move || {
+            let _ = wake.send(());
+        }),
+        host,
+    );
+    // Unscoped, as a data module's request is: the ordered lane's grants are
+    // the independent lanes' (which the core endows from `app`).
+    core.run(job(1, Request::get("https://declared.test/forecast")), None)
+        .unwrap();
+    let outcome = collect(&core, &woke, 1).remove(0).1;
+    assert!(
+        matches!(outcome, Outcome::Response(ref r) if r.status == 200),
+        "{outcome:?}"
+    );
+    // An origin neither grants is refused before contact.
+    core.run(job(2, Request::get("https://elsewhere.test/")), None)
+        .unwrap();
+    let outcome = collect(&core, &woke, 1).remove(0).1;
+    assert!(matches!(outcome, Outcome::Failed { .. }), "{outcome:?}");
+    assert_eq!(served.lock().unwrap().len(), 1, "one request was sent");
 }

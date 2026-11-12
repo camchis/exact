@@ -1032,14 +1032,15 @@ fn a_plan_without_compiled_values_keeps_every_other_data_range() {
 }
 
 /// Version 6 adds the header's `surface` (LLP 1101.003 D9), which every host
-/// checks before it boots a plan. Every plan-reading host needs a new binary,
-/// including Apple, web, Linux, Windows, Android and terminal (LLP 1030 D3a).
-/// The digest covers
-/// all of `tables/format.json`, including comments.
+/// checks before it boots a plan; declared sources add the `fetches` and
+/// `fetch_parts` tables (LLP 1162.001). Every plan-reading host needs a new
+/// binary, including Apple, web, Linux, Windows, Android and terminal (LLP
+/// 1030 D3a). The digest covers all of `tables/format.json`, including
+/// comments.
 #[test]
 fn the_format_digest_is_pinned() {
     assert_eq!(
-        FORMAT_DIGEST, 0xb4c6_802d_bd0e_a6a5,
+        FORMAT_DIGEST, 0xd692_385c_a1e8_c642,
         "the plan format digest moved: if intended, name the break and the hosts that move"
     );
 }

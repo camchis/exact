@@ -360,6 +360,62 @@
       ]
     },
     {
+      "name": "fetch_parts",
+      "_comment": "LLP 1162.001 D1: a declared source's parameter names (`value` empty), in order, and its request headers (`name`, and the value as written, with `{param}` and `{secret:name}` unexpanded).",
+      "fields": [
+        {
+          "name": "name",
+          "codec": "str"
+        },
+        {
+          "name": "value",
+          "codec": "str"
+        }
+      ]
+    },
+    {
+      "name": "fetches",
+      "_comment": "LLP 1162.001: a source declared in Contract, which the runner answers itself with one HTTP request. `url` is an RFC 6570 level-1 template over `params`; `origin` is its literal origin, which is its grant (`net.fetch <origin>`, D3); `body` is empty, `json` or `graphql`, the last with its operation in `document`; `pointer` is an RFC 6901 JSON Pointer into the reply.",
+      "fields": [
+        {
+          "name": "source",
+          "codec": "idx:sources"
+        },
+        {
+          "name": "method",
+          "codec": "str"
+        },
+        {
+          "name": "url",
+          "codec": "str"
+        },
+        {
+          "name": "origin",
+          "codec": "str"
+        },
+        {
+          "name": "params",
+          "codec": "range:fetch_parts"
+        },
+        {
+          "name": "headers",
+          "codec": "range:fetch_parts"
+        },
+        {
+          "name": "body",
+          "codec": "str"
+        },
+        {
+          "name": "document",
+          "codec": "str"
+        },
+        {
+          "name": "pointer",
+          "codec": "str"
+        }
+      ]
+    },
+    {
       "name": "module_events",
       "_comment": "LLP 1133.004 D6: a native module's event the app's root hears, and the action it runs with the event's arguments, as many as the action takes. `raised` is `activation` (a person's act on the platform's UI, which only the host raises), `emit` (the device's) or `wake` (LLP 1133.017 D5: the host's alone, at the platform's call, each an invocation of a wake); `hold` bounds the deliveries held before the session can hear them; `budget` is a wake event's milliseconds from the wake's first delivery to its deadline, 0 for any other.",
       "fields": [

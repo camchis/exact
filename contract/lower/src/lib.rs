@@ -37,6 +37,7 @@ mod disabled_look;
 mod edits;
 mod error;
 pub mod expr;
+mod fetches;
 mod fields;
 mod font_axes;
 mod fonts;

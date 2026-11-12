@@ -710,6 +710,53 @@ impl PlanBuilder {
         self.plan.modules.push(row);
     }
 
+    /// A source declared in Contract (LLP 1162.001): the runner answers
+    /// `source` with one HTTP request. `params` are its parameters' names, in
+    /// order; `headers` its request headers as written; `body` is empty,
+    /// `json` or `graphql`.
+    #[allow(clippy::too_many_arguments)]
+    pub fn fetch(
+        &mut self,
+        source: SourcesId,
+        method: &str,
+        url: &str,
+        origin: &str,
+        params: &[&str],
+        headers: &[(&str, &str)],
+        body: &str,
+        document: &str,
+        pointer: &str,
+    ) {
+        let range = |b: &mut Self, parts: &mut dyn Iterator<Item = (&str, &str)>| {
+            let start = b.plan.fetch_parts.len() as u32;
+            for (name, value) in parts {
+                let row = FetchPartsRow {
+                    name: b.str(name),
+                    value: b.str(value),
+                };
+                b.plan.fetch_parts.push(row);
+            }
+            FetchPartsRange {
+                start,
+                len: b.plan.fetch_parts.len() as u32 - start,
+            }
+        };
+        let params = range(self, &mut params.iter().map(|p| (*p, "")));
+        let headers = range(self, &mut headers.iter().copied());
+        let row = FetchesRow {
+            source,
+            method: self.str(method),
+            url: self.str(url),
+            origin: self.str(origin),
+            params,
+            headers,
+            body: self.str(body),
+            document: self.str(document),
+            pointer: self.str(pointer),
+        };
+        self.plan.fetches.push(row);
+    }
+
     /// A native module's event the root hears (LLP 1133.004 D6): `action`
     /// runs with its arguments.
     pub fn module_event(

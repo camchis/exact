@@ -271,6 +271,8 @@ fn walk(file: &mut File, scope: &Scope, seen: Option<&mut Seen>) -> Result<(), S
         library: _,
         library_packages: _,
         fns,
+        // A declared source's name is a source's, which no `use` scopes.
+        sources,
         modules,
         tests,
         properties: _,
@@ -289,6 +291,10 @@ fn walk(file: &mut File, scope: &Scope, seen: Option<&mut Seen>) -> Result<(), S
         for ty in m.answers.iter_mut().chain(&mut m.args) {
             r.ty(ty)?;
         }
+    }
+    for source in sources {
+        r.params(&mut source.params)?;
+        r.ty(&mut source.shape)?;
     }
     for shape in shapes {
         r.scope.rename(Kind::Call, &mut shape.name, shape.span)?;

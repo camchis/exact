@@ -51,6 +51,7 @@ mod controls;
 mod corpus;
 mod current;
 mod dataset;
+mod declared_source;
 mod delete_rows;
 mod delivery;
 mod desktop;

@@ -96,8 +96,8 @@ word.
 
 ```ebnf
 file          = { declaration } ;
-declaration   = use | shape | function | style | decoration | atom | keyframes | font
-              | sound | theme | timeline | color-profile | routes | component
+declaration   = use | shape | function | source | style | decoration | atom | keyframes
+              | font | sound | theme | timeline | color-profile | routes | component
               | members-block | test ;
 use           = "use" use-name { "," use-name } "from" STRING NL ;
 use-name      = IDENT [ "as" IDENT ] ;
@@ -107,6 +107,10 @@ function      = "fn" IDENT "(" [ typed-params ] ")" ":" type "="
                 ( expr NL | NL INDENT expr NL DEDENT ) ;
 typed-params  = typed-param { "," typed-param } [ "," ] ;
 typed-param   = IDENT ":" type ;
+source        = "source" IDENT "(" [ typed-params ] ")" "as" "shape" type
+                block(source-line) ;              (* the root file's; LLP 1162.001 *)
+source-line   = ( "url" STRING | "method" STRING | "header" STRING STRING
+                | "body" "json" | "graphql" STRING | "pointer" STRING ) NL ;
 style         = "style" IDENT block(style-line | part) ;
 decoration    = "decoration" IDENT ( style-line | block(style-line) ) ;
 atom          = "atom" IDENT style-line [ block(style-line | state) ] ;
@@ -129,6 +133,12 @@ route-row     = [ "tab" ] IDENT STRING { attribute } NL [ route-children ]
               | "notfound" { attribute } NL ;
 route-children = INDENT route-row { route-row } DEDENT ;
 ```
+
+A `source` is one HTTP request the runner makes for a `resource` or a `send`
+of its name ([Declared sources](contract-for-agents.md#declared-sources)): `url`
+is required, each other line at most once but `header`, and `graphql` takes no
+`method` or `body` beside it. A call passes the declared parameters and
+declares the same shape (`type-source-declared`).
 
 A font face's weight is a whole number in 1–1000. Keyframe percentages are in
 0–100; `from` and `to` are 0% and 100%. Lowering checks whether keyframe properties

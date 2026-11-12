@@ -425,7 +425,9 @@ impl<D: DataSource> Runner<D> {
             }
             let target = self.send_target(m);
             let write = self.accept_write(target, source, sargs);
-            let early = !self.data.ready() && !exact_plan::runner_owned_source(source);
+            let early = !self.data.ready()
+                && !exact_plan::runner_owned_source(source)
+                && self.plan.fetch_named(source).is_none();
             if early && !queue {
                 if let Err(e) = self.check_send_arguments(m, sargs) {
                     self.discard_later(&later);
