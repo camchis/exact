@@ -433,6 +433,18 @@ in `AccentColor` as reported, with `AccentColorText` drawn on it (a check, a swi
 the device's `primary` and `onPrimary`. The painter's own blue is desktop Linux's alone, where nothing is reported.
 The controls' shapes are still the desktop painter's (D9).
 
+**A press is Material's ripple** (D9; `host/linux/src/paint/ripple.rs`): on a button, a segment, a field that opens
+something, a checkbox and a radio (in the 40 dp circle round the mark, from its middle), a list's row and any other
+node that presses (a `press` or a link's `href`) with no pressed look of its own (`:active`, `-exact-press-scale`,
+`pointerdown`). In what scrolls it waits the platform's tap timeout, 100 ms, so a touch a scroller takes sooner shows
+none. It is the framework `RippleDrawable`'s wave, which Compose
+Material 3 draws a press with: a soft circle from the touch, in the content's colour at the pressed state's 10%,
+bounded by the pressed shape, spreading to rest in 450 ms while the finger is down, its centre moving to the shape's
+middle, and fading out over 375 ms once the finger has lifted and those 450 ms are over. No state layer shows beside
+it, as Compose shows none for a press; a hover's 8% does. The wave's sparkles are not drawn. With animations removed,
+and on the agent's clock, a press is the wave at rest and a release takes it away. The bars' targets ripple too, in
+the shape their state layer had (below); the top layer's rows and buttons still show the 10% state layer alone.
+
 **The launch window.** From Android 14 the launch theme names the platform's `system_surface_light` and
 `system_surface_dark` (`res/values-v34`, `values-night-v34`), the colour the first frame's unsaid background has, with
 the bars' icons set for it. On Android 12 and 13 the platform has no `surface` to name in a theme, and the launch
@@ -1062,7 +1074,7 @@ the bar took of the routes goes to nothing while it is covered (`Presenter::fit_
 | Title | the heading, title-large (22/28 sp, regular), `onSurface`, one line cut with an ellipsis; 16 dp from the side, or 4 dp after what leads it (56 dp after the Up arrow) | the same (`TopAppBarLayout`: the title's box at `TopAppBarTitleInset` or after the navigation icon, its own 4 dp padding) |
 | Up arrow | on a pushed route: Material Symbols' `arrow_back`, 24 dp in a 48 dp target 4 dp from the side, `onSurface` | the same |
 | Buttons | the header's, at the trailing side, 4 dp from it: a 24 dp symbol in a 48 dp target (`onSurfaceVariant`) where the button has a symbol, else a text button (label-large, `primary`, 12 dp padding, at least 58 dp wide) | icon buttons and text buttons, the same metrics |
-| Held | a state layer (10%): a 40 dp circle on an icon, a pill on a text button | a state layer and a ripple |
+| Held | the ripple (above), in a 40 dp circle on an icon, a pill on a text button | the ripple, bounded by the icon button's 40 dp circle |
 
 A level-1 heading is the same small bar: Material's medium and large bars, which collapse as the content scrolls,
 are S3's, and so is the change of colour as a transition (it switches in one frame here; Compose animates it).

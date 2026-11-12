@@ -65,6 +65,7 @@ pub use material::{FieldText, FieldTexts};
 mod native;
 pub(crate) mod neutral;
 pub(crate) mod numerals;
+pub(crate) mod ripple;
 pub use native::NativeKind;
 mod order;
 mod placed;
@@ -495,6 +496,8 @@ pub struct Painter {
     pub(crate) feedback: (Option<ViewId>, Option<ViewId>),
     /// The control a held `active` presses (`presenter/held.rs`), beside a contact's.
     pub(crate) held_press: Option<ViewId>,
+    /// Material's ripples, each from its press's touch (`ripple.rs`).
+    pub(crate) ripples: ripple::Ripples,
     /// The background the last box painted shows, its states' over its own,
     /// which its `background-clip: text` fills with (`text_clip`).
     clipped: Option<(ViewId, [u8; 4])>,
@@ -557,6 +560,8 @@ impl Painter {
         // A fresh kernel can reuse both epochs and node keys.
         self.paint_epoch = None;
         self.svg_warned.clear();
+        // The old tree's presses: its view ids are another tree's now.
+        self.ripples.clear();
     }
 
     /// A painter over a backend.
@@ -602,6 +607,7 @@ impl Painter {
             symbols: look::symbols(),
             feedback: (None, None),
             held_press: None,
+            ripples: Default::default(),
             clipped: None,
             field_content: HashMap::new(),
             field_text: HashMap::new(),
@@ -650,9 +656,19 @@ impl Painter {
     }
 
     /// Something the painter animates owes a frame: a number rolling, a
-    /// field's label floating.
+    /// field's label floating, a ripple spreading or fading.
     pub(crate) fn moving(&self) -> bool {
-        self.numerals.rolling() || self.labels.moving()
+        let (now, still) = (self.numerals.now, self.numerals.still);
+        self.numerals.rolling() || self.labels.moving() || self.ripples.moving(now, still)
+    }
+
+    /// When the last of them comes to rest, ms.
+    pub(crate) fn settles_at(&self) -> Option<f64> {
+        let now = self.numerals.now;
+        (self.numerals.settles_at().into_iter())
+            .chain(self.labels.settles_at())
+            .chain(self.ripples.settles_at(now))
+            .reduce(f64::max)
     }
 
     #[cfg(windows)]
@@ -860,6 +876,7 @@ impl Painter {
         // set remains intact; candidate leases simply unwind with `walk`.
         self.numerals.painted();
         self.labels.painted();
+        self.ripples.painted(self.numerals.now, self.numerals.still);
         if finished.is_ok() {
             self.accepted_text = walk.text;
             self.field_text = walk.fields;
@@ -1074,6 +1091,7 @@ impl Painter {
                 dark,
                 feedback,
             );
+            self.pressable(node, &surface.outer, ts);
         }
         let outer = geometry.outer;
         let content = geometry.content;
@@ -1184,16 +1202,15 @@ impl Painter {
             {
                 self.file_control(node, content, ts);
             }
-            NodeType::Control => control::paint(
-                self.backend.as_mut(),
-                node,
-                content,
-                ts,
-                self.dark,
-                walk.scene.controls.get(&node.id).copied(),
-                self.feedback.0 == Some(node.id),
-                self.scale,
-            ),
+            NodeType::Control => {
+                let held = walk.scene.controls.get(&node.id).copied();
+                let hovered = self.feedback.0 == Some(node.id);
+                let backend = self.backend.as_mut();
+                control::paint(
+                    backend, node, content, ts, self.dark, held, hovered, self.scale,
+                );
+                self.mark_ripple(node, content, held, ts);
+            }
             _ => {}
         }
         // Children, moved by this box's scroll offset when it scrolls.
