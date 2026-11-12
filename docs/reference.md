@@ -4100,10 +4100,11 @@ of it, as UIKit's `scrollViewWillBeginDragging` and
 `ScrollDragEvent` carries `velocityX` and `velocityY` in UIKit's units, CSS
 pixels per millisecond, positive in the direction `scrollLeft` and `scrollTop`
 grow, and `targetLeft` and `targetTop`, where the momentum will stop, `some` on
-iOS and `none` where the host cannot say before it gets there. macOS takes a
-trackpad's two fingers as the drag and the web a touch, each estimating the
-velocity from the last 100 ms of the fingers' moves; Linux, Windows and
-Android send neither yet. A wheel, the keyboard and a programmatic scroll send
+iOS and Android and `none` where the host cannot say before it gets there. macOS
+takes a trackpad's two fingers as the drag and the web a touch, each estimating
+the velocity from the last 100 ms of the fingers' moves; Android takes a finger
+on the innermost scroller it moves, with the platform's velocity; Linux and
+Windows send neither. A wheel, the keyboard and a programmatic scroll send
 neither
 ([events](contract-grammar.md#events)).
 

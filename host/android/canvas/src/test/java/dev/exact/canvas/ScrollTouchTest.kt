@@ -41,9 +41,12 @@ class ScrollTouchTest {
         @Implementation fun under(x: Float, y: Float, done: (IntArray) -> Unit) { answers.addLast(done) }
         @Implementation fun touch(action: Int, x: Float, y: Float, tool: Int, waitMs: Long): Boolean { touches.add(action); return false }
         @Implementation fun finger(action: Int, id: Int, x: Float, y: Float, waitMs: Long) = false
-        @Implementation fun scrolled(id: Int, dx: Float, dy: Float, rev: Int, seq: Int) { moved[id] = (moved[id] ?: 0f) + dx + dy }
+        @Implementation fun scrolled(id: Int, dx: Float, dy: Float, rev: Int, seq: Int) {
+            moved[id] = (moved[id] ?: 0f) + dx + dy
+            Host.told.add("move $id")
+        }
         @Implementation fun answer(waitMs: Long, f: () -> Unit) = false
-        @Implementation fun call(f: () -> Unit) {}
+        @Implementation fun call(f: () -> Unit) = f()
         @Implementation fun input() {}
         @Implementation fun held(on: Boolean) {}
         @Implementation fun running(on: Boolean) {}
@@ -58,6 +61,14 @@ class ScrollTouchTest {
             @JvmStatic @Implementation fun fieldInput(id: Int, generation: Int) {}
             @JvmStatic @Implementation fun fieldFocused(id: Int, generation: Int, focused: Boolean) {}
             @JvmStatic @Implementation fun fieldSelected(id: Int, generation: Int, start: Int, end: Int) {}
+            /** What exact2's thread was told of scrolling, in order: each move, and each drag's start and end. */
+            val told = ArrayList<String>()
+            val ends = ArrayList<FloatArray>()
+            @JvmStatic @Implementation fun scrollDrag(id: Int, ended: Boolean, vx: Float, vy: Float, rest: Boolean, restX: Float, restY: Float, flings: Boolean) {
+                told.add(if (!ended) "start $id" else if (flings) "end $id flings" else "end $id")
+                if (ended) ends.add(floatArrayOf(vx, vy, restX, restY))
+            }
+            @JvmStatic @Implementation fun flingEnded(id: Int) { told.add("rest $id") }
         }
     }
 
@@ -74,6 +85,7 @@ class ScrollTouchTest {
         activity.setContentView(FrameLayout(activity).also { it.addView(view, FrameLayout.LayoutParams(400, 800)) })
         val owner = Owner(false, false, 0) { null }
         thread = Shadow.extract(owner)
+        Host.told.clear(); Host.ends.clear()
         view.owner = owner
         view.ownerStarted(true)
     }
@@ -249,6 +261,68 @@ class ScrollTouchTest {
         assertEquals(emptyList<Int>(), got)
         assertEquals(listOf(0, 2, 3), thread.touches)
         assertEquals(40f - slop, thread.moved[1]!!, 0.01f)
+    }
+
+    // What exact2 is told of the drag itself: its `scrolldragstart` and `scrolldragend` ([Native.scrollDrag]).
+
+    @Test fun aDragIsToldOnceBeforeItsFirstMoveAndItsEndWithTheFlingsRest() {
+        down(400f); answer(reply(scroller(1, 0f), scroller(2, 0f)))
+        move(380f); move(340f); move(300f); up(300f)
+        // The innermost the drag moves is the one dragged; its moves follow its start, the end follows them.
+        assertEquals(listOf("start 1", "move 1", "move 1", "move 1", "end 1 flings"), Host.told)
+        val (vx, vy, restX, restY) = Host.ends.single().toList()
+        assertEquals(0f, vx)
+        assertTrue("a finger moving up scrolls toward the end: positive, px/s", vy > 1000f)
+        assertTrue("the fling's rest is past where the lift left it", restY > 100f - slop)
+        assertEquals(0f, restX)
+        assertTrue(view.scrolling().timerActive)
+    }
+
+    @Test fun aFlingsEndIsToldWhenItStopsOrAFingerCatchesIt() {
+        down(400f); answer(reply(scroller(1, 0f, max = 100000f)))
+        move(380f); move(340f); move(300f); up(300f)
+        org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idleFor(java.time.Duration.ofSeconds(10))
+        assertFalse(view.scrolling().timerActive)
+        // The fling's moves come between its drag's end and its own.
+        val end = Host.told.indexOf("end 1 flings")
+        assertTrue(end > 0 && Host.told.subList(end + 1, Host.told.size - 1).all { it == "move 1" } && end + 1 < Host.told.size - 1)
+        assertEquals("rest 1", Host.told.last())
+        Host.told.clear()
+        down(400f); answer(reply(scroller(1, 0f, max = 100000f)))
+        move(380f); move(340f); move(300f); up(300f)
+        // A finger on the list while it flings stops it and has it: the fling is over, and a drag begins.
+        down(400f)
+        assertEquals(listOf("end 1 flings", "rest 1", "start 1"), Host.told.takeLast(3))
+    }
+
+    @Test fun aDragLetGoOfStillRestsWhereItIs() {
+        down(400f); answer(reply(scroller(1, 0f)))
+        move(380f); move(340f)
+        time += 500
+        move(340f); up(340f)
+        val end = Host.ends.single()
+        assertTrue(kotlin.math.abs(end[1]) < ViewConfiguration.get(activity).scaledMinimumFlingVelocity)
+        assertEquals(60f - slop, end[3], 0.01f)
+        assertFalse(view.scrolling().timerActive)
+    }
+
+    @Test fun aDragTheSystemTakesOrAStopEndsIsToldItsEnd() {
+        down(400f); answer(reply(scroller(1, 0f)))
+        move(380f); move(340f)
+        touch(MotionEvent.ACTION_CANCEL, 100f to 340f)
+        assertEquals(listOf("start 1", "move 1", "move 1", "end 1"), Host.told)
+        assertEquals(0f, Host.ends.single()[1])
+        Host.told.clear()
+        down(400f); answer(reply(scroller(1, 0f)))
+        move(380f)
+        view.running(false)
+        assertEquals(listOf("start 1", "move 1", "end 1"), Host.told)
+    }
+
+    @Test fun aTouchThatNeverScrollsTellsNoDrag() {
+        down(400f); answer(reply(scroller(1, 0f)))
+        move(398f); up(398f)
+        assertEquals(emptyList<String>(), Host.told)
     }
 
     private fun ExactView.scrolling(): Scrolling =

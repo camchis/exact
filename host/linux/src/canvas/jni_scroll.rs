@@ -36,7 +36,8 @@ macro_rules! canvas_jni_scroll {
         }
 
         /// A finger began dragging scroller `id`, or (`ended`) let go of it
-        /// (`CanvasHost::drag_began`, `drag_ended`; px/s, px).
+        /// (`CanvasHost::drag_began`, `drag_ended`; px/s, px), and whether it
+        /// throws a fling.
         #[no_mangle]
         pub unsafe extern "system" fn Java_dev_exact_canvas_Native_scrollDrag(
             _env: *mut $crate::canvas::jni_sys::JNIEnv,
@@ -48,12 +49,24 @@ macro_rules! canvas_jni_scroll {
             rest: $crate::canvas::jni_sys::jboolean,
             rest_x: $crate::canvas::jni_sys::jfloat,
             rest_y: $crate::canvas::jni_sys::jfloat,
+            flings: $crate::canvas::jni_sys::jboolean,
         ) {
             let rest = (rest != 0).then_some((rest_x, rest_y));
             match ended != 0 {
                 false => with(|h| h.drag_began(id as u32)),
-                true => with(|h| h.drag_ended(id as u32, vx, vy, rest)),
+                true => with(|h| h.drag_ended(id as u32, vx, vy, rest, flings != 0)),
             };
+        }
+
+        /// The fling the reader threw from its drag of scroller `id` stopped
+        /// (`CanvasHost::fling_ended`).
+        #[no_mangle]
+        pub unsafe extern "system" fn Java_dev_exact_canvas_Native_flingEnded(
+            _env: *mut $crate::canvas::jni_sys::JNIEnv,
+            _class: $crate::canvas::jni_sys::jclass,
+            id: $crate::canvas::jni_sys::jint,
+        ) {
+            with(|h| h.fling_ended(id as u32));
         }
     };
 }

@@ -101,6 +101,11 @@ internal class Scrolling(private val view: ExactView) {
     var serial = 0
         private set
     private var mode = IDLE
+        set(value) {
+            // A fling that ends, however it ends (at rest, caught by a finger, stopped by the app), is told.
+            if (field == FLINGING && value != FLINGING) rested()
+            field = value
+        }
     val timerActive: Boolean get() = mode != IDLE
     /** What exact2 said is under the touch, once it has. */
     private var chain: List<Link> = emptyList()
@@ -120,6 +125,9 @@ internal class Scrolling(private val view: ExactView) {
     private var dragFrom = 0f
     /** What came of the touch that is down before exact2's answer for it ([touch]). */
     private val early = ArrayList<MotionEvent>()
+    /** The scroller whose drag, and then the fling it threw, exact2 is told of ([dragged], [lifted], [rested]): the
+     * innermost the drag moves. */
+    private var held: Scroller? = null
 
     /**
      * A touch event: whether it was taken here (a scroll's), so that exact2 does not hear it. A down, and every move
@@ -145,6 +153,7 @@ internal class Scrolling(private val view: ExactView) {
                 if (active.any { it.port.contains(e.x, e.y) }) {
                     mode = DRAGGING
                     dragFrom = active.first().at(sideways)
+                    dragged()
                     return true
                 }
             }
@@ -232,6 +241,7 @@ internal class Scrolling(private val view: ExactView) {
      * so neither does a lift that came before it: nothing scrolls or flings in a window that is not shown.
      */
     fun stopped() {
+        if (mode == DRAGGING) lifted(0f, false)
         forget()
         tracker?.recycle(); tracker = null
         released()
@@ -308,6 +318,7 @@ internal class Scrolling(private val view: ExactView) {
         lastX = if (sideways) downX + sign(x - downX) * slop else x
         lastY = if (sideways) y else downY + sign(y - downY) * slop
         view.forward(3, x, y, tool, 0L)
+        dragged()
     }
 
     /** The finger moved [delta] px along the drag's axis (toward the end positive), at ([x], [y]). */
@@ -424,14 +435,15 @@ internal class Scrolling(private val view: ExactView) {
         val edged = edged()
         val stretched = edged != null && STRETCH && edged.edges.any { it != null && it.distance != 0f }
         if (edged != null) { for (e in edged.edges) e?.onRelease(); if (stretched) stretching() }
-        if (!stretched && snap(v)) return
-        if (stretched || abs(v) < minFling || active.isEmpty()) { mode = IDLE; return }
+        if (!stretched && snap(v)) { lifted(v, mode == FLINGING); return }
+        if (stretched || abs(v) < minFling || active.isEmpty()) { lifted(v, false); mode = IDLE; return }
         mode = FLINGING
         flingAt = 0
         // Unbounded, as RecyclerView flings: each frame's travel is clamped by the scrollers themselves, whose ends
         // may move while it runs.
         if (sideways) fling.fling(0, 0, v.toInt(), 0, Int.MIN_VALUE, Int.MAX_VALUE, 0, 0)
         else fling.fling(0, 0, 0, v.toInt(), 0, 0, Int.MIN_VALUE, Int.MAX_VALUE)
+        lifted(v, true)
         frames.postFrameCallback(flinger)
     }
 
@@ -522,6 +534,44 @@ internal class Scrolling(private val view: ExactView) {
             else -> SNAP_MS
         }
         settle(d, ms)
+    }
+
+    /** The touch became a drag of the scrollers in [active]: exact2 is told the innermost's drag began
+     * ([Native.scrollDrag]; its `scrolldragstart`), before the drag's first move. */
+    private fun dragged() {
+        val s = active.firstOrNull() ?: return
+        held = s
+        tell { Native.scrollDrag(s.id, false, 0f, 0f, false, 0f, 0f, false) }
+    }
+
+    /** The finger let go of the drag at [v] px/s along its axis, positive as the offset grows (`VelocityTracker`'s,
+     * negated): exact2 is told, with where the scroller will rest, which is where [fling] ends when it [flings] and
+     * where it is otherwise; before the fling's first frame, so its `scrolldragend` precedes the fling's `scroll`s.
+     * With nothing thrown the scroll is over, and its `scrollend` comes now; a fling's comes when it stops ([rested]). */
+    private fun lifted(v: Float, flings: Boolean) {
+        val s = held ?: return
+        if (!flings) held = null
+        val travel = if (!flings) 0f else (if (sideways) fling.finalX else fling.finalY).toFloat()
+        val restX = s.at(true) + (if (sideways) travel else 0f)
+        val restY = s.at(false) + (if (sideways) 0f else travel)
+        val vx = if (sideways) v else 0f; val vy = if (sideways) 0f else v
+        tell { Native.scrollDrag(s.id, true, vx, vy, true, restX, restY, flings) }
+    }
+
+    /** The fling the drag threw stopped: exact2 is told ([Native.flingEnded]; the scroller's `scrollend`). */
+    private fun rested() {
+        val s = held ?: return
+        held = null
+        tell { Native.flingEnded(s.id) }
+    }
+
+    /** [f], a call that tells exact2 of a drag, on its thread behind the moves sent before, or here. */
+    private fun tell(f: () -> Unit) {
+        if (!view.started) return
+        val o = view.owner
+        if (o != null) { o.call(f); return }
+        f()
+        view.pump()
     }
 
     private val flinger: Choreographer.FrameCallback = Choreographer.FrameCallback {

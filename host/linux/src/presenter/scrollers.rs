@@ -490,6 +490,7 @@ impl<D: DataSource> Presenter<D> {
     /// (x, y), its farthest offset (x, y) and its port (x, y, width, height). The reader is told
     /// of each from now on ([`Presenter::reader_scrollers`]).
     pub fn reader_under(&mut self, x: f32, y: f32, scale: f32) -> Vec<i32> {
+        self.scroll_end_release_all();
         let under = self.scrollers_at(x / scale, y / scale);
         let mut out = vec![
             i32::from(under.claims.0) | i32::from(under.claims.1) << 1,

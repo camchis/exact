@@ -95,14 +95,27 @@ impl<D: DataSource + Default> CanvasHost<D> {
     /// The finger let go of scroller `id`: the platform's velocity
     /// (`vx`, `vy`, pixels per second, positive as the offset grows) and,
     /// with `rest`, where its fling will stop (`OverScroller.getFinalX/Y`),
-    /// in pixels ([`crate::presenter::Presenter::reader_drag_ended`]).
-    pub fn drag_ended(&mut self, id: u32, vx: f32, vy: f32, rest: Option<(f32, f32)>) {
+    /// in pixels, and whether it flings ([`crate::presenter::Presenter::reader_drag_ended`]).
+    pub fn drag_ended(
+        &mut self,
+        id: u32,
+        vx: f32,
+        vy: f32,
+        rest: Option<(f32, f32)>,
+        flings: bool,
+    ) {
         let s = self.scale;
         let velocity = ((vx / s) as f64, (vy / s) as f64);
         let rest = rest.map(|(x, y)| (x / s, y / s));
-        if let Some(error) = self.p.reader_drag_ended(id, velocity, rest) {
+        if let Some(error) = self.p.reader_drag_ended(id, velocity, rest, flings) {
             self.p.host_mut().log(error);
         }
+    }
+
+    /// The fling the reader threw from its drag of scroller `id` stopped
+    /// ([`crate::presenter::Presenter::reader_fling_ended`]).
+    pub fn fling_ended(&mut self, id: u32) {
+        self.p.reader_fling_ended(id);
     }
 
     /// What the reader is told of the scrollers it knows, when that is not

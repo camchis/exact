@@ -1217,7 +1217,6 @@ sits on that list carries the trade it would take.
 
 ## Cheap, any time
 
-- **Android's scroller does not report its drags** (2026-11-10): the shared presenter's `scrolldragstart` and `scrolldragend` wait on `Scrolling.kt` calling `Native.scrollDrag(id, ended, vx, vy, rest, restX, restY)` (`host/linux/src/canvas/jni.rs`): with `ended = false` when a touch becomes a scroll of scroller `id`, and at the lift, before the fling's first frame, with the scroller's velocity in px/s positive as the offset grows (Android's `VelocityTracker`, negated) and `OverScroller.getFinalX/Y` as the rest point. Check it on a phone.
 - **Drive iOS scroll drags with a real touch** (2026-11-10): `SwipeScrollDragTests` passes on a simulator, but no `--touch platform` drive has flicked a scroller with `scrolldragstart` and `scrolldragend`. Check that a flick fires one start and one end with UIKit's velocity and target.
 - **`affected.mjs --run` stops at the first failing command** (2026-11-10): `status ||= spawnSync(…)` does not call `spawnSync` once `status` is set, so a failing Cargo command skips the game workspace and every Bun file, silently. Run each command, then keep the first failure's status.
 
@@ -1242,7 +1241,8 @@ sits on that list carries the trade it would take.
   (2026-10-15; LLP 1005, Scroll completion):
   the Presenter now completes moving notches and instant jumps at its next delivery
   point (deferred notches share one completion after their frame's `scroll`),
-  reader samples after 100 ms quiet, and owned edge scrolling when it stops.
+  reader samples after 100 ms quiet (a drag the Android reader reports ends at the
+  lift or its fling's stop), and owned edge scrolling when it stops.
   Lifetime cancellation and agent settle are covered; apps without handlers retain
   main's behavior. Declared gap: viewport resize can classify end-follow layout
   movement as a new scroll. A 100 px scroller with `scrollFollowEnd`, a child of

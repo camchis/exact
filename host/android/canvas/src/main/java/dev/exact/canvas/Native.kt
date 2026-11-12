@@ -123,6 +123,13 @@ object Native {
     /** The reader moved scroller [id] by ([dx], [dy]) px, knowing revision [rev] of it. exact2 clamps the move to
      * the scroller's travel, and drops one sent under a revision the app's own scroll has moved on from. */
     @JvmStatic external fun scrolled(id: Int, dx: Float, dy: Float, rev: Int)
+    /** A finger began dragging scroller [id] (its `scrolldragstart`), or ([ended]) let go of it (its
+     * `scrolldragend`): at ([vx], [vy]) px/s, positive as its offset grows, and, with [rest], to come to rest at
+     * ([restX], [restY]) px; [flings] when it threw a fling. From the start until the lift, or the fling's end
+     * ([flingEnded]), the scroller's moves owe no `scrollend`. */
+    @JvmStatic external fun scrollDrag(id: Int, ended: Boolean, vx: Float, vy: Float, rest: Boolean, restX: Float, restY: Float, flings: Boolean)
+    /** The fling a drag of scroller [id] threw stopped: at rest, caught by a finger, or ended by the app's scroll. */
+    @JvmStatic external fun flingEnded(id: Int)
     /** What exact2 tells the reader of the scrollers it knows, when that is not what this last returned (else
      * null): nine numbers each: its id, flags (as [under]'s, for any drag), its revision, then as float bits where
      * it is (x, y), the offset its rows were last painted at (x, y) and its farthest offset (x, y). The revision

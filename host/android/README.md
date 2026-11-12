@@ -318,12 +318,14 @@ their own (a group: ops 20 and 21) is translated on the UI thread in the frame t
 far, mounts and retires rows behind it, and its next stream draws the rows where it then has them; the reader places
 the node by the difference. This is what a driver's `scroll` always did, now for the scroller under the finger.
 
-Three calls cross, all in the view's pixels:
+Five calls cross, all in the view's pixels:
 
 | Call | Direction | What it says |
 |---|---|---|
 | `Native.under(x, y)` (`CanvasHost::under`, `Presenter::reader_under`) | reader asks, at a touch's down | Which scrollers are under the point, innermost first, then the page itself where the document is larger than the viewport (id 0). For each: its id, the axes it takes a drag from here on, its revision, its offset, its farthest offset and the box it shows in. Also the axes exact2's own gestures claim there: a swipe row sideways, a reorder grip or a height handle up and down, a transform drag both, a `pan` whatever its `touch-action` does not give to scrolling. And, from D8 on, the hosted text field the touch is for (below) |
 | `Native.scrolled(id, dx, dy, rev)` (`CanvasHost::scrolled`, `Presenter::reader_scrolled`) | reader tells | It moved scroller `id` by that much, knowing revision `rev` of it. exact2 clamps the move to the scroller's travel |
+| `Native.scrollDrag(id, ended, vx, vy, rest, restX, restY)` (`CanvasHost::drag_began`, `drag_ended`; `presenter/scroll_drag.rs`) | reader tells | A finger began dragging scroller `id`, the innermost the drag moves, before the drag's first move; or let go of it, before the fling's first frame, with `VelocityTracker`'s velocity (px/s, positive as the offset grows) and where the scroller will rest (`OverScroller`'s end, or where it is when nothing is thrown). The app hears `scrolldragstart` and `scrolldragend`. From the start the scroller's moves owe no `scrollend` until the lift with nothing thrown, or until the fling stops |
+| `Native.flingEnded(id)` (`CanvasHost::fling_ended`, `Presenter::reader_fling_ended`) | reader tells | The fling a drag of scroller `id` threw stopped: at rest, caught by a finger, or ended by the app's scroll. Its `scrollend` is due now |
 | `Native.scrollers()` (`CanvasHost::scrollers`, `Presenter::reader_scrollers`) | exact2 tells, with each stream | For every scroller it has told the reader of: its id, its axes, its revision, where it is, the offset its rows were last painted at, and its farthest offset. Null when nothing of it changed; a scroller it leaves out is gone, and the reader forgets it |
 
 **Who is the authority.** While a drag or a fling runs, the reader: exact2 takes each move as told. A scroll the app
