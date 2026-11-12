@@ -103,6 +103,8 @@ struct Cursor {
     /// has moved the port since it began.
     request: u64,
     reader_moved: bool,
+    /// The last report said its smooth correction glides (`glide.rs`).
+    animating: bool,
 }
 
 #[derive(PartialEq)]
@@ -236,6 +238,13 @@ impl State {
     }
     pub(super) fn pending(&self) -> bool {
         !self.queue.is_empty()
+    }
+    /// `view` reports again in this pass or the next.
+    fn requeue(&mut self, view: ViewId) {
+        if let Some(cursor) = self.cursors.get_mut(&view).filter(|c| !c.queued) {
+            cursor.queued = true;
+            self.queue.push_back(view);
+        }
     }
     pub(super) fn data_ready(&mut self) {
         // Activation is one stimulus for edges refused before the executor was
@@ -1042,6 +1051,16 @@ impl<D: DataSource> Presenter<D> {
             .get(&view)
             .is_some_and(|c| c.queued || c.model_scroll.is_some())
             || self.host.collection(view).is_some_and(|s| s.pending)
+            || self.glides.has(view)
+    }
+    /// A glide moved list `view`'s port (`glide.rs`): its `scroll`, and its
+    /// `scrollend` once the glide lands. Not the reader's travel: no report.
+    pub(super) fn collection_glided(&mut self, view: ViewId) {
+        if let Some(key) = self.host.kernel().node(view).map(|n| n.key) {
+            self.collection.scroll_event(view, key);
+        }
+        self.scroll_end_moved(view, Completion::Glide);
+        self.executor.notify();
     }
     pub(super) fn refine_collections(&mut self) -> Option<String> {
         if self.collection.hold {
@@ -1071,6 +1090,7 @@ impl<D: DataSource> Presenter<D> {
             let all = std::cell::OnceCell::new();
             let retained_pin = self.arrange_pin();
             let tracks_end = self.tracks_scroll_end(view);
+            let (glides, now) = (self.reveal_glides(None), self.host.now());
             let cursor = self.collection.cursors.get_mut(&view).unwrap();
             cursor.queued = false;
             let Some(key) = self.host.kernel().node(view).map(|n| n.key) else {
@@ -1182,21 +1202,37 @@ impl<D: DataSource> Presenter<D> {
                     cursor.maximum = Some((0., g.max));
                 }
                 let was = self.scroll.get(&view).copied().unwrap_or_default();
-                // A seek landing on its row and the end followed are the app's; a
-                // measurement correction is the list's own.
-                cursor.model_main(
-                    key,
-                    axis,
-                    ((main + g.origin) as f32).clamp(0., g.max),
-                    self.display.attached(),
-                    origin,
-                    self.scroll.entry(view).or_default(),
-                );
-                // The content stays where it shows: a shell that scrolls
-                // this list itself goes on from where it was (D7.3).
-                let now = self.scroll.get(&view).copied().unwrap_or_default();
-                self.reader.rebased(view, was, now);
-                self.dirty = true;
+                let to = ((main + g.origin) as f32).clamp(0., g.max);
+                if glides && snapshot.correction.is_some_and(|c| c.smooth) {
+                    // A smooth one glides there from what shows, retargeting
+                    // one under way (LLP 1070.000 §11; `glide.rs`).
+                    let mut dest = was;
+                    match axis {
+                        ListAxis::Vertical => dest.1 = to,
+                        ListAxis::Horizontal => dest.0 = to,
+                    }
+                    if dest != was || self.glides.has(view) {
+                        self.glides.begin(view, was, dest, now);
+                    }
+                } else {
+                    // An ordinary correction stops a glide where it is, and lands.
+                    self.glides.stop(view);
+                    // A seek landing on its row and the end followed are the app's; a
+                    // measurement correction is the list's own.
+                    cursor.model_main(
+                        key,
+                        axis,
+                        to,
+                        self.display.attached(),
+                        origin,
+                        self.scroll.entry(view).or_default(),
+                    );
+                    // The content stays where it shows: a shell that scrolls
+                    // this list itself goes on from where it was (D7.3).
+                    let now = self.scroll.get(&view).copied().unwrap_or_default();
+                    self.reader.rebased(view, was, now);
+                    self.dirty = true;
+                }
             }
             // Opening placement and measurement corrections are not a follow.
             // Remember the end only once this list has finished opening.
@@ -1209,7 +1245,11 @@ impl<D: DataSource> Presenter<D> {
             if self.scroll.get(&view).copied() != before {
                 moved.push((view, key));
             }
-            let feedback_main = if let Some(pending) = cursor.model_scroll.as_mut() {
+            // While it glides, where the glide is headed is the port the runner plans from (§11).
+            let gliding = self.glides.target(view);
+            let feedback_main = if let Some(to) = gliding {
+                main_of(axis, to).clamp(0., g.max)
+            } else if let Some(pending) = cursor.model_scroll.as_mut() {
                 let slot = match axis {
                     ListAxis::Vertical => &mut pending.top,
                     ListAxis::Horizontal => pending.left.get_or_insert(0.),
@@ -1266,9 +1306,13 @@ impl<D: DataSource> Presenter<D> {
             };
             // Unchanged facts, the padding among them (LLP 1010 §6.9), are
             // news only to a list a slice left pending.
-            let unchanged = cursor.sent.as_ref() == Some(&feedback) && !snapshot.pending;
+            let unchanged = cursor.sent.as_ref() == Some(&feedback)
+                && !snapshot.pending
+                && cursor.animating == gliding.is_some();
+            let landing = cursor.animating && gliding.is_none();
             if !unchanged {
                 cursor.sent = Some(feedback.clone());
+                cursor.animating = gliding.is_some();
             }
             let reader_moved = cursor.reader_moved;
             if let Some(completion) = requested_scroll {
@@ -1296,6 +1340,7 @@ impl<D: DataSource> Presenter<D> {
                 // a turn back at 24,000 dp/s shows up to 58% of its view
                 // blank for one to four frames, against 35% for two).
                 lean: velocity != 0.0 && *LEAN,
+                animating: gliding.is_some(),
                 ..CollectionFill::default()
             };
             match self.host.collection_feedback_filled(feedback, fill) {
@@ -1304,7 +1349,19 @@ impl<D: DataSource> Presenter<D> {
                     error = error.or(after);
                     self.collection.schedule(&self.host.collections_shallow());
                 }
-                Ok(false) => {}
+                // A request whose glide this report says landed asks for the
+                // report that finds it done (LLP 1070.000 §2.4), though
+                // nothing else changed for a commit to queue it.
+                Ok(false) => {
+                    if landing
+                        && self
+                            .host
+                            .collection(view)
+                            .is_some_and(|s| s.seeking && s.pending)
+                    {
+                        self.collection.requeue(view);
+                    }
+                }
                 Err(why) => {
                     // An edge action can refuse after geometry committed. Run
                     // the same post-commit synchronization as timer refusals.

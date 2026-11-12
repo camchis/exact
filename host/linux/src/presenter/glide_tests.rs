@@ -186,3 +186,112 @@ fn reduced_motion_and_a_clock_the_display_does_not_own_land_at_once() {
     d.press("up");
     assert_eq!(d.top(), 0.);
 }
+
+/// Fifty rows 100 tall in a port 100 tall, and a smooth `scrollIntoView`
+/// of row 30: a virtualized list's smooth correction (LLP 1070.000 §11).
+fn list(live: bool) -> (Presenter<NoData>, Rc<Cell<f64>>, ViewId) {
+    let ids = (0..50)
+        .map(|i| i.to_string())
+        .collect::<Vec<_>>()
+        .join(", ");
+    let source = format!(
+        r#"component App
+  state ids = [{ids}]
+  action go
+    scrollIntoView("feed", 30, block="start", behavior="smooth")
+  view
+    column
+      button "go" press=go testId="go"
+      list id="feed" virtualized=true testId="feed" width=200 height=100 estimated-item-height=100
+        for i in ids key=i
+          box height=100
+"#
+    );
+    let (mut p, error) = Presenter::boot_with(
+        &contract::compile(&source).unwrap().encode(),
+        NoData,
+        (400., 500.),
+        1.,
+        PathBuf::new(),
+        PainterChoice::Cpu,
+    )
+    .unwrap();
+    assert_eq!(error, None);
+    let wall = Rc::new(Cell::new(0.0));
+    if live {
+        let read = wall.clone();
+        p.set_live_clock(Some(Rc::new(move || read.get())));
+    }
+    settle(&mut p);
+    let k = p.host.kernel();
+    let feed = k.node_by_key(k.find_by_test_id("feed")[0]).unwrap().id;
+    (p, wall, feed)
+}
+fn settle(p: &mut Presenter<NoData>) {
+    for _ in 0..16 {
+        assert_eq!(p.pump(p.host.now()), None);
+        if p.dirty() {
+            let _ = p.frame();
+        }
+    }
+}
+fn request(p: &Presenter<NoData>) -> String {
+    p.host.runner().into_view_json()
+}
+
+#[test]
+fn a_lists_smooth_correction_glides_reports_its_destination_and_lands() {
+    let (mut p, wall, feed) = list(true);
+    let go = {
+        let k = p.host.kernel();
+        k.node_by_key(k.find_by_test_id("go")[0]).unwrap().id
+    };
+    p.tap(go).unwrap();
+    p.run_commands(NoData::default);
+    settle(&mut p);
+    assert_eq!(p.scroll_of(feed).1, 0., "it starts from where the port was");
+    assert!(p.gliding(feed));
+    assert!(
+        request(&p).contains(r#""status":"pending""#),
+        "{}",
+        request(&p)
+    );
+    wall.set(150.);
+    p.tick(150.);
+    settle(&mut p);
+    let middle = p.scroll_of(feed).1;
+    assert!(middle > 0. && middle < 3000., "{middle}");
+    assert!(
+        request(&p).contains(r#""status":"pending""#),
+        "{}",
+        request(&p)
+    );
+    wall.set(300.);
+    p.tick(300.);
+    settle(&mut p);
+    assert_eq!(p.scroll_of(feed).1, 3000.);
+    assert!(!p.gliding(feed));
+    assert!(
+        request(&p).contains(r#""status":"done""#),
+        "{}",
+        request(&p)
+    );
+}
+
+#[test]
+fn a_lists_smooth_correction_lands_at_once_on_a_clock_the_display_does_not_own() {
+    let (mut p, _, feed) = list(false);
+    let go = {
+        let k = p.host.kernel();
+        k.node_by_key(k.find_by_test_id("go")[0]).unwrap().id
+    };
+    p.tap(go).unwrap();
+    p.run_commands(NoData::default);
+    settle(&mut p);
+    assert_eq!(p.scroll_of(feed).1, 3000.);
+    assert!(
+        request(&p).contains(r#""status":"done""#),
+        "{}",
+        request(&p)
+    );
+}
