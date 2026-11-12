@@ -1218,14 +1218,18 @@ impl Em<'_> {
             if b.kind == BindingKind::Prop && b.id == PropId::FocusGuide as u16 {
                 continue;
             }
-            // Nor have the system bars (LLP 1105 D7), interactive glass or
-            // a menu's order.
+            // Nor have the system bars (LLP 1105 D7), interactive glass,
+            // a menu's order or a tip (LLP 1035.006.000 D4).
             if b.kind == BindingKind::Prop
                 && (b.id == PropId::StatusBarStyle as u16
                     || b.id == PropId::StatusBarAnimation as u16
                     || b.id == PropId::SystemBarsHidden as u16
                     || b.id == PropId::GlassInteractive as u16
-                    || b.id == PropId::MenuOrder as u16)
+                    || b.id == PropId::MenuOrder as u16
+                    || b.id == PropId::Tip as u16
+                    || b.id == PropId::TipMessage as u16
+                    || b.id == PropId::TipImage as u16
+                    || b.id == PropId::TipDone as u16)
             {
                 continue;
             }
