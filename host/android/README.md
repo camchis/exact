@@ -95,7 +95,11 @@ workspace generated under `.exact/shells/` (`scripts/app-shells.mjs`), whose `an
 update` once its `app.json` names Android. That verb is `build <app> --apk --install`; its
 `test android` and `agent android` drive the APK (`--headless`: the Linux host under `adb shell`), and `verify android`
 runs the tests, the first screen and the relaunch with screenshots light and dark, without `check`, which this host
-does not observe for yet.
+does not observe for yet. A drive of the APK first wakes the device's screen and asks for the keyguard's dismissal
+(which bypasses no authentication): started on a sleeping screen, the app never said it was ready, and the drive waited
+out its minute. After the wake and dismiss calls, it checks wakefulness and keyguard state, retrying unsuccessful checks
+against a 2 s deadline; in-flight checks can overrun that deadline, and each wake, dismiss and dump call has a 5 s
+timeout. If the checks still refuse the device, the driver reports why.
 
 **In a dev loop** (LLP 1122 D4): give the launch the loop's page URL as `x_dev_plan` (exact2's `EXACT_DEV_PLAN`),
 through `adb reverse` since the loop serves this Mac's loopback only: `adb reverse tcp:<port> tcp:<port>`, then

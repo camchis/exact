@@ -483,6 +483,20 @@ async function headless([tool, serial, command, encodedLease]) {
  * the frames that follow, and a window of the top layer comes with its own animation. */
 const SHOT_SETTLE_MS = 400;
 
+/** Why a reader drive should not start yet, from the device's wakefulness (`dumpsys power`) and keyguard state
+ * (`dumpsys window`), or null. A dump that failed is null; the window is read only once the device is awake. */
+export function screenRefusal(power, window) {
+  if (power == null) return 'dumpsys power failed, so the driver cannot tell whether the device is awake';
+  const wakefulness = /mWakefulness=(\w+)/.exec(power)?.[1];
+  if (!wakefulness) return 'dumpsys power names no mWakefulness, so the driver cannot tell whether the device is awake';
+  if (wakefulness !== 'Awake') return `the device is not awake (${wakefulness}): wake and unlock it, then drive again`;
+  if (window == null) return 'dumpsys window failed, so the driver cannot tell whether the keyguard is showing';
+  // Android 11 and later say isKeyguardShowing (older builds mShowingLockscreen); Android 10 a delegate's `showing`.
+  const locked = /\bisKeyguardShowing=true\b|\bmShowingLockscreen=true\b/.test(window)
+    || /^\s*KeyguardServiceDelegate\s*\r?\n\s*showing=true\b/m.test(window);
+  return locked ? "the device's keyguard is showing: unlock it, then drive again" : null;
+}
+
 /** The reader carrier's process: launch the app with a driver's socket (the shell's `agent=<name>` extra), have
  * adb forward it, and carry the protocol's lines between this process's stdio and the app. Every line is the app's
  * to answer but `screenshot`, whose picture is the device's (`screencap`), tagged as the app tags a reply. The
@@ -511,6 +525,23 @@ async function relay([serial, id, vars, encodedLease]) {
     // as another app would (a share's `-a android.intent.action.SEND …`, LLP 1133.024 D5).
     const { EXACT_AGENT_INTENT: intent = '', ...launch } = JSON.parse(vars);
     const extras = Object.entries(launch).flatMap(([k, v]) => ['--es', `x_${k.slice('EXACT_'.length).toLowerCase()}`, quote(v)]);
+    // A phone's screen sleeps after its timeout, and a drive started on it waited out the minute for `ready`. Wake it
+    // and ask for the keyguard's dismissal (which bypasses no authentication); a device not awake, or locked, is
+    // refused if checks remain unsuccessful when the retry deadline is reached (in-flight checks can overrun it).
+    // Each wake, dismiss and dump call has a 5 s timeout.
+    const shell = (...args) => {
+      const r = spawnSync(tool, ['-s', serial, 'shell', ...args], { encoding: 'utf8', timeout: 5000 });
+      return r.status === 0 ? r.stdout : null;
+    };
+    shell('input', 'keyevent', 'KEYCODE_WAKEUP');
+    shell('wm', 'dismiss-keyguard');
+    for (const deadline = Date.now() + 2000; ;) {
+      const power = shell('dumpsys', 'power');
+      const refused = screenRefusal(power, /mWakefulness=Awake\b/.test(power ?? '') ? shell('dumpsys', 'window') : null);
+      if (!refused) break;
+      if (Date.now() >= deadline) throw new Error(refused);
+      await new Promise((r) => setTimeout(r, 100));
+    }
     sh('shell', 'am', 'force-stop', id);
     sh('logcat', '-c');
     // `lower=0`: the engine samples every animation, so none plays on the reader's own clock.

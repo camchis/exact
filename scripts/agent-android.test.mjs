@@ -8,7 +8,7 @@ import { randomUUID } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { pollUntil } from './agent-launch.mjs';
-import { androidJavaEnv, androidSdk, androidSdkPackages, reverseRoot } from './agent-android.mjs';
+import { androidJavaEnv, androidSdk, androidSdkPackages, reverseRoot, screenRefusal } from './agent-android.mjs';
 
 test('the Android reader variable filter and activity allowlist include the auth fixture; loopback URLs select ports', async () => {
   const { readerVariables, reversedPorts } = await import('./agent-android.mjs');
@@ -67,6 +67,8 @@ if (cmd[0] === 'reverse') {
   if (cmd[1] !== '--list') writeFileSync(file, JSON.stringify(mappings));
 }
 if (cmd[0] === 'forward' && cmd[1] === 'tcp:0') console.log(${server.port});
+// An awake, unlocked phone, as dumpsys prints one.
+if (cmd[0] === 'shell' && cmd[1] === 'dumpsys') console.log(cmd[2] === 'power' ? '  mWakefulness=Awake' : '    isKeyguardShowing=false');
 if (cmd[0] === 'shell' && cmd[1] === '-T') {
   appendFileSync(${JSON.stringify(resolve(dir, 'shells'))}, process.pid + '\\n');
   if (${stuckShell}) setInterval(() => {}, 1000);
@@ -122,6 +124,14 @@ for (const reader of [false, true]) for (const present of [false, true]) test(`t
       expect(fixture.mappings()).toEqual(present ? { 'tcp:4791': 'tcp:4791' } : reader ? { 'tcp:4791': 'tcp:9000' } : {});
       const launch = commands.find(args => args[2] === 'shell' && (reader ? args[3].startsWith('am start ') : args[3] === '-T'));
       expect(launch.at(-1)).toContain(reader ? "--es x_auth_fixture 'http://127.0.0.1:4791'" : "EXACT_AUTH_FIXTURE='http://127.0.0.1:4791'");
+      // A reader drive wakes the screen and finds it awake and unlocked before it starts the app.
+      const shells = commands.map(args => args.slice(2)).filter(args => args[0] === 'shell' && args[1] !== '-T').map(args => args.slice(1).join(' '));
+      const woke = shells.indexOf('input keyevent KEYCODE_WAKEUP');
+      if (!reader) expect(woke).toBe(-1);
+      else {
+        expect(shells.slice(woke, woke + 4)).toEqual(['input keyevent KEYCODE_WAKEUP', 'wm dismiss-keyguard', 'dumpsys power', 'dumpsys window']);
+        expect(woke).toBeLessThan(shells.findIndex(command => command.startsWith('am start ')));
+      }
     } finally {
       if (child && child.exitCode === null) { const closed = once(child, 'close'); child.kill(); await closed; }
       fixture.dispose();
@@ -678,4 +688,22 @@ test('an APK carries each GPU library the bake built, by the name Cargo gave it,
     for (const library of libraries) expect(readFileSync(resolve(jniLibs, library.split('/').pop()), 'utf8')).toBe(library);
     expect(stageGpuLibraries([], jniLibs)).toEqual([]);
   } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('a reader drive refuses a device not awake, or locked, by what dumpsys says, and says when it cannot tell', () => {
+  // As a Seeker (Android 14) prints them.
+  const awake = '  mWakefulness=Awake\n  mHoldingDisplaySuspendBlocker=true\n';
+  const open = '    mShowingDream=false mDreamingLockscreen=false\n    isKeyguardShowing=false\n';
+  expect(screenRefusal(awake, open)).toBe(null);
+  expect(screenRefusal('  mWakefulness=Asleep\n', null)).toBe('the device is not awake (Asleep): wake and unlock it, then drive again');
+  expect(screenRefusal('  mWakefulness=Dozing\n', null)).toBe('the device is not awake (Dozing): wake and unlock it, then drive again');
+  expect(screenRefusal(awake, '    isKeyguardShowing=true\n')).toBe("the device's keyguard is showing: unlock it, then drive again");
+  // Older builds name it mShowingLockscreen; Android 10 prints its keyguard delegate's state.
+  expect(screenRefusal(awake, '  mShowingLockscreen=true mShowingDream=false\n')).toBe("the device's keyguard is showing: unlock it, then drive again");
+  expect(screenRefusal(awake, '    KeyguardServiceDelegate\n      showing=true\n      showingAndNotOccluded=true\n')).toBe("the device's keyguard is showing: unlock it, then drive again");
+  expect(screenRefusal(awake, '    KeyguardServiceDelegate\n      showing=false\n      showingAndNotOccluded=false\n')).toBe(null);
+  // Failed commands and power output without mWakefulness have distinct diagnostics.
+  expect(screenRefusal(null, null)).toBe('dumpsys power failed, so the driver cannot tell whether the device is awake');
+  expect(screenRefusal('Can\'t find service: power\n', null)).toBe('dumpsys power names no mWakefulness, so the driver cannot tell whether the device is awake');
+  expect(screenRefusal(awake, null)).toBe('dumpsys window failed, so the driver cannot tell whether the keyguard is showing');
 });
