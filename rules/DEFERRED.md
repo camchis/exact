@@ -247,7 +247,11 @@ padding, border and radius, a ring while the selection is exactly it
 image source, so T3 Code's chips match their original's. Take: waived (Daehyeon
 Mun, 2026-11-02): the paint goes through the rows a kind already had, and the
 three outline rows are an atom's alone. Still out: the Apple reader's border,
-ring, hover paint and icon. **Expanded (Daehyeon Mun, 2026-10-29, waived;
+ring and hover paint. **Expanded (maintainers, 2026-11-11, #130; LLP
+1045.000 D4, §6):** the Apple reader draws SF Symbol and image-source icons
+inside its pills on iOS and macOS. This unblocks icon badges in wrapping
+prose, matching the editor. Take: the maintainers' ruling admits this scope;
+border, ring and hover paint stay deferred. **Expanded (Daehyeon Mun, 2026-10-29, waived;
 LLP 1045 D11):** the app gives each source line of the editor its base
 direction, `paragraphDirs` in HTML's `dir` words, drawn on the web and Apple.
 Unblocks T3 Code's composer, whose original gives each block the direction of

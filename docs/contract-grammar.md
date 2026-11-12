@@ -1693,7 +1693,7 @@ component Composer
   piece.
 
 The web, macOS and iOS draw atoms in the editor and the reader (on Apple the
-reader's pill draws no icon, border, ring or `:hover` paint, and UIKit's smart
+reader's pill draws icons, but no border, ring or `:hover` paint, and UIKit's smart
 delete takes one of the two spaces an atom's deletion leaves). In the editor,
 VoiceOver on macOS and iOS reads an atom's accessible name in place and its
 role from its element after the field. The next-item command reaches each
