@@ -48,7 +48,8 @@ NDK (`ANDROID_NDK_HOME`, else the newest under the SDK), a JDK (17 or newer) and
    `app/build/<app>/icons/res/`: from a square `maskable` PNG an adaptive icon, with a `monochrome` glyph as its
    themed layer; without one, a legacy icon from a square `any` PNG; and a banner from a 16:9 `any` PNG. A file its
    slot refuses (smaller than the slot, or a glyph with no transparent pixels) fails the build here, before anything
-   compiles;
+   compiles; and the launch theme in its `background_color`, where it names one, under `app/build/<app>/launch/res/`
+   ([the launch window](#the-devices-colours-llp-1115001-d4));
 2. builds the app's `android/` crate for `aarch64-linux-android` at `host-dev` (`--release`: at `release` with fat
    LTO, as a production build links, for measuring). The crate is a cdylib whose source is `exact_linux::canvas_jni!(<the data source>, hatches =
    crate::exact_hatches())`, with a build script that bakes the plan and calls `contract::native::android_entry`,
@@ -435,7 +436,11 @@ The controls' shapes are still the desktop painter's (D9).
 **The launch window.** From Android 14 the launch theme names the platform's `system_surface_light` and
 `system_surface_dark` (`res/values-v34`, `values-night-v34`), the colour the first frame's unsaid background has, with
 the bars' icons set for it. On Android 12 and 13 the platform has no `surface` to name in a theme, and the launch
-window is the device theme's own day or night background (`?android:attr/colorBackground`).
+window is the device theme's own day or night background (`?android:attr/colorBackground`). An app whose manifest
+names a `background_color` launches on it instead, and on `color_scheme_dark.background_color` in night mode, as its
+iOS launch screen and its web page's first paint do: the build writes a theme over `ExactLaunch` with that colour
+behind the window and on Android 12's starting window, and the bars' icons dark over a light colour
+(`agent-android.mjs` `androidLaunch`).
 
 ## The channel out (LLP 1115.001 D5)
 

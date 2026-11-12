@@ -816,6 +816,50 @@ export function androidIcons(manifest, dir, res) {
   return refs;
 }
 
+/** Whether icons in the bars read dark over a CSS hex colour: its CIE lightness above 49, the threshold the painter's
+ * `look::ink_on` takes for the ink on a fill. A translucent colour is taken as it would be over white. */
+const lightColour = (css) => {
+  const hex = css.length === 4 ? [...css.slice(1)].map((c) => c + c).join('') : css.slice(1);
+  const alpha = hex.length === 8 ? parseInt(hex.slice(6), 16) / 255 : 1;
+  const linear = (i) => {
+    const c = (parseInt(hex.slice(i, i + 2), 16) / 255) * alpha + (1 - alpha);
+    return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  };
+  const y = 0.2126 * linear(0) + 0.7152 * linear(2) + 0.0722 * linear(4);
+  return (y > 0.008856 ? 116 * Math.cbrt(y) - 16 : 903.3 * y) > 49;
+};
+
+/** The launch window in the app's first-frame background (LLP 1115.001 D3.6): the manifest's `background_color`, and
+ * `color_scheme_dark.background_color` in night mode, as the iOS launch screen and the web page's first paint take
+ * them (a fixed `userInterfaceStyle` takes its side alone, as there). Written under `res` as `ExactAppLaunch`, the
+ * reader's `ExactLaunch` with that colour behind the window and on Android 12's starting window, and the bars' icons
+ * dark over a light colour and light over a dark one, until the host says the page's (`ExactActivity.chrome`).
+ * Returns the activity's theme: null where the manifest names no colour, which leaves the platform's surface. */
+export function androidLaunch(manifest, res) {
+  rmSync(res, { recursive: true, force: true });
+  const style = manifest.userInterfaceStyle, named = manifest.color_scheme_dark?.background_color;
+  let light = manifest.background_color;
+  if (!light) return null;
+  const dark = style === 'light' ? light : named ?? light;
+  if (style === 'dark') light = dark;
+  const write = (dir, body) => {
+    mkdirSync(resolve(res, dir), { recursive: true });
+    writeFileSync(resolve(res, dir, 'exact_launch.xml'), `<?xml version="1.0" encoding="utf-8"?>\n<resources>\n${body}</resources>\n`);
+  };
+  const scheme = (css) => `    <color name="exact_launch">${androidColour(css)}</color>\n    <bool name="exact_launch_light">${lightColour(css)}</bool>\n`;
+  const theme = (splash) => [
+    '    <style name="ExactAppLaunch" parent="ExactLaunch">',
+    '        <item name="android:windowBackground">@color/exact_launch</item>',
+    ...(splash ? ['        <item name="android:windowSplashScreenBackground">@color/exact_launch</item>'] : []),
+    '        <item name="android:windowLightStatusBar">@bool/exact_launch_light</item>',
+    '        <item name="android:windowLightNavigationBar">@bool/exact_launch_light</item>',
+    '    </style>', ''].join('\n');
+  write('values', scheme(light) + theme(false));
+  write('values-night', scheme(dark));
+  write('values-v31', theme(true));
+  return '@style/ExactAppLaunch';
+}
+
 /** CI inputs shared by APK and App Bundle builds (LLP 1030.003 D6, D8). Refuse incomplete signing
  * before compiling; a bundle must use an upload key. Passwords stay in the environment, never command arguments. */
 export function androidReleaseEnvironment(env = process.env, bundle = false) {
@@ -868,6 +912,7 @@ export function buildApk(app, env, profile, writeLocks = false, bundle = false) 
   let icons;
   try { icons = androidIcons(app.manifest, app.dir, resolve(dirs.app, 'icons/res')); }
   catch (error) { for (const line of error.message.split('\n')) console.error(`${app.name}: ${line}`); return null; }
+  const launch = androidLaunch(app.manifest, resolve(dirs.app, 'launch/res'));
   const built = (name) => resolve(app.target, ANDROID_TARGET, profile, `lib${name.replaceAll('-', '_')}.so`);
   let gpu = [], out = null;
   if (carriesGpu(app)) {
@@ -921,7 +966,7 @@ export function buildApk(app, env, profile, writeLocks = false, bundle = false) 
     assembled = runGradle(['--no-watch-fs', ...(env.CI || graph.env.GRADLE_USER_HOME ? ['--no-daemon'] : []), bundle ? ':app:bundleRelease' : ':app:assembleRelease', `-Papp=${app.name}`, `-PappDir=${app.manifest.game ? app.workspace : app.dir}`,
       `-PexactDevelopment=${development ? '1' : '0'}`,
       `-PappBuildDir=${dirs.app}`, `-PcanvasBuildDir=${dirs.canvas}`, `-PndkPath=${env.ANDROID_NDK_HOME}`, '--project-cache-dir', dirs.cache, `-Pkotlin.project.persistent.dir=${dirs.kotlin}`,
-      ...gpuArgs, ...(icons.icon ? [`-PappIcon=${icons.icon}`] : []), ...(icons.banner ? [`-PappBanner=${icons.banner}`] : []), ...compose, ...extensionArgs(app, out, config, bound), ...graph.args], { env: { ...env, ANDROID_HOME: androidSdk(env), ...graph.env } });
+      ...gpuArgs, ...(icons.icon ? [`-PappIcon=${icons.icon}`] : []), ...(icons.banner ? [`-PappBanner=${icons.banner}`] : []), ...(launch ? [`-PappTheme=${launch}`] : []), ...compose, ...extensionArgs(app, out, config, bound), ...graph.args], { env: { ...env, ANDROID_HOME: androidSdk(env), ...graph.env } });
     if (assembled) graph.kept();
   } finally {
     graph.done();

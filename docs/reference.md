@@ -868,6 +868,16 @@ layers compile in the same `actool` pass as the app's catalogs; changing them
 requires a new native build. `icons` still supplies the web and the native
 raster fallback when the platform has no `icon` selection.
 
+What shows before the first frame is `app.json`'s Web App Manifest
+`background_color`, and in a dark scheme `color_scheme_dark.background_color`
+(`#RGB`, `#RRGGBB` or `#RRGGBBAA`); a fixed `userInterfaceStyle` takes its side
+alone. The web page has it until the first frame, the iOS launch screen centres
+`host.ios.launchImage` on it, and the Android launch window (the starting window
+from Android 12) is it, with the bars' icons dark over a light colour. Unset,
+each is the platform's surface: iOS's `systemBackground` (its grouped background
+under a first route that scrolls a grouped list) and Android's `surface`.
+Changing either colour requires a new native build.
+
 ### Store category, Game Mode and memory
 
 `categories` in `app.json` is the W3C manifest's member, which the web manifest
