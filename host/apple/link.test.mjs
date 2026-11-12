@@ -380,6 +380,21 @@ test('ordinary app executables refuse WidgetKit, ActivityKit and SwiftUI, includ
   } finally { rmSync(dir, {recursive:true,force:true}); }
 });
 
+test('a framework two capabilities may bring passes when either is linked, and a stray one names them both (#364)', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'exact-shared-framework-'));
+  try {
+    const name = Buffer.from('/System/Library/Frameworks/SwiftUI.framework/SwiftUI\0');
+    const size = (24 + name.length + 7) & ~7, bytes = Buffer.alloc(32 + size);
+    bytes.writeUInt32LE(0xfeedfacf, 0); bytes.writeUInt32LE(1, 16); bytes.writeUInt32LE(size, 20);
+    bytes.writeUInt32LE(0xc, 32); bytes.writeUInt32LE(size, 36); bytes.writeUInt32LE(24, 40); name.copy(bytes, 56);
+    const executable = join(dir, 'App'); writeFileSync(executable, bytes);
+    const frameworks = [['SwiftUI', ['ExactNumerals', 'ExactOther']]];
+    assert.doesNotThrow(() => assertCapabilityFrameworks(executable, ['ExactOther'], [], frameworks));
+    assert.doesNotThrow(() => assertCapabilityFrameworks(executable, ['ExactNumerals'], [], frameworks));
+    assert.throws(() => assertCapabilityFrameworks(executable, [], [], frameworks), /SwiftUI \(only ExactNumerals or ExactOther may\)/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
 test("the ActivityKit arm compiles the checkout's sources when the build runs from an app's own directory", () => {
   const dir = mkdtempSync(join(tmpdir(), 'exact-activity-arm-'));
   try {

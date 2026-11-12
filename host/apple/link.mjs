@@ -103,11 +103,12 @@ export function appleComposition(graph, production, ahead = [], granted = false)
   return { link, products };
 }
 
-/** The system frameworks only a capability's Swift half brings, and so
- * absent from an executable whose composition does not link it (LLP
- * 1047.001.000 §6, the check's first form). SafariServices belongs to
- * @exact/in-app-browser in ExactAppModules, not a SwiftPM capability product. */
-const CAPABILITY_FRAMEWORKS = [['@exact/in-app-browser', 'SafariServices'], ['ExactMediaPicker', 'PhotosUI'], ['ExactAuthSession', 'AuthenticationServices'], ['ExactNumerals', 'SwiftUI'], ['ExactSnapshot', 'WidgetKit'], ['ExactSnapshot', 'ActivityKit']];
+/** The system frameworks only a capability's Swift half brings, each with
+ * the products that may bring it, and so absent from an executable whose
+ * composition links none of them (LLP 1047.001.000 §6, the check's first
+ * form). SafariServices belongs to @exact/in-app-browser in ExactAppModules,
+ * not a SwiftPM capability product. */
+const CAPABILITY_FRAMEWORKS = [['SafariServices', ['@exact/in-app-browser']], ['PhotosUI', ['ExactMediaPicker']], ['AuthenticationServices', ['ExactAuthSession']], ['SwiftUI', ['ExactNumerals']], ['WidgetKit', ['ExactSnapshot']], ['ActivityKit', ['ExactSnapshot']]];
 
 export function appleLaunchFrameworks(destination, product) {
   return destination === 'ios' && ['ExactIOS', 'ExactHostIOS'].includes(product) ? ['SafariServices'] : [];
@@ -183,10 +184,10 @@ function machoCommands(executable) {
 /** An executable links no framework that only an unlinked capability
  * brings: the next import of one into the core fails the build by name
  * instead of costing every launch silently. */
-export function assertCapabilityFrameworks(executable, products, allowedFrameworks = []) {
+export function assertCapabilityFrameworks(executable, products, allowedFrameworks = [], frameworks = CAPABILITY_FRAMEWORKS) {
   const loaded = loadedDylibs(executable);
-  const stray = CAPABILITY_FRAMEWORKS.filter(([product, framework]) => !products.includes(product) && !allowedFrameworks.includes(framework) && loaded.some((path) => path.includes(`/${framework}.framework/`) && path.endsWith(`/${framework}`)));
-  if (stray.length) throw new Error(`host/apple: ${basename(executable)} links ${stray.map(([product, framework]) => `${framework} (only ${product} may)`).join(', ')}, which its composition does not link: an import outside the capability's module brings it to every launch`);
+  const stray = frameworks.filter(([framework, owners]) => !owners.some((owner) => products.includes(owner)) && !allowedFrameworks.includes(framework) && loaded.some((path) => path.includes(`/${framework}.framework/`) && path.endsWith(`/${framework}`)));
+  if (stray.length) throw new Error(`host/apple: ${basename(executable)} links ${stray.map(([framework, owners]) => `${framework} (only ${owners.join(' or ')} may)`).join(', ')}, which its composition does not link: an import outside the capability's module brings it to every launch`);
 }
 
 /** Whether a build links by its plan (LLP 1047.001 D6): production always;
