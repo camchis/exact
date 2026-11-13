@@ -1,6 +1,7 @@
 # An OpenRouter body failure leaves Expose stuck answering
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** `ask` ends its turn from a `catch` over the whole response handler, so a body or stream that fails after the headers ends it, and Clear aborts the turn's request and ends it before emptying the thread.
 **Systems:** apps/expose
 **Severity:** P1
 **Author:** Grok 4.7
