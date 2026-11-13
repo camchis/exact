@@ -1276,12 +1276,16 @@ impl<D: DataSource> Bridge<D> {
         self.emit(out)
     }
 
-    /// The display for Canvas 2D (LLP 1056 D4): its scale and memory, for
-    /// every session; a booted host redraws its canvases at the new scale.
+    /// The display for Canvas 2D (LLP 1056 D4): this session's scale, which
+    /// its later boots keep, and the device's memory, for every session; a
+    /// booted host redraws its canvases at the new scale.
     pub fn canvas_display(&mut self, scale: f64, memory: f64) -> u32 {
-        crate::host::canvas2d::set_display(scale, memory);
+        crate::host::canvas2d::set_memory(memory);
+        if let Some(scale) = crate::host::canvas2d::usable_scale(scale) {
+            self.launch_layout.canvas_scale = Some(scale);
+        }
         let out = match self.host.as_mut() {
-            Some(h) => h.canvas_display(),
+            Some(h) => h.canvas_display(scale),
             None => "{\"ops\":[],\"timers\":false,\"motion\":false}".to_string(),
         };
         self.emit(out)
@@ -1403,6 +1407,10 @@ mod executor_order_tests;
 #[cfg(test)]
 #[path = "collection_tests.rs"]
 mod collection_tests;
+
+#[cfg(test)]
+#[path = "abi/canvas_scale_tests.rs"]
+mod canvas_scale_tests;
 
 #[path = "abi_collections.rs"]
 mod collections;

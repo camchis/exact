@@ -208,6 +208,8 @@ pub struct Host<D: DataSource> {
     /// Canvas draws run in a turn of their own (`exact_canvas_draw`), not in
     /// the turns main waits on (LLP 1072 §8.5).
     canvas_deferred: bool,
+    /// This session's display scale for Canvas 2D (LLP 1056 D4).
+    canvas_scale: f64,
     dirty_paragraphs: BTreeSet<ViewId>,
     pending_layout: IdSet<NodeKey>,
     layout_withheld: bool,
@@ -564,6 +566,7 @@ impl<D: DataSource> Host<D> {
             canvas_held: IdSet::default(),
             canvas_kept: Default::default(),
             canvas_deferred: false,
+            canvas_scale: layout.canvas_scale.unwrap_or(canvas2d::DEFAULT_SCALE),
             dirty_paragraphs: BTreeSet::new(),
             pending_layout: IdSet::default(),
             layout_withheld: false,

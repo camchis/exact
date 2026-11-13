@@ -1,6 +1,7 @@
 # An Apple window changes other sessions' canvas resolution
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** Canvas 2D's display scale is each session's, kept on its bridge for every boot and on its host, and only the device's memory stays process-wide.
 **Systems:** host/apple/src/canvas2d.rs, host/apple/src/abi.rs, host/apple/Sources/ExactKit/Mac/ExactViewMac.swift, host/apple/Sources/ExactSurfaces/Canvas2DImage.swift
 **Author:** Codex
 **Date:** 2026-11-12
