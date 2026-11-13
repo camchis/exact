@@ -1,6 +1,7 @@
 # Web USB transfers can use an interface claimed by another connection
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** Web USB transfers, endpoint and interface control requests and `clearHalt` are checked against the calling connection's claims before the device is asked, and claims, releases and closes on one device run one at a time.
 **Systems:** packages/usb/web/index.js
 **Author:** Codex
 **Date:** 2026-11-12
