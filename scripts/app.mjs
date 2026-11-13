@@ -34,6 +34,7 @@ import { gzipSync } from 'node:zlib';
 import { BINARYEN } from '../host/web/stages.mjs';
 import { SHELL_SOURCES } from '../host/web/look.mjs';
 import { createHash } from 'node:crypto';
+import { refuse } from './deploy-signing.mjs';
 import { nativeSource, prepareRustBundle } from './rust.mjs';
 import { bakeOutside, compiledBakeDir, linkable, linkedInputs, recordRustBake } from './linked-plan.mjs';
 import { throwContractErrors } from './contract-diagnosis.mjs';
@@ -773,6 +774,22 @@ export function readBake(app, platform, target, directory = bakeOutput(app)) {
   const id = createHash('sha256').update('exact2 compatibility id v1\n').update(canonical(receipt.inputs)).digest('hex').slice(0, 32);
   if (receipt.id !== id || receipt.inputs.app !== app.id || receipt.inputs.platform !== platform || receipt.target !== target || !receipt.embedded || !Array.isArray(receipt.embedded.assets)) throw new Error(`invalid baked receipt for ${app.id} ${platform} ${target}`);
   return receipt;
+}
+
+/** The cards of a build's graph that `names` picks among those its widget and activity generation makes
+ * (`plans/`, `activities/` and, for a TypeScript app on Apple, the module pair under `typescript/`;
+ * bake/src/widgets.rs), with their bytes. They are not the app's files: each is read from the copy the bake leaves
+ * beside its receipt in `directory` and held to the digest the graph lists. */
+export function bakedEntryAssets(directory, build, names) {
+  const root = resolve(directory, `${build.compat.inputs.platform}-${build.compat.target}.entries`);
+  return build.graph.artifacts.filter((card) => names(card.name)).map((card) => {
+    const path = resolve(root, card.name);
+    const bytes = path.startsWith(root + sep) && existsSync(path) ? readFileSync(path) : null;
+    if (!bytes || bytes.length !== card.bytes || buildHash(bytes) !== card.sha256) {
+      refuse(`${card.name}: ${path} is not the file the ${build.compat.inputs.platform} bake listed; build again`);
+    }
+    return { name: card.name, bytes, sha256: card.sha256 };
+  });
 }
 
 /** Refuse packaging bytes that differ from the binary's complete bake receipt.
