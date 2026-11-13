@@ -1,6 +1,7 @@
 # A terminal openURL from a timer waits for unrelated keyboard input
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The interactive loop hands queued URLs to the system's opener before every sleep and once more when it leaves, so a URL a timer, announcement or quitting action asks for opens without waiting for input.
 **Systems:** host/terminal
 **Author:** Codex
 **Date:** 2026-11-12
