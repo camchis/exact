@@ -219,6 +219,29 @@ const BUBBLES = `component BubbleFixture
           text "Two"
 `;
 
+// A reading screen (#392): verses as runs of one paragraph, each a number and its words with a `press`, narrow enough
+// that runs wrap and share lines; `nudged` is drawn back over the run before it, and `alone` is the only run of its
+// paragraph, so in no sentence.
+const VERSES = `component VerseFixture
+  state n = 0
+  action tap(v: number)
+    n = v
+  view
+    column testId="root" padding=16 width=240
+      text testId="chapter"
+        text "1 " press=tap(1) testId="number-1" font-weight=700
+        text "In the beginning God created the heaven and the earth. " press=tap(1) testId="verse-1"
+        text "2 " press=tap(2) testId="number-2" font-weight=700
+        text "And the earth was without form, and void; and darkness was upon the face of the deep. " press=tap(2) testId="verse-2"
+        text "3 " press=tap(3) testId="number-3" font-weight=700
+        text "And God said, Let there be light. " press=tap(3) testId="verse-3"
+      text margin-top=24
+        text "Light " press=tap(4) testId="before"
+        text "dark" press=tap(5) testId="nudged" position="relative" left=-30
+      text margin-top=24
+        text "4" press=tap(6) testId="alone"
+`;
+
 const built = (() => {
   const ready = new Map();
   return (name, source) => {
@@ -472,6 +495,21 @@ test('two texts drawn over each other run together, unless one stands on the opa
   expect(judge({ ...vp, items: [{ ...row, control: 'press' }, { ...tab, pinned: true }] }, null)).toEqual([]);
 });
 
+test('a run of a paragraph that wraps is judged by its lines, and one drawn over its neighbour still overlaps it', () => {
+  const vp = { viewport: { w: 300, h: 200 }, scheme: 'light', target: 24 };
+  // "1 In the beginning … earth." ends mid-line; the next run starts there: their boxes meet, their lines do not.
+  const one = { id: 1, control: 'press', inline: true, x: 16, y: 16, w: 268, h: 36, lines: [{ x: 30, y: 16, w: 254, h: 18 }, { x: 16, y: 34, w: 120, h: 18 }] };
+  const two = { id: 2, control: 'press', inline: true, x: 16, y: 34, w: 268, h: 36, lines: [{ x: 136, y: 34, w: 148, h: 18 }, { x: 16, y: 52, w: 200, h: 18 }] };
+  const kindsOf = (items) => judge({ ...vp, items }, null).map((f) => `${f.id} ${f.kind}`);
+  expect(kindsOf([one, two])).toEqual([]);
+  expect(kindsOf([one, { ...two, lines: [{ x: 120, y: 34, w: 164, h: 18 }, two.lines[1]] }])).toEqual(['1 overlap']); // drawn back over it
+  const box = ({ lines, ...it }) => it;
+  expect(kindsOf([box(one), box(two)])).toEqual(['1 overlap']); // judged by its box, as before
+  // A block control beside it meets only its lines.
+  const button = { id: 3, control: 'button', sized: 'author', x: 230, y: 52, w: 60, h: 30 };
+  expect(kindsOf([button, two])).toEqual([]);
+});
+
 test('a page with every finding class has each found, by testId, in the scheme it shows in; a clean page has none', async () => {
   const session = await open({ host: 'web', url: await built('broken', BROKEN) });
   try {
@@ -591,6 +629,24 @@ test('a text is judged on the fill under it in each scheme, and a row its scroll
     expect(item('row3').vis.h).toBeLessThan(item('row3').h); // the list cuts it
     const whole = { ...obs, items: obs.items.map(({ vis, ...it }) => it) }; // judged on its whole box, it overlapped the tabs
     expect(judge(whole, null).filter((f) => f.kind === 'overlap').map((f) => f.id)).toContain(ids.get('row3'));
+  } finally { await session.close(); }
+}, 900000);
+
+test('pressable runs of a paragraph are targets in a sentence, judged by their lines', async () => {
+  const session = await open({ host: 'web', url: await built('verses', VERSES), size: [390, 844] });
+  try {
+    const obs = await session.op({ op: 'check' }), ids = new Map(((await session.op({ op: 'tree' })).nodes ?? []).map((n) => [n.props?.testId, n.id]));
+    const item = (testId) => obs.items.find((it) => it.id === ids.get(testId));
+    expect(item('verse-2').lines?.length).toBeGreaterThan(1); // it wraps
+    expect(['number-1', 'verse-1', 'verse-2', 'nudged'].map((t) => item(t).inline)).toEqual([true, true, true, true]);
+    expect(item('alone').inline).toBeUndefined(); // the only words of its paragraph: no sentence to be in
+    const found = judge(obs, null).map((f) => `${[...ids].find(([, id]) => id === f.id)?.[0]} ${f.kind}`);
+    // The verses wrap into each other's lines and are drawn once: nothing. The nudged run is drawn over "Light ".
+    expect(found.sort()).toEqual(['before covered', 'before overlap']);
+    // Judged by their boxes, the runs that share a line overlapped, and a finger at a wrapped run's box's middle met the next.
+    const boxes = judge({ ...obs, items: obs.items.map(({ lines, ...it }) => it) }, null).filter((f) => f.kind === 'overlap').map((f) => f.id);
+    expect(boxes).toContain(ids.get('verse-1'));
+    expect(item('verse-1').cover).toBeUndefined();
   } finally { await session.close(); }
 }, 900000);
 
