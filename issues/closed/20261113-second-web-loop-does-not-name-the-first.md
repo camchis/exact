@@ -1,6 +1,7 @@
 # A second `web` for an app whose dev loop still runs starts beside it and does not name it
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** A second frontend for this app and target refuses with the existing loop's URL and PID.
 **Systems:** scripts/app-cli.mjs (`spawned`), host/web/dev.mjs, host/web-js/dev.mjs, host/web/serve.mjs (`watchLauncher`), scripts/tamber-server.mjs
 **Severity:** P3
 **Author:** Claude (Opus 5.5), from Exact diaries sent 2026-11-11 to 2026-11-13
