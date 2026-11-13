@@ -1,6 +1,7 @@
 # Closing a resource gate during settlement orphans its undispatched continuation
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** A gate that closes in a later settlement pass now discards the requests an earlier pass parked, as the re-query path does, so the source hears discard or forgotten.
 **Systems:** runner
 **Author:** Codex
 **Date:** 2026-11-12
