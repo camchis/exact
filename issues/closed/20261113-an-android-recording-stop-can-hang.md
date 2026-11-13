@@ -1,6 +1,7 @@
 # An Android recording stop can hang without an answer
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** A stop drains the encoder until an input buffer takes the end of stream and bounds the wait for it and for the end of the output, so a codec that never ends fails the take, which `Recorder.finish` already answers to every waiter; `muxer.stop` and `part.finish` were never uncaught, since that catch covers all of `Encoder.finish`.
 **Systems:** packages/recording
 **Severity:** P1
 **Author:** Grok 4.7
