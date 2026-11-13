@@ -1,6 +1,7 @@
 # A failed keyboard reorder leaves the collection interaction pin
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** group_lift puts the collection interaction back to what it was on every return that stores no session, so a refused keyboard lift leaves no pin.
 **Systems:** host/linux, runner
 **Severity:** P3
 **Author:** Grok 4.7
