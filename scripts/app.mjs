@@ -553,6 +553,13 @@ export function authoredTests(dir) {
   return [...(existsSync(resolve(dir, 'app.test.contract')) ? ['app.test.contract'] : []), ...others].map((n) => resolve(dir, n));
 }
 
+/** app.json's text as JSON. A byte-order mark, which some Windows editors write and JSON does not allow, is named
+ * with its fix rather than left to the parser's "Unrecognized token" (expo/exact-build#190). app-cli.mjs, which
+ * copied SDKs carry alone, keeps its own copy. */
+export function parseManifest(text) {
+  if (text.charCodeAt(0) === 0xfeff) throw new Error('starts with a byte-order mark (U+FEFF), which JSON does not allow; save it as UTF-8 without a BOM');
+  return JSON.parse(text);
+}
 /** `app.json` from `dir`, validated — or the defaults an app had before the manifest: `com.exact.<name>`, the name capitalized. */
 export function readManifest(dir, name) {
   const path = resolve(dir, 'app.json');
@@ -560,7 +567,7 @@ export function readManifest(dir, name) {
   const game = gameDefaults(dir);
   if (!existsSync(path) && !game) return fallback;
   let parsed;
-  try { parsed = game ?? JSON.parse(readFileSync(path, 'utf8')); } catch (e) { throw new Error(`${path}: ${e.message}`); }
+  try { parsed = game ?? parseManifest(readFileSync(path, 'utf8')); } catch (e) { throw new Error(`${path}: ${e.message}`); }
   // LLP 1069.008 D4: a device's usage text is derived from its grant, never hand-written.
   const problems = validate(parsed, schema(), '', schema()).map((p) => /^host\.(ios|macos)\.permissions: /.test(p)
     ? `${p.split(':')[0]}: deleted (LLP 1069.008); declare the device in the source's grants as \`device.<name> <strings key>\` (e.g. \`device.microphone purpose.microphone\`) and put the text in strings/<locale>.json`
