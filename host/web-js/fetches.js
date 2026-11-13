@@ -8,7 +8,7 @@
 // ("", "json" or "graphql"), GraphQL document, JSON Pointer, parameter types,
 // answer type, its grant], the types as `sourceTypes` writes them and the grant,
 // `net.fetch <origin>`, as the compiler normalizes one.
-import { data, Store } from "./rt.js";
+import { data, Origin, Store } from "./rt.js";
 import { FetchError, admitsSecret, appGrantSet, createGrantSet, fetchWith } from "./admission.js";
 import { Shaped } from "./shape.js";
 
@@ -66,7 +66,7 @@ function pointer(j, p) {
   return j;
 }
 
-async function answer(name, [method, url, origin, params, headers, body, document, at, types, result, grant], args, forced, call) {
+async function answer(name, [method, url, origin, params, headers, body, document, at, types, result, grant], args, forced, call, asker) {
   const arg = p => text(args[params.indexOf(p)]);
   const own = createGrantSet(grant);
   const init = { method, headers: [] };
@@ -92,7 +92,7 @@ async function answer(name, [method, url, origin, params, headers, body, documen
     if (!has("content-type")) init.headers.push(["Content-Type", "application/json"]);
   }
   const target = expand(url, e => { const t = arg(e); return t == null ? null : encode(t); });
-  const response = await fetchWith(own, target, init, null, undefined, undefined, "app", false, forced);
+  const response = await fetchWith(own, target, init, null, undefined, undefined, asker, false, forced);
   if (response.status < 200 || response.status > 299) throw new Error(`${name}: HTTP ${response.status} from ${origin}`);
   let reply;
   try { reply = JSON.parse(await response.text()); }
@@ -110,8 +110,13 @@ async function answer(name, [method, url, origin, params, headers, body, documen
 export function fetches(rows) {
   const reserved = (data.reserved ??= {});
   for (const [name, row] of Object.entries(rows)) reserved[name] = (_, args, target, forced) => {
-    const call = { seen: { read: false } }, p = answer(name, row, args, forced, call);
-    p.call = call; // a header's secret makes its resource a store reader (rt.js `land`)
+    // Its request is out until it settles (`plain`: held.js counts it, and a render waits for it, as for a
+    // TypeScript source's fetch), and a header's secret makes its resource a store reader (rt.js `land`).
+    const call = { seen: { read: false }, plain: 1 };
+    // Who asked it, a tool, a wake or a package's event and not the app, is checked at each hop (LLP 1133.036 D6),
+    // as a TypeScript source's fetch is (ts-data.js `call.origin`).
+    const p = answer(name, row, args, forced, call, Origin.now()).finally(() => { call.plain = 0; call.recount?.(); });
+    p.call = call;
     return p;
   };
 }

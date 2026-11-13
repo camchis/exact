@@ -111,3 +111,50 @@ test('a declared source asks, reads and fails as a TypeScript fetch would, on th
     if (dir) rmSync(dir, { recursive: true, force: true });
   }
 }, 300_000);
+
+// A render (`--render js`) waits for a declared source's reply, as for a TypeScript source's fetch (held.js
+// `answersAtWork`): the page it serves holds the answer, not the placeholder.
+test('a render waits for a declared source and serves its answer', async () => {
+  if (webCompiler().cmd === 'cargo') throw new Error('build the compiler first: cargo build -p exact-web-js');
+  const root = resolve(import.meta.dir, '../..');
+  const api = Bun.serve({ hostname: '127.0.0.1', port: 0, async fetch() {
+    await new Promise(r => setTimeout(r, 200));
+    return Response.json({ current: { temperature_2m: 21.5 } });
+  } });
+  let dir;
+  try {
+    mkdirSync(resolve(root, 'target'), { recursive: true });
+    dir = mkdtempSync(resolve(root, 'target/web-js-declared-render-'));
+    writeFileSync(resolve(dir, 'app.json'), JSON.stringify({ name: 'Declared render', app: { id: 'test.declared-render', name: 'Declared render' }, host: { web: {} } }));
+    writeFileSync(resolve(dir, 'app.contract'), `routes nav
+  home "/" render=request
+
+shape Current
+  temperature_2m: number
+
+source weather() as shape Current
+  url "http://127.0.0.1:${api.port}/forecast"
+  pointer "/current"
+
+component App
+  resource now = weather() as shape Current
+  view
+    main
+      text \`\${now.temperature_2m}\` testId="temp"
+`);
+    const dist = resolve(dir, 'dist');
+    const built = Bun.spawn([process.execPath, 'host/web-js/build.mjs', 'declared-render', '--out', dist, '--render', 'js'], {
+      cwd: root, env: { ...process.env, EXACT_APP_DIR: dir }, stdout: 'pipe', stderr: 'pipe',
+    });
+    const [status, stdout, stderr] = await Promise.all([built.exited, new Response(built.stdout).text(), new Response(built.stderr).text()]);
+    expect({ status, error: status ? stdout + stderr : '' }).toEqual({ status: 0, error: '' });
+    const { renderer } = await import('./render.mjs');
+    const render = renderer(dist); render.ahead = false;
+    const reply = await render('/', 3000);
+    expect(reply.status).toBe(200);
+    expect(/data-testid="temp"[^>]*>([^<]*)</.exec(reply.html)?.[1]).toBe('21.5');
+  } finally {
+    api.stop(true);
+    if (dir) rmSync(dir, { recursive: true, force: true });
+  }
+}, 300_000);
