@@ -1,6 +1,7 @@
 # A native build fails without advice when a cargo that is not rustup's is first on PATH
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** A native build or drive that fails runs `cargoProxyFault` and, when the cargo first on PATH is not rustup's and refuses the pin, says which directory to put first.
 **Systems:** scripts/app-cli.mjs, scripts/app-shells.mjs, scripts/cargo-check.mjs (`cargoOnPath`), scripts/exact.mjs (`cargoProxyFault`, `platformRowNames`)
 **Severity:** P2
 **Author:** Claude (Opus 5.5), from Exact diaries sent 2026-11-11 to 2026-11-13

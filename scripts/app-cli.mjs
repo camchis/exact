@@ -300,6 +300,17 @@ async function verbRun({ dir, name, game = false, exact2, args }, reply) {
     reply?.({ code: 'platform_refused', error: why });
     return log(2);
   }
+  // A native build that failed under a cargo that is not rustup's (Homebrew's `rust`, ahead of ~/.cargo/bin) says so:
+  // that cargo ignores rust-toolchain.toml and builds with a rustc whose std has no iOS target (`cargoProxyFault`).
+  const native = ['ios', 'mac', 'linux', 'windows', 'android', 'share'].includes(verb) || (['test', 'agent', 'verify'].includes(verb) && host !== 'web');
+  const withCargoFault = async (exit) => {
+    if (exit && !interrupted && native) try {
+      const pin = Bun.TOML.parse(readFileSync(resolve(exact2, 'rust-toolchain.toml'), 'utf8')).toolchain.channel;
+      const fault = (await import(resolve(exact2, 'scripts/exact.mjs'))).cargoProxyFault(pin);
+      if (fault) console.error(`exact: ${fault}`);
+    } catch {}
+    return exit;
+  };
   // A build verb's `--json` (`reply`): one object on stdout, and the build's output on stderr. A failure is
   // `{code, error}`, as share's, with a non-zero status. It reports a finished artifact, so it takes no launch, no build
   // left running and no test run; and a flag the build's script refuses is refused before anything is built.
@@ -478,7 +489,7 @@ if (verb === 'contract') {
     const built = drivesWeb ? await webBuildQuiet(spawned, [resolve(exact2, verbs['web-build'][0]), ...verbs['web-build'].slice(1)], dir)
       : await script(['scripts/agent-build.mjs', host, '--app', name], [], [0, 2, 2]);
     if (checked) { delete process.env.EXACT_BUILD_CHECK_OUT; try { process.env.EXACT_BUILD_CHECKED = readFileSync(checked, 'utf8'); rmSync(checked); } catch {} }
-    if (built) return log(built);
+    if (built) return log(await withCargoFault(built));
   }
   // A verb that builds, runs, compiles or checks the app prepares first (`beforeBuild`); a drive prepared above. An
   // app's own command keeps its name (a game's verify, an app's check) and prepares nothing.
@@ -512,7 +523,7 @@ if (verb === 'contract') {
   // and serve.mjs run alone keep LAN (LLP 1023 D8).
   if (verb === 'serve' && !rest.includes('--lan')) rest.push('--loopback');
   if (jsonBuilt) return log(await jsonBuild(spawned, [resolve(exact2, verbs[verb][0]), ...verbs[verb].slice(1), ...rest], verb, reply));
-  if (verb !== 'test') return log(await script(verbs[verb], rest));
+  if (verb !== 'test') return log(await withCargoFault(await script(verbs[verb], rest)));
   // An app with a server of its own (the rest pattern's) has it run for the tests, where app.ts calls it, on an empty
   // database kept through them: as verify runs it, by the same code (LLP 1116.007 D2).
   const { withAppServer } = await import(resolve(exact2, 'scripts/verify.mjs'));

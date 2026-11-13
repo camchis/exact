@@ -302,3 +302,23 @@ test('a CI setup check names only the requested build toolchain and fails when i
   assert.match(result.stdout, /Android NDK: missing/);
   assert.doesNotMatch(result.stdout, /Chrome|web nightly|wasm-bindgen|Xcode/);
 });
+
+// Homebrew's `rust` puts a cargo that refuses `+<pin>` ahead of rustup's; a platform named before, no setup row reads it.
+test.skipIf(process.platform === 'win32')("a native build that fails under a cargo that is not rustup's names the directory to put first", async () => {
+  const { createApp } = await import('../game/new.mjs');
+  const { namePlatform } = await import('./app-shells.mjs');
+  const pin = Bun.TOML.parse(readFileSync(resolve(import.meta.dir, '../rust-toolchain.toml'), 'utf8')).toolchain.channel;
+  const scratch = mkdtempSync(resolve(tmpdir(), 'exact-brew-cargo-'));
+  try {
+    const app = resolve(scratch, 'brewed'), brew = resolve(scratch, 'brew'), proxy = resolve(scratch, 'home/bin');
+    createApp(app);
+    namePlatform(app, 'linux');
+    const tool = (bin, name, body) => { mkdirSync(bin, { recursive: true }); writeFileSync(resolve(bin, name), `#!/bin/sh\n${body}\n`, { mode: 0o755 }); };
+    tool(brew, 'cargo', `echo "error: no such command: \\\`+${pin}\\\`" >&2; exit 101`);
+    for (const name of ['cargo', 'rustup']) tool(proxy, name, 'exit 0');
+    const env = { ...process.env, EXACT_APP_DIR: '', EXACT_FEEDBACK: '0', CARGO_HOME: resolve(scratch, 'home'), PATH: [brew, proxy, process.env.PATH].join(delimiter) };
+    const built = spawnSync(process.execPath, [resolve(app, 'exact.mjs'), 'linux'], { cwd: app, env, encoding: 'utf8' });
+    assert.notEqual(built.status, 0);
+    assert.ok(built.stderr.includes(`exact: ${brew}/cargo is not rustup's cargo and refuses +${pin}: put ${proxy} before ${brew} on PATH`), built.stderr);
+  } finally { rmSync(scratch, { recursive: true, force: true }); }
+}, 120000);
