@@ -1,6 +1,7 @@
 # Apple's Hermes Intl.NumberFormat ignores signDisplay outside compact
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** On an engine that ignores `signDisplay`, the prelude's `NumberFormat` makes the engine formatter without `"negative"` and its `format` applies every mode itself, from the engine's negative form (a plus replacing its minus, or before the unsigned form for an accounting negative), and prints NaN and ∞ inside the style's pattern; the pure-utilities fixture compares every mode for a decimal, currency and percent in en-US, de-DE, ja-JP and sv-SE, and en-US accounting, against Chrome.
 **Systems:** js/src/intl.js, Apple Hermes
 **Severity:** P3
 **Author:** Claude (Opus 5.5), found while closing apple-s-hermes-compact-number-formatter
