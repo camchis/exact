@@ -242,7 +242,14 @@ impl Driver {
                     // LLP 1161.002) and asked of the oracle later.
                     if answers_itself(&plan, res) {
                         let name = plan.str(res.name);
-                        if let Some(v) = r.resource(name).cloned() {
+                        // Only an answer: a read held, refused or failed shows
+                        // its placeholder, which `failed`, `pending` and
+                        // `current` read as no answer; with no fact the
+                        // semantics leaves a module's read out.
+                        let unanswered = r.resource_is_placeholder(name)
+                            || r.failed_resources().iter().any(|(n, _)| *n == name)
+                            || r.pending().iter().any(|(n, _)| n == name);
+                        if let Some(v) = r.resource(name).filter(|_| !unanswered).cloned() {
                             r.data()
                                 .facts
                                 .borrow_mut()

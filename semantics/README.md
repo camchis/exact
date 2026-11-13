@@ -81,8 +81,9 @@ transcript of that oracle becomes the Lean side's oracle, so if the semantics
 makes a call the runner didn't, that is a divergence. What the runner answers
 itself never reaches the oracle: its own sources (`exactViewport`, `exactPage`,
 …) and a native module's (LLP 1133.002 D13), which it answers from the module's
-substitute. Each such resource's boot value becomes a host fact (`fact` in the
-oracle's text), and each module's source is named (`module`).
+substitute. Each such resource that answered at boot holds that answer as a
+host fact (`fact` in the oracle's text), and each module's source is named
+(`module`).
 
 The observation starts with `== <step>` and `outcome ok|refused|poisoned`.
 Before the configuration, each attempted commit prints
@@ -1141,10 +1142,11 @@ scope. So are resources reading `exactTransport` and `exactMIDI` (LLP
 answers again as they play; the semantics models neither. A native
 module's state (a permission, a preferred value, what a send to it answered)
 is the runner's: the semantics holds a module read's boot answer, a call it
-has no fact for (a send, a read closed at boot or one per element) is
-unsupported, and a step where a read no longer holds its boot answer carries
-`# outside: a module's answer moved`, from which a first difference is
-`OUTSIDE`. `sendMIDI` and
+has no fact for (a send, one per element, or a read with no answer at boot:
+closed, held or failed, whose placeholder is no answer) is unsupported, and a
+step where a read no longer holds its boot answer carries `# outside: a
+module's answer moved`, from which a first difference is `OUTSIDE`, a poll
+the trace leaves out included. `sendMIDI` and
 `requestMIDIAccess` are in, as commands. `toLowerCase` and `toUpperCase`
 (LLP 1088 D2) are typed but left out: their mappings are Unicode's case
 tables, which the semantics does not carry, and the generator writes

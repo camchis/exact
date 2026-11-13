@@ -395,12 +395,17 @@ fn compare(rust: Vec<String>, lean: Vec<String>) -> Verdict {
     };
     let first = rust.iter().zip(&lean).position(|(a, b)| a != b);
     if let Some(at) = first.or((rust.len() != lean.len()).then(|| rust.len().min(lean.len()))) {
+        // A module's answer that moved is the runner's state, however it
+        // moved: a poll's or a re-ask's commit is one the trace leaves out
+        // too, so this comes before the omitted-commit guard. A missing reply
+        // before the step it moved in still diverges.
+        if let Some((from, why)) = module_moved_by(&rust_raw, at) {
+            if missing.is_none_or(|missing| from <= missing) {
+                return Verdict::Unsupported(why);
+            }
+        }
         if missing.is_none_or(|missing| at < missing) && !omitted_at(&rust_raw, at) {
-            if let Some(why) = unsupported(at)
-                .or_else(|| bound(at))
-                .or_else(|| unset(at))
-                .or_else(|| module_moved_by(&rust_raw, at))
-            {
+            if let Some(why) = unsupported(at).or_else(|| bound(at)).or_else(|| unset(at)) {
                 return Verdict::Unsupported(why);
             }
         }
@@ -447,13 +452,14 @@ pub fn omitted_at(lines: &[String], at: usize) -> bool {
 }
 
 /// The first [`observe::MODULE_MOVED`] note in the steps up to and including
-/// the one holding compared line `at`: from there on, a module's answer is the
-/// runner's state, which the semantics, holding the boot answer, leaves out.
-fn module_moved_by(lines: &[String], at: usize) -> Option<String> {
+/// the one holding compared line `at`, with the compared line its step starts
+/// at: from there on, a module's answer is the runner's state, which the
+/// semantics, holding the boot answer, leaves out.
+fn module_moved_by(lines: &[String], at: usize) -> Option<(usize, String)> {
     let mut end = 0;
     for step in chunks(lines) {
         if let Some(note) = step.iter().find(|l| l.starts_with(observe::MODULE_MOVED)) {
-            return Some(note.clone());
+            return Some((end, note.clone()));
         }
         end += step.iter().filter(|l| !l.starts_with('#')).count();
         if at < end {

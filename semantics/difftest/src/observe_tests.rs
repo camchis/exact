@@ -268,3 +268,74 @@ test "bounds"
         .unwrap_err()
         .contains("does not hold"));
 }
+
+/// A module read held at boot (its permission still prompt) shows its
+/// placeholder, which is no answer: no host fact, so the semantics leaves the
+/// read out (#401).
+#[test]
+fn an_unanswered_module_read_is_no_fact() {
+    let path = crate::leanrun::project().join("corpus/resources/module-unanswered.contract");
+    let source = std::fs::read_to_string(&path).unwrap();
+    let s = script::scripted("unanswered", &source, Some(&path))
+        .unwrap()
+        .remove(0);
+    let plan = compile(&s.case).unwrap();
+    let (lines, oracle) = observe::run(
+        plan.clone(),
+        Oracle::for_case(&plan, &s.case),
+        &s.case.events,
+    );
+    crate::expectations_on(&s, &lines).unwrap();
+    let oracle = oracle.unwrap();
+    assert!(oracle.host_sources().is_empty());
+    let text = oracle.text();
+    assert!(!text.contains("fact \"position\""), "{text}");
+    assert!(text.contains("module \"watchPosition\"\n"), "{text}");
+}
+
+/// A polled substitute (an accelerometer's samples) moves its read on a clock
+/// advance, a commit the trace leaves out: the step carries both notes, and
+/// the semantics' observation, which holds the boot answer, differs there.
+/// That difference is outside the semantics, not a divergence (#401).
+#[test]
+fn a_polled_module_answer_that_moves_is_outside() {
+    let path = crate::leanrun::project().join("corpus/resources/module.contract");
+    let source = "use accelerometer, Accelerometer from \"@exact/motion\"\n\ncomponent App\n  resource motion = accelerometer() as shape Accelerometer else empty()\n  view\n    text `${motion.sequence}` testId=\"motion\"\n\ntest \"polls\"\n  clock +3000\n";
+    let s = script::scripted("polled", source, Some(&path))
+        .unwrap()
+        .remove(0);
+    let plan = compile(&s.case).unwrap();
+    let mut oracle = Oracle::for_case(&plan, &s.case);
+    oracle.grants = "device.motion".into();
+    let (rust, oracle) = observe::run(plan, oracle, &s.case.events);
+    assert_eq!(oracle.unwrap().host_sources(), ["accelerometer"]);
+    let steps = crate::chunks(&rust);
+    let moved = steps[1];
+    assert!(
+        moved.contains(&observe::OMITTED_COMMIT.to_string()),
+        "{rust:#?}"
+    );
+    assert!(
+        moved.iter().any(|l| l.starts_with(observe::MODULE_MOVED)),
+        "{rust:#?}"
+    );
+    // What the semantics prints: the boot answer through the advance.
+    let held: Vec<&String> = steps[0]
+        .iter()
+        .filter(|l| l.starts_with("resource ") || l.starts_with("view "))
+        .collect();
+    let mut lean: Vec<String> = steps[0].to_vec();
+    lean.extend(["== clock +3000".to_string(), "outcome ok".to_string()]);
+    lean.extend(held.into_iter().cloned());
+    assert_ne!(
+        lean[4..],
+        moved
+            .iter()
+            .filter(|l| !l.starts_with('#'))
+            .cloned()
+            .collect::<Vec<_>>()[..]
+    );
+    assert!(
+        matches!(crate::compare(rust, lean), crate::Verdict::Unsupported(why) if why.starts_with(observe::MODULE_MOVED))
+    );
+}
