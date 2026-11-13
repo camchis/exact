@@ -1,6 +1,7 @@
 # Return in an ordered item stops renumbering at a lazy line
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** Return's renumbering walk passes over a line the block machine counts as a continuation of a list item above it (a lazy line), and still stops at a blank line, a smaller indent, or a new block such as a column-0 fence or rule.
 **Systems:** markdown
 **Severity:** P2
 **Author:** Grok 4.7
