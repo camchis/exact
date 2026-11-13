@@ -1,6 +1,7 @@
 # iOS hover drops the paragraph when the pointer leaves an inline run
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** hovering enters the paragraph whenever the pointer is off an inline hover run and the paragraph is not already hovered, and ends, fails or cancels by clearing both the inline and the paragraph hover.
 **Systems:** host/apple
 **Severity:** P2
 **Author:** Grok 4.7
