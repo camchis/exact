@@ -1,6 +1,7 @@
 # Native builds never refresh app.contract.d.ts, and the guide does not say which commands do
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** One-shot native bakes refresh editor declarations with development or unset trust; composer bakes also refresh them with production trust, and the guide names which commands build.
 **Systems:** js/bake/src/lib.rs, scripts/exact.mjs (`refreshTypes`), host/web-js/build.mjs, docs/start-here.md
 **Severity:** P3
 **Author:** Claude (Opus 5.5), from Exact diaries sent 2026-11-11 to 2026-11-13
