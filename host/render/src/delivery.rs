@@ -17,9 +17,20 @@ pub(crate) fn beside(plan: &Path) -> std::io::Result<Delivery> {
                 std::io::Error::other(format!("app.version.json: {name} must be a string"))
             })
     };
+    // A file from before `production` was written names none: a development build's answer.
+    let production = match value.get("production") {
+        None => false,
+        Some(serde_json::Value::Bool(b)) => *b,
+        Some(_) => {
+            return Err(std::io::Error::other(
+                "app.version.json: production must be a boolean",
+            ))
+        }
+    };
     Ok(Delivery {
         version: field("version")?,
         build_number: field("buildNumber")?,
+        production,
         ..Default::default()
     })
 }
@@ -106,5 +117,31 @@ component Version
         );
         assert_eq!(rendered.activate, exact_plan::ActivatePolicy::Never);
         retire(page, &|| NoData);
+    }
+
+    #[test]
+    fn production_is_read_beside_the_plan_and_absent_is_a_development_build() {
+        let dir =
+            std::env::temp_dir().join(format!("exact-render-production-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let plan = dir.join("app.plan");
+        let read = |json: &str| {
+            std::fs::write(dir.join("app.version.json"), json).unwrap();
+            super::beside(&plan)
+        };
+        let built = read(r#"{"version":"2.3.4","buildNumber":"56","production":true}"#).unwrap();
+        assert_eq!((built.version.as_str(), built.production), ("2.3.4", true));
+        assert!(
+            !read(r#"{"version":"","buildNumber":""}"#)
+                .unwrap()
+                .production
+        );
+        assert_eq!(
+            read(r#"{"version":"","buildNumber":"","production":"yes"}"#)
+                .unwrap_err()
+                .to_string(),
+            "app.version.json: production must be a boolean"
+        );
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 }

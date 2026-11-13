@@ -1093,6 +1093,7 @@ fn delivery<D: DataSource>(runner: &Runner<D>, s: &mut String) {
     quote(&d.version, s);
     s.push_str(",\"buildNumber\":");
     quote(&d.build_number, s);
+    let _ = write!(s, ",\"production\":{}", d.production);
     s.push_str(",\"L\":");
     quote(&d.store.to_string(), s);
     s.push_str(",\"E\":[");

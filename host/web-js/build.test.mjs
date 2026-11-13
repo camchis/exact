@@ -1438,22 +1438,35 @@ test('web builds expose their version inputs in the view and delivery state', as
   let browser, server;
   try {
     writeFileSync(resolve(dir, 'app.json'), JSON.stringify({ name: 'Version', app: { id: 'test.delivery-version', name: 'Version' }, host: { web: {} } }));
-    writeFileSync(resolve(dir, 'app.contract'), 'shape Build\n  version: string\n  buildNumber: string\ncomponent App\n  resource build = exactDelivery() as shape Build\n  view\n    text `${build.version} (${build.buildNumber})` testId="version"\n');
+    writeFileSync(resolve(dir, 'app.contract'), 'shape Build\n  version: string\n  buildNumber: string\n  production: bool\ncomponent App\n  resource build = exactDelivery() as shape Build\n  view\n    column\n      text `${build.version} (${build.buildNumber})` testId="version"\n      if build.production\n        text "production" testId="kind"\n      else\n        text "development" testId="kind"\n');
     server = Bun.serve({ hostname: '127.0.0.1', port: 0, async fetch(request) { const file = Bun.file(resolve(dist, new URL(request.url).pathname.slice(1) || 'index.html')); return await file.exists() ? new Response(file) : new Response(null, { status: 404 }); } });
-    for (const [version, buildNumber] of [['2.3.4', '56'], [undefined, undefined], ['', '']]) {
+    for (const [version, buildNumber, production] of [['2.3.4', '56', false], [undefined, undefined, false], ['', '', false], ['2.3.4', '56', true]]) {
       const env = { ...process.env, EXACT_APP_DIR: dir };
       delete env.EXACT_VERSION; delete env.EXACT_BUILD_NUMBER;
       if (version !== undefined) env.EXACT_VERSION = version;
       if (buildNumber !== undefined) env.EXACT_BUILD_NUMBER = buildNumber;
-      const built = Bun.spawn([process.execPath, 'host/web-js/build.mjs', 'delivery-version', '--out', dist, '--render', 'none'], { cwd: root, env, stdout: 'pipe', stderr: 'pipe' });
+      const built = Bun.spawn([process.execPath, 'host/web-js/build.mjs', 'delivery-version', '--out', dist, '--render', 'none', ...(production ? ['--production'] : [])], { cwd: root, env, stdout: 'pipe', stderr: 'pipe' });
       const [status, stdout, stderr] = await Promise.all([built.exited, new Response(built.stdout).text(), new Response(built.stderr).text()]);
       expect(status, stdout + stderr).toBe(0);
-      expect(JSON.parse(readFileSync(resolve(dist, 'app.version.json'), 'utf8'))).toEqual({ version: version ?? '', buildNumber: buildNumber ?? '' });
+      expect(JSON.parse(readFileSync(resolve(dist, 'app.version.json'), 'utf8'))).toEqual({ version: version ?? '', buildNumber: buildNumber ?? '', production });
+      // A production page links no agent adapter: read what it shows in a plain browser.
+      if (production) {
+        const page = await (await suiteBrowser()).newPage();
+        try {
+          await page.goto(server.url.href);
+          await page.locator('[data-testid=kind]').waitFor();
+          expect(await page.locator('[data-testid=kind]').textContent()).toBe('production');
+          expect(await page.locator('[data-testid=version]').textContent()).toBe(`${version} (${buildNumber})`);
+        } finally { await page.close(); }
+        continue;
+      }
       browser = await open({ host: 'web', app: dir, webDist: dist, url: server.url.href });
       const state = await browser.state();
-      expect(state.resources.build).toEqual({ version: version ?? '', buildNumber: buildNumber ?? '' });
+      expect(state.resources.build).toEqual({ version: version ?? '', buildNumber: buildNumber ?? '', production: false });
+      expect(await browser.carrier.evaluate('document.querySelector("[data-testid=kind]").textContent')).toBe('development');
       expect(state.delivery.version).toBe(version ?? '');
       expect(state.delivery.buildNumber).toBe(buildNumber ?? '');
+      expect(state.delivery.production).toBe(production);
       expect(await browser.carrier.evaluate('document.querySelector("[data-testid=version]").textContent')).toBe(`${version ?? ''} (${buildNumber ?? ''})`);
       await browser.close(); browser = null;
     }

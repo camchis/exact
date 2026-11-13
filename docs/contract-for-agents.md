@@ -4196,7 +4196,17 @@ installed binary's `EXACT_VERSION` and `EXACT_BUILD_NUMBER` at bake time (defaul
 older bake without them answers `""`. The web JS build uses the same variables
 at build time, with `""` for each unset variable. Rust-rendered pages read those
 values from the web build, including when the server has neither variable set.
-`state.delivery` mirrors them.
+`state.delivery` mirrors them. Its boolean `production` says whether the
+installed binary was baked with production trust: Apple's `--release`,
+`--distribution`, and `--archive` without `--development` select it, and
+`exact release` uses the distribution path; Android's `--bundle` selects it; on
+the web, `host/web/build.mjs --out <dir>` builds with `--production`, while
+`host/web-js/build.mjs --out <dir>` alone stays a development page. Other native
+builds default to development trust unless `EXACT_UPDATE_TRUST=production` is
+set; `--run` controls launching, not trust, and Android's `--apk --release`
+selects release optimization, not production trust. Gate a developer-only
+control on `!build.production`. An older bake that recorded no trust answers
+`false`, and an over-the-air update leaves it unchanged.
 `exactViewport().displayMode` is a string: the current CSS display
 mode on the web, `fullscreen`, `window-controls-overlay` (the tall title row
 `display_override` asks for) or `standalone` on macOS, `standalone` on other

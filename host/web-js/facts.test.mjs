@@ -129,6 +129,25 @@ export function R(r){data.reserved[r.source](null,null,r.name);} export function
 });
 
 
+test('delivery reads whether the page is a production build, even from a pre-baked plan', async () => {
+  for (const production of [undefined, false, true]) {
+    const dir = mkdtempSync(resolve(tmpdir(), 'exact-delivery-production-'));
+    try {
+      const source = await Bun.file(resolve(import.meta.dir, 'facts.js')).text();
+      writeFileSync(resolve(dir, 'facts.js'), production === undefined ? source : source.replace('globalThis.__exactProduction', JSON.stringify(production)));
+      writeFileSync(resolve(dir, 'navigation.js'), await bundleHostModule(resolve(import.meta.dir, '../..'), 'navigation.js'));
+      writeFileSync(resolve(dir, 'rt.js'), `export const data = {}, Resources = []; export function commit() {} export function R() {} export const Refusal = Error, Kept = () => '', say = () => {};`);
+      const { delivery, deliveryFacts } = await import(resolve(dir, 'facts.js'));
+      const { data } = await import(resolve(dir, 'rt.js'));
+      // A plan baked by a development build answers false; the page's own build decides.
+      delivery({ build: [['production']], baked: [['production', 'seq'], [!production, 7]] });
+      expect(data.reserved.exactDelivery(null, null, 'build')).toEqual([production ?? false]);
+      expect(data.reserved.exactDelivery(null, null, 'baked')).toEqual([production ?? false, 7]);
+      expect(deliveryFacts.production).toBe(production ?? false);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  }
+});
+
 test('delivery reads build-time versions even from a pre-baked plan', async () => {
   for (const [version, buildNumber] of [[undefined, undefined], ['2.3.4', '56'], ['', '']]) {
     const dir = mkdtempSync(resolve(tmpdir(), 'exact-delivery-facts-'));

@@ -98,11 +98,11 @@ export function activities(readers) {
 }
 
 // Replaced with string literals by build.mjs for both the page and its renderer.
-export const deliveryFacts = { stream: "embedded", seq: 0, embeddedSeq: 0, staged: false, sunset: "", interpreted: [], compatibilityId: "", version: globalThis.__exactVersion ?? "", buildNumber: globalThis.__exactBuildNumber ?? "", L: "0", E: [] };
+export const deliveryFacts = { stream: "embedded", seq: 0, embeddedSeq: 0, staged: false, sunset: "", interpreted: [], compatibilityId: "", version: globalThis.__exactVersion ?? "", buildNumber: globalThis.__exactBuildNumber ?? "", production: globalThis.__exactProduction ?? false, L: "0", E: [] };
 export function delivery(readers) {
   (data.reserved ??= {}).exactDelivery = (_, a, name) => {
     const [fields, baked] = readers[name];
-    const value = { ...deliveryFacts, ...Object.fromEntries(fields.map((field, i) => [field, baked?.[i] ?? deliveryFacts[field]])), version: deliveryFacts.version, buildNumber: deliveryFacts.buildNumber };
+    const value = { ...deliveryFacts, ...Object.fromEntries(fields.map((field, i) => [field, baked?.[i] ?? deliveryFacts[field]])), version: deliveryFacts.version, buildNumber: deliveryFacts.buildNumber, production: deliveryFacts.production };
     return byName(readers, name, value);
   };
 }

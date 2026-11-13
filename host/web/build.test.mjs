@@ -4,7 +4,7 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync,
 import { tmpdir } from 'node:os';
 import { dirname, relative, resolve } from 'node:path';
 import { webChanges, webInputDigests } from '../../scripts/agent-launch.mjs';
-import { webSourceRoots } from './build.mjs';
+import { versionFile, webSourceRoots } from './build.mjs';
 import { appSources } from './serve.mjs';
 import { WEB_TOOLCHAIN } from '../../scripts/app.mjs';
 
@@ -273,4 +273,10 @@ test('the sources a receipt lists leave out the build output, dependencies and C
     if (was === undefined) delete process.env.CARGO_TARGET_DIR; else process.env.CARGO_TARGET_DIR = was;
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test("a wasm build's app.version.json carries the bake's version and whether its trust is production", () => {
+  expect(JSON.parse(versionFile({ version: '2.3.4', buildNumber: '56', trust: 'production', seq: 0 }))).toEqual({ version: '2.3.4', buildNumber: '56', production: true });
+  expect(JSON.parse(versionFile({ version: '', buildNumber: '', trust: 'development' }))).toEqual({ version: '', buildNumber: '', production: false });
+  expect(versionFile({ version: '1', buildNumber: '1', trust: 'development' }).endsWith('}\n')).toBe(true);
 });

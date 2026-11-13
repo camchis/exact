@@ -1439,7 +1439,10 @@ Read both at runtime as the string fields `version` and `buildNumber` of
 binary's baked values: an over-the-air update leaves them unchanged, and neither
 enters the compatibility id. An older bake without the fields answers `""`.
 The web JS build uses these variables at build time and answers `""` for each
-unset variable. No `app.json` version key is defined.
+unset variable. No `app.json` version key is defined. `exactDelivery().production`
+is `true` in a binary baked with production trust (for example, Apple's
+`--release`, `--distribution`, or `exact release`) and `false` in a development
+build.
 
 ## Apple privacy manifests
 

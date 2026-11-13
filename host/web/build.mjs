@@ -182,6 +182,12 @@ function completeWebInputs(app, js, render, inputRoots, inputs, inputsAt) {
   }
 }
 
+/** `app.version.json` beside the plan, from the bake's embedded record: what the Rust renderer answers for
+ * `exactDelivery()`'s version, build number and `production` (the binary's resolved trust), as the page does. */
+export function versionFile(embedded) {
+  return JSON.stringify({ version: embedded.version, buildNumber: embedded.buildNumber, production: embedded.trust === 'production' }) + '\n';
+}
+
 async function main() {
 guardFlags('web-build', process.argv.slice(2));
 const target = ['--js', '--wasm'].find((flag) => process.argv.includes(flag));
@@ -498,7 +504,7 @@ if (bakeOnly ? !!moduleInput : typeof exports.exact_module_artifact === 'functio
   finally { await bundle.close(); }
 }
 const bakedReceipt = readBake(app, 'web', 'wasm32-unknown-unknown', buildEnv.EXACT_BAKE_OUTPUT);
-writeFileSync(resolve(stage, 'app.version.json'), JSON.stringify({ version: bakedReceipt.embedded.version, buildNumber: bakedReceipt.embedded.buildNumber }) + '\n');
+writeFileSync(resolve(stage, 'app.version.json'), versionFile(bakedReceipt.embedded));
 if (!bakeOnly) {
   if (typeof exports.exact_compat !== 'function') throw new Error('the web wasm exposes no baked receipt');
   const compatLen = exports.exact_compat();
