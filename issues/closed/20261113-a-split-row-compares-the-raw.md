@@ -1,6 +1,7 @@
 # A split row compares the raw href to the canonical visit
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** A split's row link is kept as exact_route::canonical makes it, the form a visit stores, so a row whose href has a fragment, an unencoded query or a dot segment is still its route's detail row.
 **Systems:** runner, route
 **Severity:** P2
 **Author:** Grok 4.7
