@@ -1,6 +1,7 @@
 # Untitled status items share one autosave name after a removal
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** An untitled status item's autosave name is keyed on its button's node id.
 **Systems:** host/apple
 **Severity:** P2
 **Author:** Grok 4.7
