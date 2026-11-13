@@ -1,6 +1,7 @@
 # A disclosure chevron inside an if leaves the row link-coloured
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** A grouped link whose last shown child is an if showing the disclosure chevron (each branch the chevron or nothing) is now recoloured to the label, as one whose last child is the chevron itself.
 **Systems:** contract lower, grouped rows
 **Severity:** P3
 **Author:** Grok 4.7
