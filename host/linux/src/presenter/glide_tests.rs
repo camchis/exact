@@ -295,3 +295,101 @@ fn a_lists_smooth_correction_lands_at_once_on_a_clock_the_display_does_not_own()
         request(&p)
     );
 }
+
+/// The reader's wheel during a list's glide ends it where the reader puts
+/// the port: the report after says where that is, not where the glide was
+/// headed, and no longer that the host animates, so the request ends there
+/// and the window is built around the port.
+#[test]
+fn a_reader_interrupting_a_lists_glide_reports_where_the_port_is() {
+    let (mut p, wall, feed) = list(true);
+    let go = {
+        let k = p.host.kernel();
+        k.node_by_key(k.find_by_test_id("go")[0]).unwrap().id
+    };
+    p.tap(go).unwrap();
+    p.run_commands(NoData::default);
+    settle(&mut p);
+    wall.set(150.);
+    p.tick(150.);
+    settle(&mut p);
+    assert!(p.gliding(feed));
+    p.wheel(feed, 0., -40.).unwrap();
+    settle(&mut p);
+    assert!(!p.gliding(feed), "the reader's move ends it");
+    let at = p.scroll_of(feed).1;
+    assert!(at > 0. && at < 3000., "{at}");
+    let c = p.host.collection(feed).unwrap();
+    let row = (at / 100.).floor() as usize;
+    assert!(
+        c.rows.iter().any(|r| r.index == row),
+        "the window is built where the port is ({at}): {:?}",
+        c.rows.iter().map(|r| r.index).collect::<Vec<_>>()
+    );
+    assert!(
+        request(&p).contains(r#""status":"cancelled""#),
+        "{}",
+        request(&p)
+    );
+    wall.set(400.);
+    p.tick(400.);
+    settle(&mut p);
+    assert_eq!(p.scroll_of(feed).1, at, "nothing moves it after");
+}
+
+/// A reveal inside an open modal box glides its scroller as anywhere else;
+/// only the page under the box stays put.
+#[test]
+fn a_reveal_inside_an_open_modal_glides() {
+    let source = r#"component App
+  action reveal
+    scrollIntoView("deep", behavior="smooth")
+  view
+    column width="100%" height="100%"
+      button "Open" testId="open" commandfor="box" command="show-modal" height=30
+      dialog id="box" testId="box" width=220 height=180 overflow-y="auto"
+        button "Reveal" press=reveal testId="reveal" height=30 flex-shrink=0
+        box height=1000 flex-shrink=0
+        box id="deep" height=30 flex-shrink=0
+"#;
+    let (mut p, error) = Presenter::boot_with(
+        &crate::test_plan(source),
+        NoData,
+        (480., 400.),
+        1.,
+        PathBuf::new(),
+        PainterChoice::Cpu,
+    )
+    .unwrap();
+    assert!(error.is_none(), "{error:?}");
+    let wall = Rc::new(Cell::new(0.0));
+    let read = wall.clone();
+    p.set_live_clock(Some(Rc::new(move || read.get())));
+    p.serve_overlays();
+    p.frame();
+    let named = |p: &Presenter<NoData>, name: &str| {
+        let k = p.host.kernel();
+        k.node_by_key(k.find_by_test_id(name)[0]).unwrap().id
+    };
+    p.tap(named(&p, "open")).unwrap();
+    p.run_commands(NoData::default);
+    p.frame();
+    assert!(p.alert_inert(), "the box is open and modal");
+    let modal = named(&p, "box");
+    p.tap(named(&p, "reveal")).unwrap();
+    p.run_commands(NoData::default);
+    assert_eq!(
+        p.scroll_of(modal).1,
+        0.,
+        "no jump: it starts from where it was"
+    );
+    assert!(p.gliding(modal));
+    wall.set(150.);
+    p.tick(150.);
+    let middle = p.scroll_of(modal).1;
+    wall.set(300.);
+    p.tick(300.);
+    let end = p.scroll_of(modal).1;
+    assert!(middle > 0. && middle < end && end > 800., "{middle} {end}");
+    assert!(!p.gliding(modal));
+}

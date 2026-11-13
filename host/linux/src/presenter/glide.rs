@@ -62,6 +62,10 @@ impl Glides {
     pub(super) fn stop(&mut self, id: ViewId) {
         self.running.remove(&id);
     }
+    /// Something else moved the port of the one on `id`, now at `at`.
+    pub(super) fn interrupted(&self, id: ViewId, at: (f32, f32)) -> bool {
+        self.running.get(&id).is_some_and(|g| g.last != at)
+    }
 }
 
 /// CSS `ease-in-out`, `cubic-bezier(0.42, 0, 0.58, 1)`, at progress `x`.
@@ -131,6 +135,8 @@ impl<D: DataSource> Presenter<D> {
             };
             if at != g.last || (id != PAGE && self.host.kernel().node(id).is_none()) {
                 self.glides.running.remove(&id);
+                // A list reports where its port is, no longer animating.
+                landed_list |= id != PAGE && self.host.collection(id).is_some();
                 continue;
             }
             let t = ((now - g.start) / GLIDE_MS).clamp(0., 1.);

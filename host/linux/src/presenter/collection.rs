@@ -1091,6 +1091,12 @@ impl<D: DataSource> Presenter<D> {
             let retained_pin = self.arrange_pin();
             let tracks_end = self.tracks_scroll_end(view);
             let (glides, now) = (self.reveal_glides(None), self.host.now());
+            // The reader moved a gliding port (a wheel's input runs this pass
+            // before the next frame's step): the glide is over, and this report
+            // says where the port is, not where it was headed (LLP 1070.000 §2.5).
+            if self.glides.interrupted(view, self.scroll_of(view)) {
+                self.glides.stop(view);
+            }
             let cursor = self.collection.cursors.get_mut(&view).unwrap();
             cursor.queued = false;
             let Some(key) = self.host.kernel().node(view).map(|n| n.key) else {

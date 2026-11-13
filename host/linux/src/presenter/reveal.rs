@@ -553,10 +553,12 @@ impl<D: DataSource> Presenter<D> {
                 self.collection_scroll_input(a, off);
             }
         }
-        if self.alert_inert() {
-            return scrolled;
-        }
-        if let Some(target) = self.reveal_rect(id) {
+        // The page under an open box does not move; the scrollers above
+        // still glide (below).
+        let page = (!self.alert_inert())
+            .then(|| self.reveal_rect(id))
+            .flatten();
+        if let Some(target) = page {
             let doc = self.document();
             let max = ((doc.0 - vw).max(0.0), (doc.1 - vh).max(0.0));
             let target = if spacing {
