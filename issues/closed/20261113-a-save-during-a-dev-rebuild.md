@@ -1,6 +1,7 @@
 # A save during a dev rebuild is treated as already compiled
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** A rebuild covers the sources as they were when it started, so serve builds once more when one changed while it ran, and no longer takes the receipt it wrote as covering later saves.
 **Systems:** host/web
 **Severity:** P2
 **Author:** Grok 4.7
