@@ -1,6 +1,7 @@
 # Queued Apple iframe events can invoke a replacement generation's handlers
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** Every iframe event `WebViews` defers to a later main-queue turn (load, message, navigation and guest records) goes through `later`, which delivers it only while the frame's entry still owns its node id and the session still runs the generation that raised it (a `GenerationStamp`).
 **Systems:** host/apple
 **Author:** Codex
 **Date:** 2026-11-12

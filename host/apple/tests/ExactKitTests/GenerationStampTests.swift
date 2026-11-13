@@ -31,13 +31,14 @@ final class GenerationStampTests: XCTestCase {
 
     """
 
-    /// A session running `source`, with no view.
-    private func session(_ source: String = plain) throws -> ExactSession {
+    /// A session running `source`, with no view; `before` runs before it boots.
+    private func session(_ source: String = plain, before: (ExactSession) -> Void = { _ in }) throws -> ExactSession {
         #if os(macOS)
         _ = NSApplication.shared
         #endif
         let session = ExactApp.shared.makeSession(label: "stamp-\(UUID().uuidString.prefix(6))")
         sessions.append(session)
+        before(session)
         session.presenter.viewport.frame = CGRect(x: 0, y: 0, width: 300, height: 400) // what a reload lays out in
         XCTAssertNil(session.boot(plan: try compile(source), size: CGSize(width: 300, height: 400)).error)
         return session
@@ -204,6 +205,52 @@ final class GenerationStampTests: XCTestCase {
         let current = session.openURLAnswer(["app-settings:", "result"])
         session.destroy()
         current(false)
+    }
+
+    // MARK: iframe events
+
+    private static let framing = """
+    component App
+      state landed = 0
+      action land(e: FrameNavigation)
+        landed = landed + 1
+      view
+        column
+          iframe id="guest" src="https://example.invalid/" navigatesuccess=land width=300 height=180 testId="guest"
+
+    """
+
+    /// A frame whose arm never loads: its entry still takes the arm's events.
+    private func framed() throws -> (ExactSession, NodeView, Data) {
+        let session = try session(Self.framing) { $0.webviews.moduleLocation = { "/nonexistent/libexact_web.dylib" } }
+        let frame = try XCTUnwrap(session.presenter.views.values.first { $0.props["testId"] == "guest" })
+        let record: [String: Any] = ["event": "navigatesuccess", "record": ["url": "https://old.example/", "navigationId": 7]]
+        return (session, frame, try JSONSerialization.data(withJSONObject: record))
+    }
+
+    func testAFramesQueuedEventReachesItsHandlerInItsGeneration() throws {
+        let (session, frame, event) = try framed()
+        session.webviews.receivedEvent(id: frame.id, kind: 4, data: event)
+        drain()
+        XCTAssertEqual(try slots(session)["landed"] as? Int, 1)
+    }
+
+    /// The arm's event is queued to a later turn; before it, the generation
+    /// ends, or the node's frame is replaced by another at its id, as a
+    /// reload replaces the tree.
+    func testAFramesQueuedEventIsDroppedWhenItsGenerationOrEntryEnds() throws {
+        for replaced in [false, true] {
+            let (session, frame, event) = try framed()
+            session.webviews.receivedEvent(id: frame.id, kind: 4, data: event)
+            if replaced {
+                session.webviews.destroy(id: frame.id)
+                _ = session.webviews.create(owner: frame)
+            } else {
+                session.commitForTests()
+            }
+            drain()
+            XCTAssertEqual(try slots(session)["landed"] as? Int, 0, replaced ? "a replaced frame's event" : "an ended generation's event")
+        }
     }
 
     func testAToolCallPolledInItsGenerationReadsItsRunner() throws {
