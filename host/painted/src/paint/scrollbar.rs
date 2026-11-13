@@ -71,6 +71,37 @@ pub(crate) struct State {
     pub limits: BTreeMap<ViewId, f32>,
 }
 
+/// How a thumb paints.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) struct Look {
+    expanded: bool,
+    /// Hovered or dragged, which a high-contrast palette highlights.
+    lit: bool,
+}
+
+impl State {
+    /// `None` while automatic hiding hides the thumb.
+    pub fn look(&self, bar: &Bar) -> Option<Look> {
+        let dragged = self
+            .drag
+            .is_some_and(|d| (d.0, d.1) == (bar.key, bar.vertical));
+        let hovered = self.pointer.is_some_and(|(x, y)| contains(bar.track, x, y));
+        let visible = !self.auto_hide
+            || dragged
+            || self.pointer.is_some_and(|(x, y)| contains(bar.port, x, y));
+        visible.then_some(Look {
+            expanded: hovered || dragged || !self.auto_hide,
+            lit: hovered || dragged,
+        })
+    }
+
+    /// The policy and every thumb's look, which a partial repaint must keep.
+    pub fn ink(&self) -> (bool, bool, Vec<Option<Look>>) {
+        let looks = self.bars.iter().map(|b| self.look(b)).collect();
+        (self.enabled, self.auto_hide, looks)
+    }
+}
+
 impl Painter {
     pub(super) fn paint_scrollbars(&mut self, walk: &Walk<'_, '_>) {
         self.scrollbars.bars.clear();
@@ -151,24 +182,9 @@ impl Painter {
             }
         }
         for bar in &self.scrollbars.bars {
-            let dragged = self
-                .scrollbars
-                .drag
-                .is_some_and(|d| (d.0, d.1) == (bar.key, bar.vertical));
-            let hovered = self
-                .scrollbars
-                .pointer
-                .is_some_and(|(x, y)| contains(bar.track, x, y));
-            let visible = !self.scrollbars.auto_hide
-                || dragged
-                || self
-                    .scrollbars
-                    .pointer
-                    .is_some_and(|(x, y)| contains(bar.port, x, y));
-            if !visible {
+            let Some(Look { expanded, lit }) = self.scrollbars.look(bar) else {
                 continue;
-            }
-            let expanded = hovered || dragged || !self.scrollbars.auto_hide;
+            };
             let width = if expanded { 6. } else { 2. };
             let (x, y, w, h) = bar.thumb;
             let rect = if bar.vertical {
@@ -177,7 +193,7 @@ impl Painter {
                 (x, y + (h - width) / 2., w, width)
             };
             let ink = if let Some(palette) = super::look::contrast() {
-                if dragged || hovered {
+                if lit {
                     palette.highlight
                 } else {
                     palette.button_text

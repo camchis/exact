@@ -798,7 +798,9 @@ impl Painter {
         self.viewport = viewport;
         self.backend.page(page_color(self.dark));
         let partial = if let Some(previous) = self.damage.pixels.as_ref().filter(|_| {
-            !self.damage.next.is_empty() && self.top_surface.is_none() && !self.scrollbars.enabled
+            !self.damage.next.is_empty()
+                && self.top_surface.is_none()
+                && (!self.scrollbars.enabled || self.split.is_some())
         }) {
             self.backend.begin_damage(
                 viewport.0,
@@ -892,6 +894,7 @@ impl Painter {
                     .any(|p| !p.fragments().is_empty())
         });
         self.damage.dark = self.dark;
+        self.damage.scrollbars = self.scrollbars.ink();
         self.damage.focus_ink = damage::field_focus_ink(scene.kernel, scene.focus);
         Ok(Frame {
             pixmap,
