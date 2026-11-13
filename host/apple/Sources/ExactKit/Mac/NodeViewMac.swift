@@ -159,7 +159,7 @@ package final class NodeView: NSView, NSTextViewDelegate, NSTextFieldDelegate {
     /// raster, symbol, surface).
     var layerPaintCache: Bool?
     /// What the host last wrote to AppKit accessibility (props and form state).
-    struct AccessibilityWrite: Equatable { var enabled = true; var identifier: String?; var label: String?; var help: String?; var required = false; var formInitialized = false }
+    struct AccessibilityWrite: Equatable { var enabled = true; var identifier: String?; var label: String?; var help: String?; var required = false; var formInitialized = false; var text: TextAccessibilityWrite? }
     var lastAccessibilityWrite = AccessibilityWrite()
     var boxGradient: CAGradientLayer?
     var imageLayer: CALayer?
@@ -1040,7 +1040,7 @@ package final class NodeView: NSView, NSTextViewDelegate, NSTextFieldDelegate {
             let last = lastAccessibilityWrite
             if ax.enabled != last.enabled { setAccessibilityEnabled(ax.enabled) }
             if ax.identifier != last.identifier { setAccessibilityIdentifier(ax.identifier) }
-            if ax.label != last.label { setAccessibilityLabel(ax.label) }
+            if ax.label != last.label { setAccessibilityLabel(ax.label); ax.text = nil }
             lastAccessibilityWrite = ax
         }
         updateTextAccessibility()
