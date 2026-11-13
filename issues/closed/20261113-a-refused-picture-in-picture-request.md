@@ -1,6 +1,7 @@
 # A refused picture-in-picture request has already left the current float
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The platform's picture-in-picture request ends the current floats only once its new host exists, so a refusal leaves them showing.
 **Systems:** host/apple
 **Severity:** P2
 **Author:** Grok 4.7
