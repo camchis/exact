@@ -4055,21 +4055,36 @@ A data crate answers the view's sources in Rust instead of `app.ts`: an app's
 | `app_id()` | The app's identity, which names its storage: `com.example.my-app-3f9a2c` (`exact new` writes the name and six random hex digits), or for a game `com.exact.<Game::ID>` unless its app.json names one. A source that names none takes app.json's `app.id` in the app's build, so its storage (`app:/data`, kept answers, `persist` states, an agent drive's `--storage`) is the app's; one that names its own keeps it, so write the same id as app.json or leave it out. |
 | `grants()` | One grant per line, the lines `app.ts`'s `grants` takes (`net.fetch …`, `sqlite.open …`, `fs.read …`). |
 
-An app `exact new` made outside this checkout that answers in Rust writes its own Cargo workspace
-(LLP 1153 D1.4). Read its crates from [Sparkline](../apps/sparkline)'s `data/`, `web/` and `apple/`:
-each `Cargo.toml`, `build.rs` and `src/lib.rs`, not the TypeScript ones `.exact/shells/` holds. Sparkline's
-paths into Exact are relative to this checkout: in the copies, write each as `<exact2>/…` before running
-`bun exact.mjs update`, `contract` as `<exact2>/contract/cli` too. `update` points `exact-*` crates at this
-checkout by name, and any other path only through that placeholder. The web build copies the source
-`web/build.rs` passes to `contract::bake(plan, …)` into a module of its own, where build.rs's `use`s and
-locals are not: write it as a path from the data crate (`my_app_data::MyApp`), or that path's `::default()`
-or `::new()` with no arguments, with no comma after it (rustfmt adds one when it breaks the call across
-lines). For a mixed app, the build copies the third argument to
-`exact_js_bake::build_mixed_with`: a reference to the same data-crate value or constructor,
-with no constructor arguments. TypeScript answers the other sources. A declared
-`rust.module.package` supplies the module instead of a generated one.
-A source built with arguments is exported by a crate of the app's own
-instead, named in app.json's `rust.module.package` (Update Lab's `logic/`).
+An app outside this checkout that answers in Rust has its own Cargo workspace beside app.json (LLP 1153
+D1.4). `exact new <path> --rust` writes one: `data/`, whose type answers the starter's source (the view's
+shapes are generated into it by `contract rust`), and the host crates `apple/` and `web/`, shaped as
+[Sparkline](../apps/sparkline)'s are, with a resolved `Cargo.lock`. Another host's crate (`linux/`) is
+copied from Sparkline. To give an existing app a data crate instead:
+
+1. Run a native verb once (`bun exact.mjs ios --no-install`), which writes the generated workspace to
+   `.exact/shells/`, then copy it up: `cp -R .exact/shells/. . && rm -rf .exact/shells .stamp.json`.
+2. Write `data/` and replace the copied `apple/` and `web/` crates with Sparkline's: each `Cargo.toml`,
+   `build.rs` and `src/lib.rs`, and `web/src/bin/sparkline-dev.rs` (the dev loop's driver, renamed with the
+   crate's `[[bin]]`), not the TypeScript ones the shells hold. Rename `sparkline` in them, and
+   write each path into Exact as `<exact2>/…` (`contract` as `<exact2>/contract/cli` too), and each
+   `build.rs`'s `../../../Cargo.lock` as `../Cargo.lock`. An app with an update store
+   (`deploy.store.ios` or `deploy.store.macos` other than `"0"`) adds `exact-apple-update = { path =
+   "<exact2>/host/apple-update" }` to `apple/`'s dependencies, which Sparkline's lacks. Add `"data"` to
+   the root `Cargo.toml`'s `members`, and delete `app.ts`.
+3. Run `bun exact.mjs update`, which resolves `<exact2>` and points `exact-*` crates at this checkout,
+   then `bun exact.mjs lock`.
+
+A build script binds the source before asking its grants (`let source = my_app_data::MyApp::default();
+let grants = source.grants();`): `my_app_data::MyApp::default().grants()` borrows a temporary (E0716).
+The web build copies the source `web/build.rs` passes to `contract::bake(plan, …)` into a module of its
+own, where build.rs's `use`s and locals are not: write it as a path from the data crate
+(`my_app_data::MyApp`), or its `::default()` or `::new(…)` whose arguments are literals
+(`my_app_data::MyApp::new(true)`), across lines as rustfmt writes it or not: what it copies is the source
+the app runs, so a constructor for the bake alone is not one. For a mixed app, the build
+copies the third argument to `exact_js_bake::build_mixed_with`, a reference to the same kind of source.
+TypeScript answers the other sources. A source built from anything else (a local, a path read at build
+time) is exported by a crate of the app's own instead, named in app.json's `rust.module.package`
+(Update Lab's `logic/`), which supplies the module instead of a generated one.
 
 A source that wraps another implements `exact_runner::DataSourceWrapper`.
 Every method is required, so adding a data-source method cannot silently use

@@ -50,7 +50,7 @@ import { grantAdvice } from './grant-advice.mjs';
 import { installIn } from './package-manager.mjs';
 export { grantAdvice, grantLines } from './grant-advice.mjs';
 const { cargoEnvironment, appleExecutableName, HERMES_INSTALLER, hermesBundle, hermesTarget, pathFrom, resolveApp, WEB_TOOLCHAIN, webToolchainEnv } = await import('./app.mjs');
-const { applyPattern, createApp, createGame, patternList, UNCACHED_CRATES, wireSnapback } = await import('../game/new.mjs');
+const { applyPattern, createApp, createGame, patternList, rustApp, UNCACHED_CRATES, wireSnapback } = await import('../game/new.mjs');
 const { gameDefaults, sdkFetch } = await import('../game/app/shells.mjs');
 const { HOST_SDKS, appleSdkName, developerDir, xcodeRefusal } = await import('../host/apple/devices.mjs');
 const { appleArtifacts, assertAppleIdentity } = await import('../host/apple/build.mjs');
@@ -743,7 +743,7 @@ export function refreshTypes(dir, binary = resolve(ROOT, 'target/debug', process
 }
 /** `exact new`: check the machine first, since a game's or a Snapback app's scaffold needs Cargo (an app's does
  * not); then write it and say what its builds will still need. */
-function newApp(path, {update = false, without = null, with: platforms = [], game = false, assets = false, snapback = null, title, id} = {}) {
+async function newApp(path, {update = false, without = null, with: platforms = [], game = false, assets = false, rust = false, snapback = null, title, id} = {}) {
   if (update) {
     console.log(createApp(path, {update, without, with: platforms}));
     const manifest = resolve(path, 'app.json');
@@ -761,16 +761,27 @@ function newApp(path, {update = false, without = null, with: platforms = [], gam
   // An app compiles no Rust to be made, so a machine without it (an agent's sandbox for a build service) can make one;
   // a game resolves its crates now, and a Snapback app wires a device build.
   const noRust = report.some(row => row.name === 'rustup' && !row.ok);
-  if (noRust && (game || snapback)) {
+  if (noRust && (game || snapback || rust)) {
     printReport(report, {onlyMissing: true});
     throw new Error('exact new needs Rust (rustup) to build exact2\'s own tools, the compiler among them; install it, then run exact new again');
   }
   // A game is a path here, as an app is: `game/new.mjs` alone takes a bare name for game/games.
-  const created = game ? createGame(resolve(path), undefined, {assets}) : createApp(path, {snapback, title, id, with: platforms});
+  const created = game ? createGame(resolve(path), undefined, {assets}) : createApp(path, {snapback, title, id, with: platforms, rust});
   // A game's cache note is what to do next, so it comes after the compiler's line and the table.
   const note = created.indexOf(`\n${UNCACHED_CRATES}`);
   console.log(note < 0 ? created : created.slice(0, note));
   if (!noRust) prebuildCompiler();
+  // A Rust app's lock, resolved from this checkout's (scripts/app-rust.mjs): its builds run Cargo --locked. Its
+  // first line and app-cli's note on the GPU module, not each version it chose; the app stands either way, so a
+  // failure says what to run.
+  if (rust) {
+    try {
+      const said = (await (await import('./app-cli.mjs')).lockApp(resolve(path))).split('\n');
+      console.log([said[0], ...said.slice(1).filter(line => line.startsWith('The GPU module'))].join('\n'));
+    } catch (error) {
+      console.log(`\nThe app is made, but its Cargo.lock could not be resolved: ${error.message}\nRun bun exact.mjs lock in it once Cargo can fetch.`);
+    }
+  }
   if (report.some(row => !row.ok)) {
     // Builders read a bare "still needs" list as the reason a later command failed (bench diaries,
     // 2026-10-07/08): say when nothing on it blocks the app.
@@ -1190,6 +1201,8 @@ export function pattern(args, say = console.log) {
   const name = args.find(arg => !arg.startsWith('-'));
   if (!name) return say(patternList());
   const dir = process.env.EXACT_APP_DIR ?? process.cwd();
+  // A pattern is a view and its app.ts: beside a Rust data crate it would make the app mixed and drop the view's shapes.
+  if (rustApp(dir)) throw new Error('exact pattern: a pattern writes app.ts, and this app\'s data is Rust (data/); read a pattern with `bun exact.mjs pattern` and port its sources to data/src/lib.rs');
   const { said, next } = applyPattern(dir, name, { force: args.includes('--force') });
   say(said);
   refreshTypes(dir);
@@ -1374,6 +1387,7 @@ async function main(argv) {
     for (const [at, flag, example] of [[titled, '--name', '"Field Log"'], [bundle, '--bundle-id', 'com.yourcompany.fieldlog']])
       if (at >= 0 && (!args[at + 1] || args[at + 1].startsWith('--'))) throw new Error(`exact new: ${flag} takes a value, as in ${flag} ${example}`);
     if ((titled >= 0 || bundle >= 0) && args.includes('--game')) throw new Error('exact new: --name and --bundle-id name an app; a game takes its name and id from its app.json');
+    if (args.includes('--rust') && args.includes('--game')) throw new Error('exact new: --rust makes an app whose data is Rust; a game is Rust already (--game)');
     if (args.includes('--online') && !args.includes('--snapback')) throw new Error('exact new: --online requires --snapback and an existing backend schema');
     if (port >= 0 && !args.includes('--snapback')) throw new Error('exact new: --port is the Snapback origin’s, with --snapback');
     if (without >= 0 && !args[without + 1]) throw new Error('update --without: name the platform, as in --without linux');
@@ -1381,7 +1395,7 @@ async function main(argv) {
     // `mac` is the verb's spelling; the manifest's key is `macos` (scripts/app-shells.mjs PLATFORMS).
     const platforms = [...new Set(withs.flatMap(i => args[i + 1].split(',')).map(p => p.trim()).filter(Boolean).map(p => p === 'mac' ? 'macos' : p))];
     const snapback = args.includes('--snapback') ? { port: port >= 0 ? args[port + 1] : undefined, online: args.includes('--online') } : null;
-    return newApp(path, {update: args.includes('--update'), without: without >= 0 ? (args[without + 1] === 'mac' ? 'macos' : args[without + 1]) : null, with: platforms, game: args.includes('--game'), assets: args.includes('--assets'), snapback, title: titled >= 0 ? args[titled + 1] : undefined, id: bundle >= 0 ? args[bundle + 1] : undefined});
+    return newApp(path, {update: args.includes('--update'), without: without >= 0 ? (args[without + 1] === 'mac' ? 'macos' : args[without + 1]) : null, with: platforms, game: args.includes('--game'), assets: args.includes('--assets'), rust: args.includes('--rust'), snapback, title: titled >= 0 ? args[titled + 1] : undefined, id: bundle >= 0 ? args[bundle + 1] : undefined});
   }
   if (verb === 'backend') {
     const dir = resolve(name), parent = resolve(dir, '..');
