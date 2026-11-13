@@ -1,6 +1,7 @@
 # Input runs while its preceding clock advance still needs the host to apply receipts
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** An input that arrives behind a change action's yield is held until the work due by its arrival has run, after the host applies each receipt; a refused timer no longer stops that work, so the input observes its arrival; the JavaScript target's input wrapper resumes its advance the same way.
 **Systems:** runner/src/runner/advance.rs, host/apple/src/host.rs, host/linux/src/host.rs, host/web-js/rt.js
 **Author:** Codex
 **Date:** 2026-11-12
