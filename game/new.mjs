@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 import { spawnSync } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
-import { chmodSync, cpSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, cpSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { basename, dirname, relative, resolve } from 'node:path';
 import { capturedLockDrift, gameDefaults, gameShells, prepareGame } from './app/shells.mjs';
 import { cargoEnvironment, lockedMetadata, pathFrom, patchLines } from '../scripts/app.mjs';
@@ -65,6 +65,35 @@ export function createGame(destination, directory = import.meta.dir, options = {
   if (collided) throw new Error(`${name}: its Rust type would collide with an exact_game export or a template item; choose another name, such as ${name}-game`);
   destination = local ? resolve(destination) : resolve(directory, 'games', name);
   if (existsSync(destination) && readdirSync(destination).length) throw new Error(`Game already exists: ${destination}`);
+  // A failure (Cargo cannot fetch the engine's crates offline, say) leaves
+  // nothing of ours behind, so exact new can run again: the directory itself
+  // when we made it, its entries when the author made it empty. Only the
+  // directory we started in is cleared (the same device and inode), and a
+  // cleanup that fails never hides the error.
+  const existed = existsSync(destination);
+  mkdirSync(destination, {recursive:true});
+  const started = statSync(destination);
+  try {
+    return writeGame(destination, directory, options, {name, local});
+  } catch (error) {
+    let removed = false;
+    try {
+      const now = lstatSync(destination);
+      if (now.isDirectory() && now.dev === started.dev && now.ino === started.ino) {
+        if (existed) for (const entry of readdirSync(destination)) rmSync(resolve(destination, entry), {recursive:true, force:true});
+        else rmSync(destination, {recursive:true, force:true});
+        removed = true;
+      }
+    } catch {}
+    // The Cargo error names a manifest in the game, which is gone now. exact
+    // setup fetches the game SDK lock a new game resolves from (sdkFetch).
+    if (removed && /^game Cargo graph: /.test(error?.message ?? '')) {
+      error.message += `\nexact new removed ${destination}. Fetch the game SDK's crates with bun ${JSON.stringify(resolve(directory, '../scripts/exact.mjs'))} setup, then run exact new again.`;
+    }
+    throw error;
+  }
+}
+function writeGame(destination, directory, options, {name, local}) {
   cpSync(resolve(directory, 'new'), destination, {recursive:true});
   if (options.assets === true) withModel(destination, directory);
   destination = realpathSync(destination);
