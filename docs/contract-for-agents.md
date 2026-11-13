@@ -4170,8 +4170,15 @@ tick/feed/encode durations, and on every host: `quality`, the resolved rung
 force, `none` when the canvas draws at the display's rate; and `idle`, true
 while the canvas rests between changes (`none` under the agent's virtual
 clock). `thermalState` is `nominal`, `fair`, `serious` or `critical` where the
-host reads the device's (Apple), `none` elsewhere. GPU, memory and audio
-measurements remain unavailable. The 16 KiB snapshot limit is separate from the public surface
+host reads the device's (Apple), `none` elsewhere. Memory, in bytes:
+`processMemoryBytes` is the process's footprint (`phys_footprint` on Apple, the
+resident set on Linux and Android), `none` on the web and Windows;
+`gameHeapBytes` is the GPU module's linear memory on the web, the simulation's
+and renderer's heap, and `none` natively, where that heap is the process's;
+`textureMemoryBytes` counts the delivered textures resident on the device
+(render targets are not counted) and `geometryMemoryBytes` the renderer's
+vertex and index buffers, on every host once the renderer exists. GPU and
+audio measurements remain unavailable. The 16 KiB snapshot limit is separate from the public surface
 record's limit.
 
 A GPU HUD can show its last successful publication while its world loads:

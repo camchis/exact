@@ -756,6 +756,10 @@ impl<const ASSETS: bool> crate::renderer::RendererWithAssets<ASSETS> {
     pub(crate) fn texture_summary(&self) -> String {
         textures::summary(&self.models.textures)
     }
+    /// Device bytes of the resident delivered textures.
+    pub(crate) fn texture_bytes(&self) -> u64 {
+        textures::resident_bytes(&self.models.textures)
+    }
     pub(crate) fn residency_work(&self) -> crate::world::assets::Work {
         let (pipelines, textures) = self.asset_work();
         let skin = self.models.skinning.as_ref();

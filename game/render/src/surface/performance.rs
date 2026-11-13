@@ -22,6 +22,9 @@ pub(crate) struct Live {
     pub max_fps: u32,
     /// The canvas is at rest: it asks for no frames until something changes.
     pub idle: bool,
+    /// Device bytes of the resident delivered textures and of the shared
+    /// vertex and index buffers, once the renderer exists.
+    pub memory: Option<(u64, u64)>,
 }
 
 #[derive(Default)]
@@ -148,6 +151,13 @@ impl Report {
             // The module honors caps down to 5 Hz (exact_gpu::Module::max_fps).
             write!(out, ",\"maxFps\":{}", live.max_fps.max(5)).unwrap();
         }
+        if let Some((textures, geometry)) = live.memory {
+            write!(
+                out,
+                ",\"textureMemoryBytes\":{textures},\"geometryMemoryBytes\":{geometry}"
+            )
+            .unwrap();
+        }
         // Only a live clock rests; under a virtual one the fact is unknown.
         if self.live == Some(true) {
             write!(out, ",\"idle\":{}", live.idle).unwrap();
@@ -189,7 +199,13 @@ mod tests {
         report.submitted();
         let value: serde_json::Value =
             serde_json::from_str(&report.take(0., &Live::default()).unwrap()).unwrap();
-        for absent in ["thermalState", "quality", "maxFps", "idle"] {
+        for absent in [
+            "thermalState",
+            "quality",
+            "maxFps",
+            "idle",
+            "textureMemoryBytes",
+        ] {
             assert!(value.get(absent).is_none(), "{absent}");
         }
         report.clock(false);
@@ -198,6 +214,7 @@ mod tests {
             quality: Some("mid"),
             max_fps: 2,
             idle: true,
+            memory: Some((4096, 1024)),
         };
         let value: serde_json::Value =
             serde_json::from_str(&report.take(0., &live).unwrap()).unwrap();
@@ -205,6 +222,8 @@ mod tests {
         assert_eq!(value["quality"], "mid");
         assert_eq!(value["maxFps"], 5, "caps below 5 Hz draw at 5 Hz");
         assert_eq!(value["idle"], true);
+        assert_eq!(value["textureMemoryBytes"], 4096);
+        assert_eq!(value["geometryMemoryBytes"], 1024);
     }
 
     #[test]

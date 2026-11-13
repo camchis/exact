@@ -261,16 +261,24 @@ impl<const ASSETS: bool> crate::renderer::RendererWithAssets<ASSETS> {
     }
 }
 
+fn delivered(textures: &BTreeMap<String, Texture>) -> impl Iterator<Item = &Texture> {
+    textures
+        .iter()
+        .filter(|(name, t)| t.active && !name.starts_with('\0'))
+        .map(|(_, t)| t)
+}
+
+/// The device bytes of the active delivered textures: [`summary`]'s `bytes`.
+pub(crate) fn resident_bytes(textures: &BTreeMap<String, Texture>) -> u64 {
+    delivered(textures).map(|t| t.bytes).sum()
+}
+
 /// Active delivered textures (the 1×1 defaults excluded) for `state.world.gpu`:
 /// device bytes and a count per format, e.g. `{"bytes":1398128,"Bc7":1}`.
 pub(crate) fn summary(textures: &BTreeMap<String, Texture>) -> String {
     let mut bytes = 0;
     let mut counts = [0u32; TextureFormat::ALL.len()];
-    for texture in textures
-        .iter()
-        .filter(|(name, t)| t.active && !name.starts_with('\0'))
-        .map(|(_, t)| t)
-    {
+    for texture in delivered(textures) {
         bytes += texture.bytes;
         counts[texture.format as usize] += 1;
     }

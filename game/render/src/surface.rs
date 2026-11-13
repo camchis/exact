@@ -678,6 +678,8 @@ impl<G: Game, P: Executor, const ASSETS: bool, H: crate::Hooks> Surface
             quality: self.rung.map(|rung| rung.level.keyword()),
             max_fps: self.max_fps(),
             idle: self.resting,
+            memory: (self.render.as_ref())
+                .map(|(renderer, _)| (renderer.texture_bytes(), renderer.mesh_buffer_bytes())),
         };
         let report = self.perf.reporting.as_mut()?;
         report.clock(self.seekable);
