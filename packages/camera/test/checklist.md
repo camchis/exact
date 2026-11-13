@@ -59,7 +59,7 @@ and look. Each step says what to run and what you should see.
   take and keep a photo: the shot line names `app:/tmp/camera/N.jpg` with its size,
   upright. Open it again and close the camera app: the shot error reads `AbortError`.
   Deny the dialog: `NotAllowedError`, and no camera app. An app that does not open the
-  camera itself (no `getUserMedia(video=)`) asks nothing: its manifest names no CAMERA.
+  camera itself (no `getUserMedia`) asks nothing: its manifest names no CAMERA.
 - iPhone, the camera app, with `--bind camera`: Camera app shows the system camera
   (allow the camera's dialog the first time); take a photo and Use Photo: the shot
   line names `app:/tmp/camera/N.jpg`, sized upright as held. Cancel: `AbortError`.

@@ -1086,8 +1086,8 @@ reading. Nothing that isn't HTML is added by it.
   `accept="image/*"` and `capture` opened inside the press, the photo the
   person keeps written to an `app:/` path and answered as `takePhoto`'s.
   It needs no grant line; iOS needs the `device.camera` line's usage key,
-  and Android's `CAMERA` comes from `getUserMedia(video=)`, not that
-  line. Consumer: an access-control app whose guards photograph a visitor's
+  and Android's `CAMERA` comes from a use of `getUserMedia` under that
+  line, not the line alone. Consumer: an access-control app whose guards photograph a visitor's
   identity card with the phone's own camera app (its shutter, flash and
   review). Unblocks that without app Kotlin or Swift. Take: none offered;
   waived by Charlie's ask (2026-11-12: work the open issues through to the

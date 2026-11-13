@@ -574,30 +574,30 @@ fn the_camera_app_needs_no_line_and_its_sheet_takes_take_or_cancel() {
     assert_eq!(sent(&calls, "takePhotoWithCameraApp"), 2);
 }
 
-/// Android's `CAMERA` comes from opening the camera in the app
-/// (`getUserMedia`'s `video`), not from the `device.camera` line, which iOS's
-/// system camera UI needs for its usage key: an app that only uses the camera
-/// app declares none, whatever its lines (LLP 1133.008 D6 as amended).
+/// Android's `CAMERA` comes from opening the camera in the app: any use of
+/// `getUserMedia` under the `device.camera` line, since data code may compute
+/// its options (`getUserMedia(JSON.parse(saved))` names no `video`). The line
+/// alone, which iOS's system camera UI needs for its usage key, derives none:
+/// an app that only uses the camera app asks nothing on Android, and an
+/// audio-only app has no camera line (LLP 1133.008 D6 as amended).
 #[test]
 fn android_s_camera_permission_comes_from_opening_the_camera_in_the_app() {
-    let derived = |source: &str| {
+    let plan = |source: &str| {
         let app = App::with_source("derives", source);
-        let (plan, _) = contract::compile_path_all(&app.0.join("app.contract"), false)
-            .unwrap_or_else(|e| panic!("{e:?}"));
-        contract::native::derived(&plan, source, "android")
+        contract::compile_path_all(&app.0.join("app.contract"), false)
+            .unwrap_or_else(|e| panic!("{e:?}"))
+            .0
     };
-    assert!(derived(CAMERA_APP).is_empty(), "{:?}", derived(CAMERA_APP));
-    let camera = (
-        "device.camera".to_owned(),
-        "android.permission.CAMERA".to_owned(),
-    );
-    assert_eq!(derived(APP), [camera]);
-    // Only the microphone: no camera.
-    let audio = APP
-        .replace(
-            "getUserMedia(audio=true, video=true)",
-            "getUserMedia(audio=true)",
-        )
-        .replace("getUserMedia(video=true)", "getUserMedia(audio=true)");
-    assert!(derived(&audio).is_empty(), "{:?}", derived(&audio));
+    let camera = ["android.permission.CAMERA"];
+    let both = Some("device.camera purpose.camera\ndevice.microphone purpose.microphone");
+    let mic = Some("device.microphone purpose.microphone");
+    let permissions = contract::native::android_permissions;
+    assert!(permissions(&plan(CAMERA_APP), both, CAMERA_APP).is_empty());
+    let opens = plan(APP);
+    assert_eq!(permissions(&opens, both, APP), camera);
+    // Computed in data code: no `video` in the source, still the camera.
+    let computed = "const stream = await getUserMedia(JSON.parse(saved));\n";
+    assert_eq!(permissions(&opens, both, computed), camera);
+    // An app whose lines grant no camera opens none.
+    assert!(permissions(&opens, mic, computed).is_empty());
 }

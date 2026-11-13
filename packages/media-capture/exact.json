@@ -142,8 +142,7 @@
       },
       "derives": {
         "android": {
-          "video": "android.permission.CAMERA",
-          "videoConstraints": "android.permission.CAMERA"
+          "device.camera": "android.permission.CAMERA"
         }
       },
       "options": {

@@ -224,23 +224,35 @@ pub fn android_reach(
     let ceiling = compat
         .and_then(|c| serde_json::from_str::<serde_json::Value>(&c).ok())
         .and_then(|c| c["inputs"]["grantCeiling"].as_str().map(str::to_owned));
-    let text = app_text(app_root);
-    let used = |name: &str| names(&text, name);
-    let mut permissions: Vec<String> = android_write_permissions(plan, ceiling.as_deref(), used)
+    let permissions = android_permissions(plan, ceiling.as_deref(), &app_text(app_root));
+    std::fs::write(out_dir.join("permissions.txt"), permissions.join("\n"))
+        .map_err(|e| e.to_string())
+}
+
+/// The Android permissions the module names `text` (the app's source) uses
+/// derive beside the grant lines' own, each where `ceiling` (the app's
+/// grant lines, when known) grants the line it is under: a writing name's
+/// ([`android_write_permissions`]) and a name's `derives` ([`derived`]).
+pub fn android_permissions(
+    plan: &exact_plan::Plan,
+    ceiling: Option<&str>,
+    text: &str,
+) -> Vec<String> {
+    let used = |name: &str| names(text, name);
+    let mut permissions: Vec<String> = android_write_permissions(plan, ceiling, used)
         .into_iter()
         .map(str::to_owned)
         .collect();
-    for (line, permission) in derived(plan, &text, "android") {
+    for (line, permission) in derived(plan, text, "android") {
         let granted = |g: &str| {
             (line.strip_prefix("device.")).is_none_or(|n| exact_runner::device::granted(g, n))
         };
-        if ceiling.as_deref().is_none_or(granted) && !permissions.contains(&permission) {
+        if ceiling.is_none_or(granted) && !permissions.contains(&permission) {
             permissions.push(permission);
         }
     }
     permissions.sort_unstable();
-    std::fs::write(out_dir.join("permissions.txt"), permissions.join("\n"))
-        .map_err(|e| e.to_string())
+    permissions
 }
 
 /// What the app's use of its module names declares to `target`'s platform
@@ -248,9 +260,10 @@ pub fn android_reach(
 /// keys, `android` permissions), each with the grant line whose purpose a
 /// usage key takes: a name's own list where the app's source names it; per
 /// option, the permission of each value the source writes as a string
-/// literal, or of a flag it names. A computed value of such an option is
-/// refused at bake (`contract-module-literal`), so a Contract caller's
-/// values are in its text; data code's are its own literals.
+/// literal, or of a flag it names; per grant line (a `device.` key), its
+/// permission under that line wherever the name is used. A computed value of
+/// an option is refused at bake (`contract-module-literal`), so a Contract
+/// caller's values are in its text; data code's are its own literals.
 pub fn derived(plan: &exact_plan::Plan, text: &str, target: &str) -> Vec<(String, String)> {
     use serde_json::Value;
     // A package's specifier (`"@exact/pedometer"`) names no module name.
@@ -286,11 +299,6 @@ pub fn derived(plan: &exact_plan::Plan, text: &str, target: &str) -> Vec<(String
         let first = (lines.first().and_then(Value::as_str))
             .unwrap_or_default()
             .to_owned();
-        // A name whose lines are by argument (`getUserMedia`'s `video` is the
-        // camera's) takes an option's own line.
-        let line_of = |option: &str| {
-            (sub["nameGrants"][option].as_str()).map_or_else(|| first.clone(), str::to_owned)
-        };
         let mut keys: Vec<(String, &str)> = Vec::new();
         match declares {
             Value::Array(list) => keys.extend(
@@ -302,11 +310,18 @@ pub fn derived(plan: &exact_plan::Plan, text: &str, target: &str) -> Vec<(String
                 for (option, d) in by {
                     let flag = option.rsplit('.').next().unwrap_or(option);
                     match d {
-                        Value::String(k) if names(text, flag) => keys.push((line_of(option), k)),
+                        // A grant line in place of an option: any use of the
+                        // name, under that line, since data code may compute
+                        // the options (`getUserMedia(JSON.parse(saved))`), and
+                        // the line is what admits the capability at all.
+                        Value::String(k) if option.starts_with("device.") => {
+                            keys.push((option.clone(), k))
+                        }
+                        Value::String(k) if names(text, flag) => keys.push((first.clone(), k)),
                         Value::Object(values) => keys.extend(
                             (values.iter())
                                 .filter(|(v, _)| quoted(v))
-                                .filter_map(|(_, k)| Some((line_of(option), k.as_str()?))),
+                                .filter_map(|(_, k)| Some((first.clone(), k.as_str()?))),
                         ),
                         _ => {}
                     }
