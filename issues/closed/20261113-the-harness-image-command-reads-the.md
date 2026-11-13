@@ -1,6 +1,7 @@
 # The harness /image command reads the whole file to parse a header
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** image_size reads a PNG's or GIF's first 24 bytes and a JPEG's segment headers alone, seeking past each body to the frame header, within 4096 steps; it no longer reads the whole file.
 **Systems:** apps/harness
 **Severity:** P2
 **Author:** Grok 4.7
