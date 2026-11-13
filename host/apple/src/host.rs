@@ -262,6 +262,7 @@ pub struct Host<D: DataSource> {
     secrets: Option<Box<dyn crate::store::KeptStore>>,
     pending_store_writes: Vec<exact_runner::StoreWrite>,
     pending_store_stamps: std::collections::BTreeMap<String, exact_data::secrets::Stamp>,
+    reported_store_failures: BTreeSet<String>,
     data_activated: bool,
     /// The source's activation, run ahead of `activate_data` by `prepare_data`.
     source_prepared: Option<Result<(), String>>,
@@ -617,6 +618,7 @@ impl<D: DataSource> Host<D> {
             secrets,
             pending_store_writes: Vec::new(),
             pending_store_stamps: Default::default(),
+            reported_store_failures: BTreeSet::new(),
             update_line: None,
             delivery,
             colors_seen: None,
