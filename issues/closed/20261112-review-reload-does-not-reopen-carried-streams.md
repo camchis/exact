@@ -1,6 +1,7 @@
 # Reloading a runner preserves a stream's value but does not reopen the stream
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** `Carried` names the resources whose answer came from a stream still open, and a replacement that takes such an answer shows it and asks again, now or at readiness, opening the stream anew.
 **Systems:** runner
 **Author:** Codex
 **Date:** 2026-11-12

@@ -968,10 +968,16 @@ impl<D: DataSource> Runner<D> {
         runner.carry_uploads_in(carried.map_or(&[][..], |c| &c.uploads));
         // @ref LLP 1048.000 D6 — a document's answers seed their resources.
         // The device's own store is an input its render never had.
-        let (seeded, again) = match seed {
+        let (seeded, mut again) = match seed {
             Seed::Checkpoint(checkpoint) => runner.seed_checkpoint(checkpoint),
             _ => (vec![false; runner.resources.len()], Vec::new()),
         };
+        // A carried answer of a stream still open, as a checkpoint's.
+        let streamed = |name: &str| carried.is_some_and(|c| c.streams.iter().any(|s| s == name));
+        again.extend((0..runner.plan.resources.len()).filter(|&i| {
+            runner.resources[i].state.is_some()
+                && streamed(runner.plan.str(runner.plan.resources[i].name))
+        }));
         // Store-reading resources when the data source is not ready (a TypeScript module before
         // its host loads it, LLP 1027 D4): the answer kept from the last launch seeds the first
         // frame if its identifying arguments still match and its value still fits; the compiled
