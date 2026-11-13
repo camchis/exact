@@ -595,8 +595,9 @@ component App
   `localStorage` (`exact.state.<name>`), the app's `UserDefaults` domain on Apple
   (never the Keychain), or a file under the app's data directory on Linux. The key
   is the state's name, so renaming the state forgets what was kept.
-- Small settings only: a number, string or bool, or an option or list of one, at
-  most 16 KB as JSON. A longer value leaves the last stored value intact, and
+- Small settings only: a number, string (an `enum<…>` too) or bool, or an option or
+  list of one, at most 16 KB as JSON. A kept enum member a later version dropped is
+  of another shape: the initializer's value stands. A longer value leaves the last stored value intact, and
   `logs` reports it once until it changes. `persist` on a record, a list of records
   or a state holding an action is `type-persist-type`: keep app data in a source.
   A child component's state is `type-persist-child`; a derive, `syntax-persist-derive`.

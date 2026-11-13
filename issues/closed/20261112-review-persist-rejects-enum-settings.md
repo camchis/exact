@@ -1,6 +1,7 @@
 # Persist refuses settings whose strings have a finite vocabulary
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** persist admits an enum, an option of one and a list of them as string settings with their declared type; a stored member a later version dropped falls back to the initializer and the journal names the enum.
 **Systems:** contract/types/src/persist.rs
 **Author:** Codex
 **Date:** 2026-11-12
