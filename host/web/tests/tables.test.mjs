@@ -9,7 +9,7 @@ import {filesystem} from '../../../scripts/filesystem.mjs';
 import {devGenerationDigest} from '../serve.mjs';
 import {sealEnvelope} from '../../../scripts/deploy-signing.mjs';
 import {pendingBuildInputs, resolveApp} from '../../../scripts/app.mjs';
-import {driveStore, removeBrowserProfile} from '../../../scripts/agent-launch.mjs';
+import {driveStore, removeDriveStore} from '../../../scripts/agent-launch.mjs';
 const source = readFileSync(new URL('../dev.mjs', import.meta.url), 'utf8');
 
 test('table publication counts the whole operation and refuses imported subprocess helpers', () => {
@@ -216,8 +216,8 @@ test('real game dev journals rejected edits and reloads tables after a gpu-dev p
         }
       } finally {
         if(oldApp===undefined)delete process.env.EXACT_APP_DIR;else process.env.EXACT_APP_DIR=oldApp;
-        try { await removeBrowserProfile(store.profile); }
-        finally { rmSync(resolve(store.base+'-locks',storage),{recursive:true,force:true}); }
+        // A Chrome whose exit was not confirmed keeps its profile and browser-owner record.
+        if(!await removeDriveStore(store,storage))console.error(`kept ${store.profile}: its Chrome did not confirm its exit`);
       }
     }
   }
