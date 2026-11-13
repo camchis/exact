@@ -1,6 +1,7 @@
 # `@exact/oauth` reports an auth session the system ended with an error as a network failure, and drops the system's reason
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** OAuth reports host auth-session 502 failures as auth_session, preserving the status and reason without automatic retry.
 **Systems:** packages/oauth/index.ts, packages/oauth/index.d.ts, host/apple/Sources/ExactAuthSession/AuthSession.swift
 **Severity:** P3
 **Author:** Claude (Opus 5.5), from Exact diaries sent 2026-11-11 to 2026-11-13

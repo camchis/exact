@@ -32,13 +32,13 @@ export interface OAuthSession {
 /** What `signIn()` and `signOut()` answer; `OAuthResult` in Contract. */
 export interface OAuthResult {
   ok: boolean;
-  /** A stable code: "access_denied", "cancelled", "popup_blocked", "state_mismatch", "issuer_mismatch", "invalid_grant", "network", "server", "config", "invalid_response", or the provider's OAuth error code. */
+  /** A stable code: "access_denied", "cancelled", "popup_blocked", "state_mismatch", "issuer_mismatch", "invalid_grant", "auth_session", "network", "server", "config", "invalid_response", or the provider's OAuth error code. */
   code: string;
   /** A sentence for the person; "" when ok. */
   error: string;
   /** Trying again later may succeed. */
   retryable: boolean;
-  /** The HTTP status, 400 or over, of the reply that failed; 0 otherwise: no reply came, or the package refused a 2xx or 3xx it could not use. */
+  /** The HTTP status, 400 or over, of the reply that failed, or 502 for a failed system auth session; 0 otherwise: no reply came, or the package refused a 2xx or 3xx it could not use. */
   status: number;
 }
 
@@ -388,6 +388,7 @@ export function oauth(config: OAuthConfig): OAuthProvider {
         return result('popup_blocked', 'The sign-in window was blocked. Tap Sign In again.', true);
       }
       if (status === 403 || status === 501) return result('config', `Sign-in cannot open here: ${(e as Error).message}`);
+      if (status === 502) return result('auth_session', `Sign-in could not finish: ${(e as Error).message}`, false, status);
       return result('network', 'Sign-in could not finish. Try again.', true);
     }
   };
