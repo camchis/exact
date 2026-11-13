@@ -29,6 +29,8 @@ extension Run {
         run.size = CGFloat(Float(size) * scale)
         run.lineHeight = lineHeight.map { CGFloat(Float($0) * scale) }
         run.letterSpacing = CGFloat(Float(letterSpacing) * scale)
+        run.inlineStart = CGFloat(Float(inlineStart) * scale)
+        run.inlineEnd = CGFloat(Float(inlineEnd) * scale)
         return run
     }
 }
@@ -90,6 +92,11 @@ package struct Run: Hashable {
     package var box: InlineBox?
     /// The reader atom's icon; its box reserves horizontal room only.
     package var atomIcon: AtomIconRun?
+    /// Its inline boxes' padding, border and margin before its first glyph
+    /// and after its last, start and end by the paragraph's direction (the
+    /// kernel's `TextRun::edges`): a metric, kerned in (`attributed`).
+    package var inlineStart: CGFloat = 0
+    package var inlineEnd: CGFloat = 0
 
     package static func == (lhs: Run, rhs: Run) -> Bool {
         guard lhs.size == rhs.size, lhs.weight == rhs.weight, lhs.family == rhs.family,
@@ -100,7 +107,8 @@ package struct Run: Hashable {
               lhs.strikeColor == rhs.strikeColor, lhs.href == rhs.href,
               lhs.hidden == rhs.hidden, lhs.fixedInk == rhs.fixedInk, lhs.background == rhs.background, lhs.backgroundBox == rhs.backgroundBox,
               lhs.backgroundRadii == rhs.backgroundRadii, lhs.shadow == rhs.shadow, lhs.stroke == rhs.stroke,
-              lhs.indent == rhs.indent, lhs.hang == rhs.hang, lhs.box == rhs.box, lhs.atomIcon == rhs.atomIcon else { return false }
+              lhs.indent == rhs.indent, lhs.hang == rhs.hang, lhs.box == rhs.box, lhs.atomIcon == rhs.atomIcon,
+              lhs.inlineStart == rhs.inlineStart, lhs.inlineEnd == rhs.inlineEnd else { return false }
         // CoreText's ranges address the original UTF16 source. Swift String's
         // canonical equality would alias NFC/NFD paragraphs with different
         // source lengths, so both equality and hashing use the exact UTF8.
@@ -141,6 +149,8 @@ package struct Run: Hashable {
         hasher.combine(hang)
         hasher.combine(box)
         hasher.combine(atomIcon)
+        hasher.combine(inlineStart)
+        hasher.combine(inlineEnd)
     }
     package init(text: String, size: CGFloat, weight: Int, family: Int, italic: Bool, lineHeight: CGFloat?, letterSpacing: CGFloat, numeric: Int = 0, ligatures: Int = 0, stretch: CGFloat = 100, variations: [FontAxis] = [], features: [FontFeature] = [], color: [Double]? = nil, decoration: String = "", href: String = "", background: [Double]? = nil, hidden: Bool = false, fixedInk: Bool = false, shadow: [Double]? = nil, stroke: [Double]? = nil, indent: CGFloat = 0, hang: Bool = false) {
         self.text = text
@@ -199,6 +209,10 @@ package struct Spec: Hashable {
     package var source = SourceMap()
     /// CSS `text-indent` in points, the paragraph's first line only.
     package var textIndent: CGFloat = 0
+    /// Where the first line starts: `text-indent`, and the start edge of
+    /// the inline boxes the first run is in, which nothing precedes to kern
+    /// (`TextEngine.kernInlineEdges`).
+    package var firstLineIndent: CGFloat { textIndent + (runs.first?.inlineStart ?? 0) }
     /// CSS `hyphens`: 0 manual (the initial value), 1 none (soft hyphens
     /// already arrive as U+034F), 2 auto.
     package var hyphens = 0
@@ -874,6 +888,7 @@ package final class TextEngine {
             presentation?.attributes(block, color: spec.color, scale: lineScale, attributes: &a)
             s.addAttribute(.exactClampStyle, value: a, range: NSRange(location: 0, length: s.length))
         }
+        TextEngine.kernInlineEdges(s, runs: spec.runs)
         TextEngine.setBaseDirection(s, direction: spec.direction)
         presentation?.finish(s)
         if spec.preserves, s.string.contains("\t"), let first = spec.strut ?? spec.runs.first {
@@ -1325,7 +1340,7 @@ package final class TextEngine {
         let resident = residency.shape(TextShapeKey(identity: identity, paint: TextPaint(spec)))
         let source = resident?.attributed ?? attributed(spec)
         let typesetter = resident?.typesetter ?? CTTypesetterCreateWithAttributedString(source)
-        var indent = spec.textIndent
+        var indent = spec.firstLineIndent
         let text = source.string as NSString
         let emergencyEnds = Set(spec.emergencyBreaks.map { $0 + 1 })
         let boundaries = (resident?.lineBreakBoundaries ?? lineBoundaries(text, length: text.length)).filter { !emergencyEnds.contains($0) }
@@ -1438,6 +1453,7 @@ package final class TextEngine {
             var made = run(r)
             // An image's box draws no ink of its own (LLP 1011.002).
             if let box = InlineBox(r) { made.box = box; made.hidden = true }
+            made.inlineStart = CGFloat(r.inline_start); made.inlineEnd = CGFloat(r.inline_end)
             return made
         }
         // Markdown source arrives as one run; the archive expands it the

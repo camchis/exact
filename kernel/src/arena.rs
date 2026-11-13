@@ -748,11 +748,7 @@ impl NodeArena {
                         .or_else(|| props.str(PropId::Placeholder).filter(|p| !p.is_empty()))
                         .unwrap_or(" ")
                 };
-                out.push(TextRun {
-                    text: text.into(),
-                    style,
-                    inline: None,
-                });
+                out.push(TextRun::new(text, style));
                 // A textarea's final Return creates a caret line. Paragraph
                 // shapers can omit a terminal break, so retain that line with
                 // zero-width measurement content, never in the field's value.
@@ -760,11 +756,7 @@ impl NodeArena {
                     && props.str(PropId::SemanticTag) == Some("textarea")
                     && text.ends_with('\n')
                 {
-                    out.push(TextRun {
-                        text: "\u{200b}".into(),
-                        style,
-                        inline: None,
-                    });
+                    out.push(TextRun::new("\u{200b}", style));
                 }
             }
             _ => {
@@ -782,17 +774,22 @@ impl NodeArena {
                     let mut style = rows.style();
                     // Bold Text (LLP 1115.000 D12.3), as `text_style` reads it.
                     self.embolden(slot, &mut style);
-                    out.push(TextRun {
-                        text: shown,
-                        style,
-                        inline: None,
-                    });
+                    out.push(TextRun::new(shown, style));
                 } else {
                     for child in &self.children[s] {
                         match self.node_types[*child as usize] {
                             NodeType::Text => {
                                 let rows = self.run_style_rows(*child, rows);
+                                let first = out.len();
                                 self.text_runs_after(*child, rows, out, boundary);
+                                // Its box's edges beside its first and last runs; an
+                                // inner box's are already there.
+                                let edges = crate::text::inline_box::inline_edges(self, *child);
+                                if out.len() > first {
+                                    out[first].edges.start += edges.start;
+                                    let last = out.len() - 1;
+                                    out[last].edges.end += edges.end;
+                                }
                             }
                             // Its alignment reads its parent's font (CSS 2
                             // §10.8.1), so its run is in the paragraph's style.
@@ -800,6 +797,7 @@ impl NodeArena {
                                 out.push(TextRun {
                                     text: crate::text::inline_box::INLINE_BOX_TEXT.into(),
                                     style: rows.style(),
+                                    edges: Default::default(),
                                     inline: Some(
                                         crate::text::inline_box::inline_image(self, *child)
                                             .reserved,

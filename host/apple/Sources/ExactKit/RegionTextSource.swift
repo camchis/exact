@@ -110,7 +110,7 @@ final class RegionTextSource: Sendable {
         let base = spec.strut ?? spec.runs.first
         strut = base.map(font); strutExplicit = base?.lineHeight != nil
         align = spec.align; direction = spec.direction; lineClamp = spec.lineClamp; overflowWrap = spec.overflowWrap
-        textIndent = spec.textIndent; hyphens = spec.hyphens; language = spec.language
+        textIndent = spec.firstLineIndent; hyphens = spec.hyphens; language = spec.language
         hyphenated = !spec.source.inserted.isEmpty; emergencyBreaks = spec.emergencyBreaks
         textBox = (spec.textBoxTrim, spec.textBoxOver, spec.textBoxUnder)
         balance = spec.balance

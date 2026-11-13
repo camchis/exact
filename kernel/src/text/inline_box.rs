@@ -163,3 +163,62 @@ pub(crate) fn inline_image(arena: &NodeArena, slot: u32) -> InlineImage {
         ),
     }
 }
+
+/// The rows an inline run's edges are made of (`inline_edges`).
+pub(crate) const EDGE_ROWS: [crate::generated::StyleId; 8] = {
+    use crate::generated::StyleId;
+    [
+        StyleId::PaddingLeft,
+        StyleId::PaddingRight,
+        StyleId::BorderWidthLeft,
+        StyleId::BorderWidthRight,
+        StyleId::BorderStyleLeft,
+        StyleId::BorderStyleRight,
+        StyleId::MarginLeft,
+        StyleId::MarginRight,
+    ]
+};
+
+/// What the inline box a `text` inside a paragraph is takes along the line
+/// beside its text (`TextRun::edges`): its padding, border and margin on
+/// each inline side, as its taffy style resolves them, start and end by its
+/// direction. A percentage is not read, as for an image (LLP 1011.002 §4).
+pub(crate) fn inline_edges(arena: &NodeArena, slot: u32) -> crate::text::InlineEdges {
+    use crate::generated::StyleId;
+    use taffy::style::CompactLength;
+    // Most runs say none of these rows: no taffy style is made for them.
+    let own = arena.style(slot);
+    if !EDGE_ROWS.iter().any(|row| own.mask.has(*row)) {
+        return crate::text::InlineEdges::default();
+    }
+    let style = crate::style::taffy_style(arena, slot);
+    let length = |raw: CompactLength| {
+        (raw.tag() == CompactLength::LENGTH_TAG)
+            .then(|| raw.value())
+            .filter(|v| v.is_finite())
+            .unwrap_or(0.0)
+    };
+    let side = |pad: CompactLength, border: CompactLength, margin: CompactLength| {
+        length(pad).max(0.0) + length(border).max(0.0) + length(margin)
+    };
+    let left = side(
+        style.padding.left.into_raw(),
+        style.border.left.into_raw(),
+        style.margin.left.into_raw(),
+    );
+    let right = side(
+        style.padding.right.into_raw(),
+        style.border.right.into_raw(),
+        style.margin.right.into_raw(),
+    );
+    match arena.computed_source(slot, StyleId::Direction).direction {
+        crate::Direction::Rtl => crate::text::InlineEdges {
+            start: right,
+            end: left,
+        },
+        _ => crate::text::InlineEdges {
+            start: left,
+            end: right,
+        },
+    }
+}

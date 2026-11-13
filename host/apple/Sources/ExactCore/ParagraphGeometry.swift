@@ -222,7 +222,7 @@ package struct LineInsets {
     /// `spec`'s; `marker` is the width of a hung run's UTF-16 range, as
     /// the paragraph's own source shapes it.
     package init(_ spec: Spec, marker: (CFRange) -> CGFloat) {
-        textIndent = spec.textIndent; rtl = spec.direction == 1
+        textIndent = spec.firstLineIndent; rtl = spec.direction == 1
         guard spec.runs.contains(where: { $0.indent != 0 }) else { return }
         var open: (start: Int, first: CGFloat, rest: CGFloat)?
         var at = 0

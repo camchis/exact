@@ -42,6 +42,10 @@ package struct InlineText {
         value.text = props["text"] ?? ""
         if value.background != nil || style.backgroundRef != nil { value.backgroundBox = id } else { value.backgroundRadii = [] }
         value.href = props["href"] ?? ""
+        // The room its inline boxes take beside its text, as the kernel measured it ("start end").
+        if let edges = props["inlineEdges"]?.split(separator: " ").compactMap({ Float($0) }), edges.count == 2 {
+            value.inlineStart = CGFloat(edges[0]); value.inlineEnd = CGFloat(edges[1])
+        }
         // An image in the text is its box, with no ink or paint of its own (LLP 1011.002).
         boxShown = props["inlineBoxHidden"] != "true"
         if let box = InlineBox(prop: props["inlineBox"]) {
