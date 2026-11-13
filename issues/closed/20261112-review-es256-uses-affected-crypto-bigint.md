@@ -1,6 +1,7 @@
 # ES256 signing uses crypto-bigint covered by a timing advisory
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** ES256 signing moves to p256 0.14, whose elliptic-curve 0.14 resolves crypto-bigint 0.7.11, and the Apple host names the new series for feature unification.
 **Systems:** Cargo.lock, data/src/crypto/ecdsa.rs, host/apple/Cargo.toml
 **Author:** Codex
 **Date:** 2026-11-12
