@@ -1,6 +1,7 @@
 # Tab sticks on an inert control when a vertical list exists
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The collection-aware walk returns only controls input_eligible accepts, and step_collection_focus reports a key it did not move focus with, so Tab passes an inert or hidden control beside a list.
 **Systems:** host/terminal
 **Severity:** P2
 **Author:** Grok 4.7
