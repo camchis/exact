@@ -1104,9 +1104,6 @@ sits on that list carries the trade it would take.
   300 ms to DOM acceptance (9 ms plan), above the 100 ms budget. Use the existing
   metrics drive to separate startup/preflight work from repeated edit latency.
 
-- **Sample-host no-op input delay** (2026-09-04): `smoke.mjs host` passed but its
-  final repeated light-scheme tap after destroying session a waited 74–131 seconds.
-  Trace and GPU drawable samples are in the filesystem run; reduce the carrier/frame acknowledgement path.
 
 1. **Linux host follow-ups** (LLP 1015 landed 2026-08-29; r2 the same day: vello on
    the GPU is the main painter, tiny-skia the fallback and pixel oracle; green on
@@ -1687,7 +1684,6 @@ and the Linux headless CPU renderer without claiming display frame timing.
 
 
 - **Apple frame-health qualification (LLP 1079.000, 2026-10-28).** An iPhone 15 Pro on iOS 27.0.1 is connected; the minimal development app is installed and launched, with its running process verified. The minimal frame-health fixture and signed development/core/off builds are prepared locally. Use the phone when available and identify an above-120 Hz display. Run the independent presentation and observer off/on experiments, hidden/stationary/dragging overlay pairs, and energy/thermal checks. Callback/apply proxies and the debug scroll probe currently provide no presentation or battery certification. The card's own work in the app's frames has an opt-in benchmark (`FrameHealthCardCostIOSTests`, `EXACT_FRAME_HEALTH_BENCHMARK=1`) measured only on the simulator; run it and the overlay pairs on a phone over a full-window GPU canvas, a 60 Hz iPhone included, where the card's own work was 13 to 17 ms an update before it drew in bands and tiles (expo/exact#296).
-- **Apple smoke mismatches before the frame-health rebase (2026-10-28).** On the original 15e54de3e1 base and iPhone Duo/iOS 27.1, both timing arms hold the stationary row at −125 pt, then release to about −77/−79 and settle at −73; two stationary-release assertions fail. On macOS 27.2, the canvas reference differs at 1.63% of pixels beyond the band (mean 1.64). Compare against the branch baseline before assigning a cause; focused frame-health and agent UI tests pass.
 
 - **macOS live trackpad replay (LLP 1079.000, 2026-10-28).** Add a reliable completion acknowledgement for synthetic phased wheels before admitting them under platform timing. Immediate layout reads exposed zero or partial motion; posting the later phases first did not resolve it. The carrier currently refuses with `platform-trackpad-replay-unqualified`; ordinary wheels and frozen-clock functional replay remain available.
 - **A minimized frame-health card (LLP 1079.000 §7.2).** The card is opaque and takes the touches within its bounds, so on a phone it covers over a third of the app. A minimized form, resting in its corner as the card does, would leave the app usable while it watches.
