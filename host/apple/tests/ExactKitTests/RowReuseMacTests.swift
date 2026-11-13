@@ -232,7 +232,7 @@ final class RowReuseMacTests: XCTestCase {
     /// picture. A rebound image of another source shows the new one.
     func testAFloatingImagesWindowClosesWhenItsRowIsRebound() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("row-reuse-\(UUID().uuidString)")
-        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: root.appendingPathComponent("assets"), withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
         for (name, color) in [("even.png", NSColor.systemRed), ("odd.png", NSColor.systemBlue)] {
             let rep = try XCTUnwrap(NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 8, pixelsHigh: 8, bitsPerSample: 8, samplesPerPixel: 4,
@@ -241,13 +241,13 @@ final class RowReuseMacTests: XCTestCase {
             NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
             color.setFill(); NSRect(x: 0, y: 0, width: 8, height: 8).fill()
             NSGraphicsContext.restoreGraphicsState()
-            try XCTUnwrap(rep.representation(using: .png, properties: [:])).write(to: root.appendingPathComponent(name))
+            try XCTUnwrap(rep.representation(using: .png, properties: [:])).write(to: root.appendingPathComponent("assets").appendingPathComponent(name))
         }
         let previous = ExactApp.shared.assetRoot
         ExactApp.shared.assetRoot = root
         defer { ExactApp.shared.assetRoot = previous }
         let source = Self.source(count: 2_000).replacingOccurrences(
-            of: #"image (r % 2 == 0 ? "symbol:star" : "symbol:heart")"#, with: #"image (r % 2 == 0 ? "even.png" : "odd.png")"#)
+            of: #"image (r % 2 == 0 ? "symbol:star" : "symbol:heart")"#, with: #"image (r % 2 == 0 ? "assets/even.png" : "assets/odd.png")"#)
         let f = try TableFixture(count: 2_000, table: false, source: source)
         fixtures.append(f)
         func spin(_ note: String, _ done: () -> Bool) {
@@ -262,7 +262,7 @@ final class RowReuseMacTests: XCTestCase {
         for y in stride(from: CGFloat(300), through: 4_000, by: 337) { f.scroll(to: y) }
         XCTAssertTrue(f.presenter.views[row.id] === row && f.item(row) != 4, "item 4's row was rebound to item \(f.item(row))")
         XCTAssertFalse(PictureInPictureHost.floating.contains { $0.node === picture }, "the old item's window closed with its image")
-        let item = f.item(row), wanted = item % 2 == 0 ? "even.png" : "odd.png"
+        let item = f.item(row), wanted = item % 2 == 0 ? "assets/even.png" : "assets/odd.png"
         XCTAssertEqual(picture.imageSource, wanted)
         spin("the new item's picture loads") { picture.raster != nil }
     }
