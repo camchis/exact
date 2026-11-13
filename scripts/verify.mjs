@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 // `bun exact.mjs verify [web|ios|windows|android]` (LLP 1116.004 D7, 1116.005 D7; unnamed, a host the app ships, app-cli.mjs
-// `verifyHost`): one command a builder can stop on, where test,
+// `shippedHost`): one command a builder can stop on, where test,
 // drives, check and screenshots were three to five turns. It builds when the build is stale (web: the dist's
 // record against its sources, as the driver checks it; iOS: agent-build.mjs `buildFirst`, the plan fast path
 // included), runs the app's tests (app.test.contract and each other `*.test.contract` beside it, app.mjs
@@ -47,7 +47,7 @@ import { createRequire } from 'node:module';
 import { availableParallelism, loadavg, networkInterfaces } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { findings as feelFindings, summary as feelSummary } from '../host/apple/feel/analyze.mjs';
-import { compilerWarnings, information, verifyHost, windowsWindow } from './app-cli.mjs';
+import { compilerWarnings, information, shippedHost, windowsWindow } from './app-cli.mjs';
 import { guardFlags } from './help.mjs';
 import { holderOf, takePort } from './port-lock.mjs';
 import { backendOriginSelection, privateNetwork, selectBackendOrigin } from '../js/bake/src/typescript.mjs';
@@ -1328,7 +1328,7 @@ async function deviceMain(argv, emitJSON, declined, ended) {
   const flagged = new Set([args.indexOf('--app') + 1, args.indexOf('--sim') + 1, args.indexOf('--shots') + 1].filter((i) => i > 0));
   const { resolveApp } = await import('./app.mjs');
   const app = resolveApp(value('--app'));
-  const named = args.find((a, i) => !a.startsWith('-') && !flagged.has(i)), chosen = named ? { host: named } : verifyHost(app.manifest);
+  const named = args.find((a, i) => !a.startsWith('-') && !flagged.has(i)), chosen = named ? { host: named } : shippedHost('verify', app.manifest);
   // No platform the app ships has a leg here: the semantics check runs alone, and the run says so.
   if (!chosen.host) {
     if (json) emitJSON({ host: null, skipped: chosen.why, problems: 0, exit: 0 }); else ended(`verify: ${chosen.why}`);

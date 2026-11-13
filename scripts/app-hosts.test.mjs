@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { hostOf, verifyHost } from './app-cli.mjs';
+import { hostOf, shippedHost } from './app-cli.mjs';
 import { main } from './agent.mjs';
 
 // The host before `test`'s files and `agent`'s ops is optional: a word is taken as the host only when it names one, so
@@ -18,11 +18,11 @@ test('the first word is the host only when it names one', () => {
   }
 });
 
-// A verify that names no host checks one the app ships (#402): app.json's `host`, `deploy.store` and `deploy.binaries`,
-// as the build and deploy read them. The web is an app's only when it names the web or names nothing.
-test("a verify that names no host runs on one the app's manifest names", () => {
+// A test, agent or verify that names no host runs on one the app ships (#402): app.json's `host`, `deploy.store` and
+// `deploy.binaries`, as the build and deploy read them. The web is an app's only when it names the web or names nothing.
+test("a drive that names no host runs on one the app's manifest names", () => {
   const native = { host: { ios: {}, macos: {} }, deploy: { store: { ios: '0', macos: '0' } } };
-  for (const [manifest, os, host] of [
+  for (const [manifest, os, verify, drive = verify] of [
     [{}, 'darwin', 'web'],
     [{ host: {}, deploy: {} }, 'linux', 'web'],
     [{ host: { web: {} }, deploy: { store: { web: '0' } } }, 'darwin', 'web'],
@@ -33,24 +33,52 @@ test("a verify that names no host runs on one the app's manifest names", () => {
     [{ host: { ios: {}, android: {} } }, 'linux', 'android'],
     [{ host: { ios: {}, windows: {} } }, 'win32', 'windows'],
     [{ host: { ios: {}, windows: {} } }, 'darwin', 'ios'],
+    // test and agent drive the Mac and the headless Linux host too, which verify has no leg for.
+    [{ host: { macos: {} } }, 'darwin', null, 'macos'],
+    [{ host: { macos: {}, linux: {} } }, 'linux', null, 'linux'],
+    [{ host: { linux: {}, android: {} } }, 'darwin', 'android', 'linux'],
+    [native, 'win32', null],
+    [{ host: { tvos: {} } }, 'darwin', null],
   ]) {
-    expect([JSON.stringify(manifest), os, verifyHost(manifest, os).host]).toEqual([JSON.stringify(manifest), os, host]);
-    const rest = ['--strict'];
-    expect(hostOf('verify', rest, manifest, os)).toBe(host);
-    expect(rest).toEqual(['--strict']);
+    for (const [verb, host] of [['verify', verify], ['test', drive], ['agent', drive]]) {
+      expect([verb, JSON.stringify(manifest), os, shippedHost(verb, manifest, os).host]).toEqual([verb, JSON.stringify(manifest), os, host]);
+      const rest = ['--strict'];
+      expect(hostOf(verb, rest, manifest, os)).toBe(host);
+      expect(rest).toEqual(['--strict']);
+    }
   }
-  // A host named on the command line is the run's, whatever the manifest says; test and agent stay the web's.
-  expect(hostOf('verify', ['web'], native, 'darwin')).toBe('web');
-  expect(hostOf('test', ['app.test.contract'], native, 'darwin')).toBe('web');
-  // With no platform verify drives here, there is no device leg, and the line says why.
-  for (const [manifest, os, why] of [[native, 'win32', /names ios, macos and not the web.*ios: its simulator needs macOS; macos: verify has no leg for it/],
-    [{ host: { macos: {} } }, 'darwin', /names macos and not the web/], [{ host: { windows: {} } }, 'linux', /windows: it runs on Windows/]]) {
-    const chosen = verifyHost(manifest, os);
+  // A host named on the command line is the run's, whatever the manifest says; another verb's is the web's.
+  for (const verb of ['verify', 'test', 'agent']) expect(hostOf(verb, ['web'], native, 'darwin')).toBe('web');
+  expect(hostOf('test', ['app.test.contract'], native, 'darwin')).toBe('ios');
+  expect(hostOf('build', [], native, 'darwin')).toBe('web');
+  // With none it drives here, the line says why, and what follows for the verb.
+  for (const [verb, manifest, os, why] of [['verify', native, 'win32', /names ios, macos and not the web.*ios: its simulator needs macOS; macos: verify has no leg for it.*so only the semantics check runs$/],
+    ['verify', { host: { macos: {} } }, 'darwin', /names macos and not the web/], ['verify', { host: { windows: {} } }, 'linux', /windows: it runs on Windows/],
+    ['test', native, 'win32', /ios: its simulator needs macOS; macos: it needs macOS\), so test runs nowhere unless named \(`test web` runs it on the web anyway\)$/],
+    ['agent', { host: { tvos: {} } }, 'darwin', /tvos: agent has no host for it/]]) {
+    const chosen = shippedHost(verb, manifest, os);
     expect(chosen.host).toBeNull();
     expect(chosen.why).toMatch(why);
-    expect(hostOf('verify', [], manifest, os)).toBeNull();
+    expect(hostOf(verb, [], manifest, os)).toBeNull();
   }
 });
+
+// End to end: a test or agent with no host the app ships here refuses before it builds anything, and says why.
+test('a drive with no host the app ships here refuses and says why', async () => {
+  const { createApp } = await import('../game/new.mjs');
+  const root = mkdtempSync(resolve(tmpdir(), 'exact-drive-host-')), dir = resolve(root, 'tv-only');
+  try {
+    createApp(dir);
+    const manifest = JSON.parse(readFileSync(resolve(dir, 'app.json'), 'utf8'));
+    writeFileSync(resolve(dir, 'app.json'), JSON.stringify({ ...manifest, host: { tvos: {} }, deploy: {} }, null, 2));
+    for (const verb of ['test', 'agent']) {
+      const r = spawnSync(process.execPath, [resolve(dir, 'exact.mjs'), verb, ...(verb === 'agent' ? ['tree'] : [])], { cwd: dir, encoding: 'utf8', timeout: 60_000, env: { ...process.env, EXACT_FEEDBACK: '0' } });
+      expect([verb, r.status]).toEqual([verb, 2]);
+      expect(r.stderr).toMatch(new RegExp(`^${verb}: app\\.json names tvos and not the web, .*\\(\`${verb} web\` runs it on the web anyway\\)$`, 'm'));
+      expect(existsSync(resolve(dir, 'dist'))).toBe(false);
+    }
+  } finally { rmSync(root, { recursive: true, force: true }); }
+}, 120_000);
 
 // End to end: an app that ships only the Mac app runs the semantics check alone, and builds and drives no web.
 test('verify of an app that ships no host verify drives builds nothing and says so', () => {

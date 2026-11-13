@@ -11,31 +11,37 @@ import { noteBunLoaded } from '../js/bake/src/__exact_env.mjs';
 /** The hosts a `test`, `agent` or `verify` may name first. */
 const APP_HOSTS = ['web', 'ios', 'macos', 'mac', 'linux', 'windows', 'android'];
 /** The host `verb` runs on, taken off `rest` when its first word names one (help's optional `[web|ios|…]`): a test
- *  file or an op written first stays where it is, and the run is the web's, but a `verify`'s is the one the app ships
- *  (`verifyHost`; null when none of them is a verify leg here). */
+ *  file or an op written first stays where it is, and the run is on a host the app ships (`shippedHost`; null when
+ *  none drives here). */
 export const hostOf = (verb, rest, manifest = {}, os = process.platform) => ['test', 'agent', 'verify'].includes(verb) && APP_HOSTS.includes(rest[0]) ? rest.shift()
-  : verb === 'verify' ? verifyHost(manifest, os).host : 'web';
+  : ['test', 'agent', 'verify'].includes(verb) ? shippedHost(verb, manifest, os).host : 'web';
 
-/** The platforms `verify` drives other than the web, each with whether it drives on `os` and, when not, why. */
-const VERIFY_LEGS = {
+/** The platforms other than the web that a verb drives, each with whether it drives on `os` and, when not, why:
+ *  `verify` has legs for three; `test` and `agent` drive every host the driver carries (scripts/agent.mjs). */
+const LEGS = {
   ios: (os) => os === 'darwin' || 'its simulator needs macOS',
+  macos: (os, verb) => verb === 'verify' ? 'verify has no leg for it' : os === 'darwin' || 'it needs macOS',
   windows: (os) => os === 'win32' || 'it runs on Windows',
+  linux: (os, verb) => verb === 'verify' ? 'verify has no leg for it' : true,
   android: () => true,
 };
 
-/** The host a `verify` that names none runs on: the web when the manifest names it (`host.web`, a web store or binary)
- *  or names no platform at all, as an app `exact new` made does; else the first platform the manifest names (under
- *  `host`, `deploy.store` or `deploy.binaries`, as the build and deploy read them) that verify drives on `os`, this
- *  machine's own first. With none, `host` is null and `why` says so in a line: the device leg is skipped, since a
- *  web leg would check a host the app does not ship. */
-export function verifyHost(manifest, os = process.platform) {
+/** The host a `test`, `agent` or `verify` that names none runs on: the web when the manifest names it (`host.web`, a
+ *  web store or binary) or names no platform at all, as an app `exact new` made does; else the first platform the
+ *  manifest names (under `host`, `deploy.store` or `deploy.binaries`, as the build and deploy read them) that the verb
+ *  drives on `os`, this machine's own first. With none, `host` is null and `why` says so in a line: a web run would
+ *  check a host the app does not ship. */
+export function shippedHost(verb, manifest, os = process.platform) {
   const named = new Set([manifest?.host, manifest?.deploy?.store, manifest?.deploy?.binaries].flatMap((table) => Object.keys(table ?? {})));
   if (!named.size || named.has('web')) return { host: 'web' };
-  const order = os === 'win32' ? ['windows', 'ios', 'android'] : ['ios', 'windows', 'android'];
-  const host = order.find((p) => named.has(p) && VERIFY_LEGS[p](os) === true);
+  const own = { darwin: ['ios', 'macos'], win32: ['windows'], linux: ['linux'] }[os] ?? [];
+  const order = [...new Set([...own, 'ios', 'macos', 'windows', 'linux', 'android'])];
+  const leg = (p) => p in LEGS ? LEGS[p](os, verb) : `${verb} has no host for it`;
+  const host = order.find((p) => named.has(p) && leg(p) === true);
   if (host) return { host };
-  const reasons = [...named].map((p) => p in VERIFY_LEGS ? `${p}: ${VERIFY_LEGS[p](os)}` : `${p}: verify has no leg for it`);
-  return { host: null, why: `app.json names ${[...named].join(', ')} and not the web, and none is a verify leg here (${reasons.join('; ')}), so only the semantics check runs` };
+  const reasons = [...named].map((p) => `${p}: ${leg(p)}`).join('; ');
+  const then = verb === 'verify' ? 'so only the semantics check runs' : `so ${verb} runs nowhere unless named (\`${verb} web\` runs it on the web anyway)`;
+  return { host: null, why: `app.json names ${[...named].join(', ')} and not the web, and none drives here (${reasons}), ${then}` };
 }
 
 /** The compiler's warnings in what a build said (LLP 1116.004 D7), each once as `contract build` prints
@@ -234,7 +240,8 @@ async function verbRun({ dir, name, game = false, exact2, args }, reply) {
     reply({ code: 'app_json', error: message });
     return 1;
   }
-  const host = hostOf(verb, rest, declared);
+  // A game's hosts are its bake's (game/README.md): its drives stay the web's unless named.
+  const host = hostOf(verb, rest, game ? {} : declared);
   const verbs = appVerbs(name, dir, { host, game });
   const own = declared.commands ?? {};
   const clash = Object.keys(own).find((name) => verbs[name]);
@@ -285,6 +292,13 @@ async function verbRun({ dir, name, game = false, exact2, args }, reply) {
     for (const line of feedback.nudge(dir, { verb, host, exit, ms: Date.now() - started, args: rest, interrupted })) console.error(line);
   } catch {}
   return exit; };
+  // A drive with no host the app ships here runs nowhere, and says why (verify runs its semantics check alone).
+  if (host === null && verb !== 'verify') {
+    const { why } = shippedHost(verb, declared);
+    console.error(`${verb}: ${why}`);
+    reply?.({ code: 'platform_refused', error: why });
+    return log(2);
+  }
   // A build verb's `--json` (`reply`): one object on stdout, and the build's output on stderr. A failure is
   // `{code, error}`, as share's, with a non-zero status. It reports a finished artifact, so it takes no launch, no build
   // left running and no test run; and a flag the build's script refuses is refused before anything is built.
