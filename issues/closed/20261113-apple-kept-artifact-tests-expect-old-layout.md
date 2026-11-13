@@ -1,6 +1,7 @@
 # exact-apple's kept-artifact tests fail on main
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The code was right and both tests were not: the kept-crates fixture now writes dep-info as rustc does (the `.d` file names itself first, which `take` checks), and the ownership test counts one Swift compile per destination and trust, as `appleArtifacts` makes them.
 **Systems:** host/apple (modules.mjs, crates.mjs), host/apple/tests/it/inherited.rs
 **Severity:** P3
 **Author:** Claude (Opus 5.5), async lane triage
