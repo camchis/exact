@@ -1,6 +1,7 @@
 # A completed clock held leaves its deadline keeping the process alive
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** Each clock held look clears its losing deadline timer when the race settles, so a finished wait no longer keeps the process alive until its bound.
 **Systems:** scripts/agent-held.mjs, programmatic agent driver
 **Author:** Codex
 **Date:** 2026-11-12
