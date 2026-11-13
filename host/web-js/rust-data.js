@@ -2,13 +2,14 @@ import { admitsSecret, createRequestExecutor, fetchHostAsset, sameGrantDeclarati
 import { rustGrantSet, tsGrantSet } from './admission-data.js';
 import { boundedHttpBody, longPollRefusal, streamed } from './http-body.js';
 import { rt } from './rt-link.js'; // (rt.js's own, as a lazy chunk takes them)
-// A Rust data module on the JS runtime (LLP 1029.000's seam, ABI 9,
+import { heldReply } from './held.js';
+// A Rust data module on the JS runtime (LLP 1029.000's seam, ABI 10,
 // `logic/abi/src/lib.rs`): the app's importless module wasm and its plan's
 // declarations (`app.bind.plan`, the plan without the bake's answers),
 // fetched after first pixel; once bound and activated, every answer is a
 // synchronous call, as the runner's `DataSource::answer` is. Until then the
 // runtime shows its compiled value or placeholder and asks again at `ready`.
-const ABI = 9, utf8 = new TextEncoder(), text = new TextDecoder();
+const ABI = 10, utf8 = new TextEncoder(), text = new TextDecoder(), CALL = Symbol('call');
 
 function writer() {
   let buf = new Uint8Array(256), at = 0;
@@ -92,6 +93,9 @@ export async function install(data, sources, load = p => fetchHostAsset(p).then(
   // A result (`read_result`): now, or an HTTP request for the host to run.
   const result = r => {
     let tag = r.u8(), cache;
+    // A held mark (tag 15, LLP 1016.000 D9) wraps the HTTP result and its other markers.
+    const held = tag === 15;
+    if (held) { tag = r.u8(); if (![1, 6, 9, 10, 11, 12, 13, 14].includes(tag)) throw new Error('invalid held HTTP result'); }
     const prefetch = tag === 14;
     if (prefetch) { tag = r.u8(); if (![1, 12, 13].includes(tag)) throw new Error('invalid prefetch HTTP result'); }
     if (tag === 13) {
@@ -124,7 +128,9 @@ export async function install(data, sources, load = p => fetchHostAsset(p).then(
       const pollRefusal = longPoll && longPollRefusal({ url, longPoll, stream: true }, method, n ? 'x' : '');
       if (pollRefusal) throw new Error(pollRefusal);
       // `cancel`: a read, which the commit that lets its ticket go aborts (request-send.js); a write runs to its end.
-      return { req: { method, url, headers, cache, ...(prefetch ? { prefetch: true } : {}), body: text.decode(body), raw: body, http, maxResponseBytes: http === 'ordered' ? undefined : Number(http.split(':')[1]), scope: scoped ? scope : null, stream: tag >= 9, cancel: tag < 9 && /^(GET|HEAD)$/i.test(method), socket: tag === 11, protocols, longPoll } };
+      // `http` is what resources.js `sameReq` compares beyond the request itself: its scheduling and its held mark, so
+      // an in-flight request is not kept for newer arguments whose request differs only in being held.
+      return { req: { method, url, headers, cache, ...(prefetch ? { prefetch: true } : {}), held, body: text.decode(body), raw: body, http: held ? `${http} held` : http, maxResponseBytes: http === 'ordered' ? undefined : Number(http.split(':')[1]), scope: scoped ? scope : null, stream: tag >= 9, cancel: tag < 9 && /^(GET|HEAD)$/i.test(method), socket: tag === 11, protocols, longPoll } };
     }
     // Storage work (LLP 1027.001 D2): a portable request the host runs
     // through the web host's own `storage-request.js`, under its scope.
@@ -242,7 +248,23 @@ export async function install(data, sources, load = p => fetchHostAsset(p).then(
     else out.effects = [sending(ops, turn)];
     return out;
   };
-  const rust = (source, args, store, target, mutation) => callWith(3, source, args, store, null, mutation ? { mutation, verb: 'send', name: target } : null);
+  // A held request (`Request::held()`, LLP 1016.000 D9) on the page. Each answer's HTTP request that is not a stream
+  // has a call, as a TypeScript answer has (ts-fetch.js), whose `held` is 1 while its request is held and out: held.js
+  // then leaves the ticket out of every clock and names it, and a store write asks it again at once (resources.js
+  // `openEnded`). A request that a reply's parse asks for goes out on the same ticket, so it takes the same call
+  // (`CALL`, carried on the request and on the outcome that is parsed). A render waits for every request, held or not
+  // (held.js `counted`), so it makes no call.
+  const carry = (req, call) => {
+    if (!call || !req?.method || req.stream) return false;
+    call.held = req.held ? 1 : 0;
+    req[CALL] = call;
+    return true;
+  };
+  const rust = (source, args, store, target, mutation) => {
+    const out = callWith(3, source, args, store, null, mutation ? { mutation, verb: 'send', name: target } : null), call = {};
+    if (!globalThis.__exactRender && carry(out.req, call)) out.call = call;
+    return out;
+  };
   const ts = data.ts, tsThrewRead = data.threwRead;
   data.threwRead = () => { const read = [threwRead, !!tsThrewRead?.()]; threwRead = false; return read[0] || read[1]; };
   data.answer = ts ? (source, args, store, target, mutation, forced) => { try { return rust(source, args, store, target, mutation); } catch (e) { if (e.unknown) return ts(source, args, store, target, mutation, forced); throw e; } } : rust;
@@ -250,7 +272,11 @@ export async function install(data, sources, load = p => fetchHostAsset(p).then(
   // one's answer theirs; one that answers with a request (the stream asked again) ends them there.
   // A two-way socket's `open` or frame is its own mapper's turn (LLP 1016.003 D4): it may send on that socket.
   data.parse = (source, args, outcome, store) => {
-    if (!outcome.streamed) return callWith(4, source, args, store, outcome);
+    if (!outcome.streamed) {
+      const out = callWith(4, source, args, store, outcome);
+      carry(out.req, outcome[CALL]);
+      return out;
+    }
     let out, read = false;
     const effects = [];
     for (const m of outcome.streamed) {
@@ -295,7 +321,16 @@ export async function install(data, sources, load = p => fetchHostAsset(p).then(
   // its messages names its socket for `parse`. A mutation's socket has no mapper to send, and only listens.
   const run = createRequestExecutor(data.appId ?? meta[0], rustGrantSet, boundedHttpBody);
   data.fetch = (req, message, controller) => {
-    if (!req.stream) return run(req, controller?.signal);
+    if (!req.stream) {
+      const call = req[CALL];
+      if (!call) return run(req, controller?.signal);
+      // A held request's reply, a failure too, is a held reply for `clock held` (the runner's `held_replies`).
+      return run(req, controller?.signal).then(o => {
+        if (call.held) { call.held = 0; heldReply(call); }
+        o[CALL] = call;
+        return o;
+      });
+    }
     let socket = null;
     const protocol = req.socket && controller.resource ? { socket: transport => {
       socket = { transport, controller, id: idOf(controller.owner), ticket: controller.ticket, name: controller.streamName, unsent: 0 };

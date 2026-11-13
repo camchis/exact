@@ -189,7 +189,7 @@ test('a render refuses a Rust storage request after validating its scope', async
 test("a Rust source's store read reaches rt.js whether its call answers or fails", async () => {
   const dir = mkdtempSync(resolve(tmpdir(), 'exact-rust-readers-'));
   const set = normalized('secret.keep k');
-  for (const name of ['rust-data.js', 'admission.js']) {
+  for (const name of ['rust-data.js', 'admission.js', 'held.js']) {
     const source = readFileSync(resolve(ROOT, 'host/web-js', name), 'utf8').replace(/'\.\.\/web\/([a-z-]+\.js)'/g, "'./$1'");
     writeFileSync(resolve(dir, name), source);
   }
@@ -197,12 +197,13 @@ test("a Rust source's store read reaches rt.js whether its call answers or fails
   writeFileSync(resolve(dir, 'admission-data.js'), `import {createGrantSet} from './admission.js';export const rustGrantSet=createGrantSet(${JSON.stringify(set)}),tsGrantSet=createGrantSet(${JSON.stringify(normalized(''))});\n`);
   writeFileSync(resolve(dir, 'rt-link.js'), 'export const rt = {};\n');
   const memory = new WebAssembly.Memory({ initial: 1 }), out = 32768;
-  let output = new Uint8Array(), read = false, fails = false, unknown = false, socket = false, writes = false, cache, preload, prefetch = false, method = 'GET', abi = 9;
+  let output = new Uint8Array(), read = false, fails = false, unknown = false, socket = false, writes = false, cache, preload, prefetch = false, method = 'GET', abi = 10;
+  let held = false, heldTag;
   const scopes = [];
   const response = fill => {
     const bytes = [], u8 = value => bytes.push(value), u32 = value => bytes.push(value & 255, value >>> 8 & 255, value >>> 16 & 255, value >>> 24 & 255);
     const string = value => { const encoded = new TextEncoder().encode(value); u32(encoded.length); bytes.push(...encoded); };
-    u32(9); fill({ u8, u32, string }); output = Uint8Array.from(bytes); new Uint8Array(memory.buffer, out, output.length).set(output);
+    u32(10); fill({ u8, u32, string }); output = Uint8Array.from(bytes); new Uint8Array(memory.buffer, out, output.length).set(output);
   };
   const exports = {
     memory, exact_logic_abi: () => abi, exact_logic_create: () => 1, exact_logic_alloc: () => 0, exact_logic_dealloc() {},
@@ -224,6 +225,8 @@ test("a Rust source's store read reaches rt.js whether its call answers or fails
           w.u8(2); w.u8(read ? 1 : 0); w.u32(writes ? 1 : 0);
           if (writes) { w.string('k'); w.u8(1); w.string('private'); }
           w.u32(0); w.u8(0); w.string('');
+          if (held) w.u8(15);
+          if (heldTag !== undefined) { w.u8(heldTag); return; }
           if (prefetch) w.u8(14);
           if (preload !== undefined) { w.u8(13); w.string(preload); }
           if (socket) { if (cache !== undefined) { w.u8(12); w.string(cache); } w.u8(11); w.u32(1 << 20); w.u8(0); w.string(''); w.string('GET'); w.string('wss://api.example/book'); w.u32(0); w.u32(0); w.u32(0); } else if (unknown) { w.u8(2); w.string('reader'); } else if (fails) { w.u8(3); w.string('nothing kept'); } else { if (cache !== undefined) { w.u8(12); w.string(cache); } w.u8(1); w.u8(0); w.string(''); w.string(method); w.string('https://api.example/me'); w.u32(0); w.u32(0); }
@@ -239,13 +242,16 @@ test("a Rust source's store read reaches rt.js whether its call answers or fails
   try {
     const module = await import(`${pathToFileURL(resolve(dir, 'rust-data.js')).href}?readers=${Date.now()}`);
     const kept = [], data = { q: [] }, store = { map: new Map(), set(...write) { kept.push(write); } }, failed = { failed: 3, message: 'refused' };
-    abi = 8;
-    await expect(module.install(data, { reader: '' }, async () => new ArrayBuffer(0))).rejects.toThrow('Rust module ABI 8 is not 9');
     abi = 9;
+    await expect(module.install(data, { reader: '' }, async () => new ArrayBuffer(0))).rejects.toThrow('Rust module ABI 9 is not 10');
+    abi = 10;
     await module.install(data, { reader: '' }, async () => new ArrayBuffer(0));
     for (const mode of ['default', 'no-store', 'reload', 'no-cache', 'force-cache', 'only-if-cached']) {
       cache = mode;
       expect(data.answer('reader', [], store).req.cache).toBe(mode);
+      held = true;
+      expect(data.answer('reader', [], store).req).toMatchObject({ held: true, cache: mode });
+      held = false;
     }
     for (const mode of [undefined, 'force-cache']) {
       preload = 'feed-2'; cache = mode;
@@ -258,6 +264,9 @@ test("a Rust source's store read reaches rt.js whether its call answers or fails
         preload = name; cache = mode;
         const req = data.answer('reader', [], store).req;
         expect([req.url, req.cache, req.prefetch]).toEqual(['https://api.example/me', mode, true]);
+        held = true;
+        expect(data.answer('reader', [], store).req).toMatchObject({ held: true, prefetch: true, cache: mode });
+        held = false;
       }
     }
     prefetch = false;
@@ -272,6 +281,37 @@ test("a Rust source's store read reaches rt.js whether its call answers or fails
     expect(() => data.answer('reader', [], store)).toThrow('invalid preload HTTP result');
     preload = undefined;
     cache = undefined;
+    held = true;
+    expect(data.answer('reader', [], store).req).toMatchObject({ held: true, method: 'GET' });
+    writes = true;
+    for (const tag of [0, 2, 3, 4, 5, 7, 8, 15, 255]) {
+      heldTag = tag;
+      expect(() => data.answer('reader', [], store)).toThrow('invalid held HTTP result');
+      expect(kept).toEqual([]);
+    }
+    heldTag = undefined; writes = false; held = false;
+    // On the page each request carries a call whose `held` held.js counts, and `http` tells a held request from the
+    // same one unheld (resources.js `sameReq`); a render makes no call. A held request's reply (a refusal here: no
+    // grant covers its origin) is a held reply, and a request its parse asks for takes the same call.
+    const heldJs = await import(pathToFileURL(resolve(dir, 'held.js')).href);
+    held = true;
+    const asked = data.answer('reader', [], store);
+    held = false;
+    const unheld = data.answer('reader', [], store);
+    expect([asked.call, unheld.call, asked.req.http, unheld.req.http]).toEqual([{ held: 1 }, { held: 0 }, 'ordered held', 'ordered']);
+    globalThis.__exactRender = true; held = true;
+    expect(data.answer('reader', [], store)).not.toHaveProperty('call');
+    globalThis.__exactRender = false;
+    const ticket = { name: 'reader' };
+    ticket.owner = { ticket };
+    asked.call.ticket = ticket;
+    const outcome = await data.fetch({ ...asked.req });
+    expect([outcome.failed, asked.call.held, heldJs.heldReplies()]).toEqual([2, 0, { reader: 1 }]);
+    expect(data.parse('reader', [], outcome, store).req.held).toBe(true);
+    expect(asked.call.held).toBe(1);
+    held = false;
+    expect(data.parse('reader', [], outcome, store).req.held).toBe(false);
+    expect(asked.call.held).toBe(0);
     [read, fails] = [true, false];
     expect(data.answer('reader', [], store).store).toBe(true);
     expect(data.parse('reader', [], failed, store).store).toBe(true);
@@ -329,7 +369,7 @@ test("a Rust source's store read reaches rt.js whether its call answers or fails
 // A Rust long poll's reply that is no event (LLP 1016.000 D8): the reader counts it, and rust-data.js lands nothing of it.
 test("a Rust long poll's reply that is no event reaches no message", async () => {
   const dir = mkdtempSync(resolve(tmpdir(), 'exact-rust-poll-'));
-  for (const name of ['rust-data.js', 'admission.js']) {
+  for (const name of ['rust-data.js', 'admission.js', 'held.js']) {
     const source = readFileSync(resolve(ROOT, 'host/web-js', name), 'utf8').replace(/'\.\.\/web\/([a-z-]+\.js)'/g, "'./$1'");
     writeFileSync(resolve(dir, name), source);
   }
@@ -346,12 +386,12 @@ export function streamed(req, _grants, message) {
   const memory = new WebAssembly.Memory({ initial: 1 }), out = 32768;
   let output = new Uint8Array();
   const exports = {
-    memory, exact_logic_abi: () => 9, exact_logic_create: () => 1, exact_logic_alloc: () => 0, exact_logic_dealloc() {},
+    memory, exact_logic_abi: () => 10, exact_logic_create: () => 1, exact_logic_alloc: () => 0, exact_logic_dealloc() {},
     exact_logic_output: () => out, exact_logic_output_len: () => output.length,
     exact_logic_call(_session, pointer) {
       const code = new Uint8Array(memory.buffer)[pointer + 4], bytes = [];
       const u32 = v => bytes.push(v & 255, v >>> 8 & 255, v >>> 16 & 255, v >>> 24 & 255), string = v => { const e = new TextEncoder().encode(v); u32(e.length); bytes.push(...e); };
-      u32(9);
+      u32(10);
       if (code === 0) { bytes.push(0); string('test.rust'); string(''); } else bytes.push(0, 0, 3);
       output = Uint8Array.from(bytes); new Uint8Array(memory.buffer, out, output.length).set(output);
       return 0;
@@ -376,7 +416,7 @@ export function streamed(req, _grants, message) {
   }
 });
 
-test('a forced Rust resource keeps forcing parser-created requests and tickets after a stream message', async () => {
+test('a forced Rust resource keeps forcing parser-created requests and tickets after a stream message, and preserves held changes and store invalidation', async () => {
   const { stageHostGlue, bundleHostModule, localImports } = await import('./glue.mjs');
   const { createDocument } = await import('./dom.js');
   const vm = await import('node:vm');
@@ -395,19 +435,36 @@ test('a forced Rust resource keeps forcing parser-created requests and tickets a
     const built = await Bun.build({ entrypoints: [resolve(dir, 'entry.js')], format: 'iife', target: 'browser', define: { 'import.meta.url': '"https://example.test/app.js"' } });
     expect(built.success, String(built.logs)).toBe(true);
     const code = await built.outputs[0].text();
-    for (const stream of [false, true]) {
+    for (const kind of ['request', 'stream', 'held']) {
       const ctx = vm.createContext({
         document: createDocument(), location: new URL('https://example.test/'), navigator: {},
         __exactRender: true, console, performance, setTimeout, clearTimeout, queueMicrotask,
         addEventListener() {}, removeEventListener() {}, requestAnimationFrame: () => 0,
         getComputedStyle: () => ({ fontSize: '16px' }),
         TextEncoder, TextDecoder, URL, URLSearchParams, AbortController,
-        stream,
+        stream: kind === 'stream', heldCase: kind === 'held',
       });
       ctx.globalThis = ctx; ctx.self = ctx;
       vm.runInContext(code, ctx);
       const result = await vm.runInContext(`(async () => {
         const sent = [];
+        if (heldCase) {
+          // What rust-data.js answers on the page (rust-readers' first test): a held request's \`http\` says it is held,
+          // and its call counts it out.
+          globalThis.__exactRender = false;
+          const marked = rt.sig(true);
+          rt.data.answer = (_source, args) => ({ store: true, call: { held: args[0] ? 1 : 0 }, req: { method: 'GET', url: '/same', held: args[0], http: args[0] ? 'ordered held' : 'ordered' } });
+          rt.data.fetch = req => { sent.push(req.held); return new Promise(() => {}); };
+          rt.mount(() => {
+            const value = rt.res('value', 'rust', () => [marked()], undefined, undefined, 's', '');
+            rt.effect(() => value());
+          });
+          rt.commit(() => rt.W(marked, false));
+          rt.commit(() => rt.W(marked, true));
+          rt.Store.set('token', 'renewed');
+          await new Promise(queueMicrotask);
+          return JSON.stringify(sent);
+        }
         let value, finish;
         const done = new Promise(resolve => { finish = resolve; });
         rt.data.answer = () => ({ req: { method: 'GET', url: '/first', cache: 'force-cache', stream } });
@@ -429,7 +486,9 @@ test('a forced Rust resource keeps forcing parser-created requests and tickets a
         await done;
         return JSON.stringify(sent);
       })()`, ctx);
-      expect(JSON.parse(result)).toEqual([{ url: '/first', forced: true }, { url: '/next', forced: true }]);
+      expect(JSON.parse(result)).toEqual(kind === 'held'
+        ? [true, false, true, true]
+        : [{ url: '/first', forced: true }, { url: '/next', forced: true }]);
     }
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });

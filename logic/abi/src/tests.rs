@@ -516,23 +516,136 @@ fn a_body_to_a_file_is_refused_at_the_module_seam() {
     ));
 }
 
-/// A held mark (LLP 1016.000 D9) has no encoding at the seam: refused, never
-/// silently turned into a request a clock waits on.
 #[test]
-fn a_held_request_is_refused_at_the_module_seam() {
-    let mut encoded = Writer::default();
+fn a_held_request_crosses_the_module_seam() {
+    let url = "https://example.test/changes";
+    for mut request in [
+        Request::get(url),
+        Request::post_json(url, "body"),
+        Request::get(url).independent_http(4096),
+        Request {
+            stream: true,
+            ..Request::get(url).independent_http(4096)
+        },
+        Request {
+            stream: true,
+            ..Request::get(url)
+                .independent_http(4096)
+                .long_poll("since", "seq")
+        },
+        Request::socket("wss://example.test/changes")
+            .protocols(["chat.v1"])
+            .unwrap(),
+    ] {
+        request.grants = Some("net.fetch https://example.test".into());
+        request
+            .headers
+            .push(("Authorization".into(), "Bearer token".into()));
+        for held in [false, true] {
+            request.held = held;
+            for cache in [CacheMode::Unspecified, CacheMode::Reload] {
+                if request.socket && cache != CacheMode::Unspecified {
+                    continue;
+                }
+                request.cache = cache;
+                let mut encoded = Writer::default();
+                encode_result(&mut encoded, Ok(Answer::Later(request.clone())));
+                let bytes = encoded.into_vec();
+                assert_eq!(bytes[0] == 15, held);
+                let mut reader = Reader::new(&bytes);
+                let Ok(Answer::Later(decoded)) = read_result(&mut reader).unwrap() else {
+                    panic!("an HTTP request");
+                };
+                assert_eq!(decoded, request);
+                assert_eq!(decoded.is_held(), held && !request.stream);
+                assert_eq!(decoded.has_effects(), request.method == "POST" && !held);
+                end(&reader).unwrap();
+            }
+        }
+    }
+    // The held mark wraps prefetch and preload, which wrap the cache mode.
+    for prefetch in [false, true] {
+        for named in [false, true] {
+            let mut request = Request::get(url).held().cache(CacheMode::ForceCache);
+            if prefetch {
+                request = request.prefetch();
+            }
+            if named {
+                request = request.preload("feed").unwrap();
+            }
+            let mut encoded = Writer::default();
+            encode_result(&mut encoded, Ok(Answer::Later(request.clone())));
+            let bytes = encoded.into_vec();
+            assert_eq!(bytes[0], 15);
+            let mut reader = Reader::new(&bytes);
+            assert_eq!(
+                read_result(&mut reader).unwrap(),
+                Ok(Answer::Later(request))
+            );
+            end(&reader).unwrap();
+        }
+    }
+}
+
+#[test]
+fn invalid_held_results_are_refused_before_effects() {
+    let prefix = || {
+        let mut w = header(2);
+        w.u8(1);
+        w.u32(1);
+        w.string("token");
+        w.u8(1);
+        w.string("private");
+        w.u32(0); // socket operations
+        w.u8(0);
+        w.string("");
+        w
+    };
+    let check = |data: &[u8]| {
+        let mut store = Store::new("secret.keep token", []);
+        assert!(call_reply(data, &mut store).is_err());
+        assert!(store.take_writes().is_empty());
+        assert_eq!(store.reads(), 0);
+    };
+    let mut w = prefix();
+    let offset = w.len();
     encode_result(
-        &mut encoded,
+        &mut w,
         Ok(Answer::Later(
-            Request::get("https://example.test/changes").held(),
+            Request::get("https://example.test")
+                .held()
+                .cache(CacheMode::Reload),
         )),
     );
-    let bytes = encoded.into_vec();
-    let mut reader = Reader::new(&bytes);
-    assert!(matches!(
-        read_result(&mut reader).unwrap(),
-        Err(DataError::Unavailable(s)) if s == "a held request cannot cross the Rust module seam yet"
-    ));
+    let mut data = w.into_vec();
+    for len in 0..data.len() {
+        check(&data[..len]);
+    }
+    let mut store = Store::new("secret.keep token", []);
+    assert!(matches!(call_reply(&data, &mut store), Ok(Answer::Later(r)) if r.is_held()));
+    assert_eq!(store.get("token"), Some("private"));
+    data[offset] = 255;
+    check(&data);
+    for tag in [0, 2, 3, 4, 5, 7, 8, 15, 255] {
+        let mut w = prefix();
+        w.u8(15);
+        w.u8(tag);
+        check(&w.into_vec());
+    }
+    for request in [
+        Request::get("https://example.test").held().timeout(1000),
+        Request::get("https://example.test")
+            .held()
+            .idle_timeout(1000),
+        Request::storage(vec![]).held(),
+    ] {
+        let mut w = Writer::default();
+        encode_result(&mut w, Ok(Answer::Later(request)));
+        assert!(matches!(
+            read_result(&mut Reader::new(&w.into_vec())),
+            Ok(Err(DataError::Unavailable(_)))
+        ));
+    }
 }
 
 /// A source that draws one surface, `dot`, translating once per draw: the
@@ -776,9 +889,9 @@ fn a_locked_name_crosses_the_seam_as_occupancy_alone() {
 
 #[test]
 fn cache_modes_cross_the_rust_module_seam() {
-    assert_eq!(ABI, 9);
+    assert_eq!(ABI, 10);
     let mut old = header(0).into_vec();
-    old[..4].copy_from_slice(&8u32.to_le_bytes());
+    old[..4].copy_from_slice(&9u32.to_le_bytes());
     assert!(matches!(reader(&old), Err(e) if e == "logic ABI version differs"));
     for word in [
         "unspecified",

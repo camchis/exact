@@ -410,8 +410,8 @@ every host, and the request is made as written, as an ordinary fetch. No host ho
 its reply yet. A tool's, wake's or device's plain read may use it too. A send,
 a mutation, a stream, a file-bodied or an independent request, or native work,
 refuses it. In TypeScript the value must be a boolean.
-A TypeScript bundle naming it needs runtime 13; the Rust module seam is ABI 9
-(LLP 1162.000 D5).
+A TypeScript bundle naming it needs runtime 13; the Rust module seam needs ABI 9
+or later (LLP 1162.000 D5).
 
 A one-window Mac app ends when its window closes. An app with work the person
 expects to go on without the window (a server, a sync), as Mail and Messages
@@ -2103,8 +2103,9 @@ until each held request has had one reply (20 s by default), then `clock data`. 
 the asks that wait (a first ask answered at once need not be); a stream never is
 (`exactStream` stops counting when its first message commits), and with
 `exactStream` it is refused; an upload (`exactBodyFrom`) is never held either, its file being read
-before it is sent, nor is a download to a file (`exactBodyTo`). A Rust source's request takes `Request::held()` (not across the Rust
-module seam, which refuses it, as it refuses a deadline). On the web build an
+before it is sent, nor is a download to a file (`exactBodyTo`). A Rust source's request takes `Request::held()`,
+across the Rust module seam too (which refuses a deadline). A server render waits for a held
+request as for any other, until its reply or the render's deadline. On the web build an
 answer counts as held only while every fetch it has out is held: an ordinary
 fetch beside it is waited on, and so is a held one made in a plain `.then`
 callback, where the page cannot tell whose answer it is (made in the answer's
@@ -2308,7 +2309,7 @@ every host take it, and Rust sources with `Request::long_poll(cursor, from)` on
 a stream's request. An older prelude would ignore it and open an event stream,
 so it moves `typescriptRuntime` to 3: a native app with a TypeScript data module
 needs a new binary once more. A Rust source's long poll is a new kind on the
-module seam. The Rust module ABI is 9: prefetches (LLP 1162.000 D5), preload names (LLP 1162.000 D1), long polls,
+module seam. The Rust module ABI is 10: held marks (LLP 1016.000 D9), prefetches (LLP 1162.000 D5), preload names (LLP 1162.000 D1), long polls,
 two-way sockets (LLP 1016.003), cache modes (LLP 1162 D4) and admitted secret names
 (LLP 1048.000 D9) require a matching binary.
 

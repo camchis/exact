@@ -14,7 +14,7 @@ use exact_runner::{
 pub mod draw;
 
 /// Seam version, independent of the plan format version.
-pub const ABI: u32 = 9;
+pub const ABI: u32 = 10;
 /// Maximum request or response bytes, enforced on both sides.
 pub const MAX_MESSAGE: usize = exact_runner::MAX_HOST_WORK_BYTES;
 
@@ -469,13 +469,17 @@ fn encode_result(w: &mut Writer, result: Result<Answer, DataError>) {
                 "an idle timeout cannot cross the Rust module seam".into(),
             )),
         ),
-        // Nor a held mark (LLP 1016.000 D9): refused, never silently waited on.
-        Ok(Answer::Later(r)) if r.held => encode_result(
-            w,
-            Err(DataError::Unavailable(
-                "a held request cannot cross the Rust module seam yet".into(),
-            )),
-        ),
+        Ok(Answer::Later(r))
+            if r.held
+                && (r.storage.is_some() || r.continuation.is_some() || r.surface.is_some()) =>
+        {
+            encode_result(
+                w,
+                Err(DataError::Unavailable(
+                    "a held mark is HTTP-only at the Rust module seam".into(),
+                )),
+            )
+        }
         // Nor an upload's progress: refused, never sent as a plain stream.
         Ok(Answer::Later(r)) if r.upload_progress => encode_result(
             w,
@@ -570,6 +574,11 @@ fn encode_result(w: &mut Writer, result: Result<Answer, DataError>) {
             // A stream (tag 9) is always independent (LLP 1016.000); a long
             // poll (tag 10, D8) is a stream with its terms after the body; a
             // two-way socket (tag 11, LLP 1016.003) is a stream.
+            // A held mark (LLP 1016.000 D9, tag 15) wraps the HTTP result
+            // and its other markers; hosts without it reject it before effects.
+            if r.held {
+                w.u8(15);
+            }
             // Prefetch wraps the HTTP result and its other markers (LLP 1162.000 D5).
             if r.prefetch {
                 w.u8(14);
@@ -645,6 +654,13 @@ fn encode_result(w: &mut Writer, result: Result<Answer, DataError>) {
 }
 fn read_result(r: &mut Reader<'_>) -> Result<Result<Answer, DataError>, String> {
     let mut tag = r.u8().map_err(error)?;
+    let held = tag == 15;
+    if held {
+        tag = r.u8().map_err(error)?;
+        if !matches!(tag, 1 | 6 | 9..=14) {
+            return Err("invalid held HTTP result tag".into());
+        }
+    }
     let prefetch = tag == 14;
     if prefetch {
         tag = r.u8().map_err(error)?;
@@ -717,6 +733,9 @@ fn read_result(r: &mut Reader<'_>) -> Result<Result<Answer, DataError>, String> 
         if let Some(why) = request.preload_refusal() {
             return Err(why.into());
         }
+    }
+    if let (true, Ok(Answer::Later(request))) = (held, &mut answer) {
+        request.held = true;
     }
     if prefetch {
         let Ok(Answer::Later(request)) = &mut answer else {
