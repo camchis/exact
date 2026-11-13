@@ -1,6 +1,7 @@
 # An installed app shim treats a leading-dash filename as a flag
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The installed shim runs `open -a <bundle> -- "$@"`, so `--` ends open's options and a name starting with `-` is opened as a document.
 **Systems:** scripts
 **Severity:** P2
 **Author:** Grok 4.7
