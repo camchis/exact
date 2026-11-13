@@ -1,5 +1,5 @@
 //! An app-local Win32 presenter: Contract state and kernel frames become real HWNDs.
-use crate::sizing;
+use crate::{sizing, text_file};
 use exact_kernel::{Kernel, Offer, PropId};
 use exact_plan::{Plan, Value};
 use exact_runner::{ControlValue, Event, Runner, Viewport};
@@ -265,7 +265,12 @@ impl App {
         }
         unsafe {
             SendMessageW(combo, CB_SETCURSEL, 0, 0);
-            SendMessageW(self.controls["body"].hwnd, EM_SETLIMITTEXT, 1_000_000, 0);
+            SendMessageW(
+                self.controls["body"].hwnd,
+                EM_SETLIMITTEXT,
+                text_file::MOST as usize,
+                0,
+            );
             SendMessageW(self.controls["title"].hwnd, EM_SETLIMITTEXT, 500, 0);
         }
         SYNCING.set(false);
@@ -620,8 +625,8 @@ impl App {
                 OPEN => {
                     if unsafe { self.confirm_replace() } {
                         if let Some(path) = unsafe { self.dialog(false) } {
-                            match std::fs::read_to_string(&path) {
-                                Ok(body) if body.len() <= 1_000_000 => {
+                            match text_file::read(&path, text_file::MOST) {
+                                Ok(Some(body)) => {
                                     let title = path
                                         .file_stem()
                                         .unwrap_or_default()
@@ -634,7 +639,7 @@ impl App {
                                     self.sample = -1;
                                     unsafe { self.select_sample() };
                                 }
-                                Ok(_) => unsafe {
+                                Ok(None) => unsafe {
                                     self.error(
                                         "Please choose a UTF-8 text file smaller than 1 MB.",
                                     );

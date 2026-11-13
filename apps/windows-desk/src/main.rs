@@ -4,6 +4,8 @@
 mod native;
 #[cfg_attr(not(windows), allow(dead_code))]
 mod sizing;
+#[cfg_attr(not(windows), allow(dead_code))]
+mod text_file;
 
 fn main() {
     #[cfg(windows)]
