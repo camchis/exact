@@ -1,6 +1,7 @@
 # A replaced Android activity marks the visible page hidden
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** A stopped activity that starts again takes the host before it makes its reader, so the one that finished no longer reads, and its stop and destroy leave the host, the page's visibility and the new reader's callbacks alone; 34cb52677 had already kept a replaced activity's late `hidden` and `detach` off its successor.
 **Systems:** host/android
 **Severity:** P1
 **Author:** Grok 4.7
