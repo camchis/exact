@@ -147,7 +147,10 @@ final class Canvas2DHost: Canvas2DEnv {
     /// waits for them.
     var loadingCount: Int { loading.count + pending }
 
-    /// Decode the handles the runner asked for, off the main thread.
+    /// Decode the handles the runner asked for, off the main thread, within
+    /// an `img`'s bounds: a remote body is fetched as one is, spooled to a
+    /// file and stopped past its byte limit, and an image over its pixel
+    /// limit is refused before it is decoded.
     func load(_ srcs: [String]) {
         for src in srcs where images[src] == nil && !loading.contains(src) {
             loading.insert(src)
@@ -157,18 +160,19 @@ final class Canvas2DHost: Canvas2DEnv {
                 var bytes = local
                 if let remote {
                     let done = DispatchSemaphore(value: 0)
-                    var request = URLRequest(url: remote); request.timeoutInterval = 20
-                    URLSession.shared.dataTask(with: request) { data, response, _ in
-                        if let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) { bytes = data }
+                    RasterInput.fetch(remote, cancellation: RasterCancellation()) { result in
+                        bytes = try? result.get().bytes()
                         done.signal()
-                    }.resume()
+                    }
                     done.wait()
                 }
                 let image = bytes.flatMap { CGImageSourceCreateWithData($0 as CFData, nil) }
                     .flatMap { source -> CGImage? in
                         guard let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
                               let w = properties[kCGImagePropertyPixelWidth] as? NSNumber,
-                              let h = properties[kCGImagePropertyPixelHeight] as? NSNumber else { return nil }
+                              let h = properties[kCGImagePropertyPixelHeight] as? NSNumber,
+                              w.intValue > 0, h.intValue > 0,
+                              w.intValue <= RasterMetadata.pixelLimit / h.intValue else { return nil }
                         // Full-size transformed pixels make both drawImage and
                         // the dimensions reported to the runner honor EXIF.
                         return CGImageSourceCreateThumbnailAtIndex(source, 0, [
