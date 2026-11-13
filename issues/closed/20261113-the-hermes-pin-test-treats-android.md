@@ -1,6 +1,7 @@
 # The Hermes pin test treats Android as Linux
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The pin test maps an -android triple to android before its -linux- arm and asserts a pinned target maps there, so dropping android from ENGINE_OS fails it.
 **Systems:** js
 **Severity:** P3
 **Author:** Grok 4.7
