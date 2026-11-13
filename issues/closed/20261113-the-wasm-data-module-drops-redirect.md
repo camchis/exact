@@ -1,6 +1,7 @@
 # The wasm data module drops redirect, cache, and long poll
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The wasm data module copies a fetch's `redirect`, `cache` and `exactLongPoll` onto the request the page runs, and refuses a value no host runs.
 **Systems:** js, host/web
 **Severity:** P2
 **Author:** Grok 4.7
