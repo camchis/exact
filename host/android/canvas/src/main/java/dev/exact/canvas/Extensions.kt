@@ -587,6 +587,10 @@ internal object Extensions {
     /** Whether the activity is resumed ([resumed], [paused]). */
     val resumedNow: Boolean get() = foreground
 
+    /** Whether the activity shows, resumed or paused under a dialog ([started], [stopped]): what Android's own rule for
+     * a start from the foreground reads, an app with a visible activity. */
+    val visibleNow: Boolean get() = visible
+
     /** The extension that serves the authenticator entry (LLP 1133.010 D13), made if need be. */
     fun authenticator(): ExactAuthenticator? = roster.keys.firstNotNullOfOrNull { extension(it) as? ExactAuthenticator }
 
