@@ -939,6 +939,18 @@ The agent identifies an implementation's own name as
 `<extension>.<name>#<import-path>` in `state.extensions` and `prefer extension`;
 shared names keep `<extension>.<name>`.
 
+`@exact/language-model` tools name functions in the data module's `tools`
+export, as its own properties: a class's methods are its prototype's and are
+not found. A handler receives the input object, `Store`, and `Storage`. Baking
+checks literal declarations it can resolve in Contract and the data module's
+runtime dependencies against that export and each declared input schema
+(`language-model-tool-handler`). Type-only dependencies introduce no tools.
+For Contract declarations, annotate `export const tools: LanguageModelTools`
+with the generated type from `./app.contract.d.ts` to infer each handler's input.
+Computed declarations, including objects that are mutated or escape to other
+code, and a `tools` value whose type has only an index signature keep their
+runtime checks.
+
 Choose the mechanism from its lifetime:
 
 | Requirement | Mechanism |
