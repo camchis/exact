@@ -1,6 +1,7 @@
 # Canvas2D shadows can request gigabytes and trillions of shader iterations
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** A shadow whose σ passes 16 texture pixels, or that would pass the frame's budget of four canvases' pixels, is drawn and blurred at a lower resolution and drawn back at full size, so its textures and shader taps follow the canvas, not the blur radius.
 **Systems:** canvas/vello
 **Author:** Codex
 **Date:** 2026-11-12
