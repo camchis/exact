@@ -1,6 +1,7 @@
 # macOS: a title-bar area beside the traffic lights, and a full-screen fact (rest of #113)
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** A real macOS full-screen transition now has a test: `FullScreenTransitionMacTests` enters and leaves full screen with `toggleFullScreen`, and `env(titlebar-area-*)` and `displayMode` follow it in both directions with no code change.
 **Systems:** host/apple macOS, viewport facts, kernel env
 **Severity:** P2
 **Author:** daehyeon-mun (GitHub report); Codex (filesystem transfer)
@@ -160,3 +161,25 @@ did not answer within 20 s (`osascript -e 'tell application "System Events"
 to get name of first process whose frontmost is true'`), so no ⌃⌘F could be
 sent. The check needs a person at an unlocked Mac, or a session whose
 terminal has Accessibility permission for System Events.
+
+## Full-screen transition verified, 2026-11-12
+
+`FullScreenTransitionMacTests` opens a 900×600 `viewport-fit="cover"`
+window through `ExactView`, sends `toggleFullScreen(nil)` (the action
+⌃⌘F, the green button and the View menu send) and waits up to 10 s for
+AppKit's own `didEnterFullScreenNotification`, then does the same to
+leave. On macOS 27.0.1 with the screen unlocked, the window went to the
+screen's 1920×1080 frame and back to 900×600 in about 7 s, and the
+runtime saw:
+
+| | `displayMode` (agent `state`, resource) | bar `x, width, height` from `env(titlebar-area-*)` |
+|---|---|---|
+| windowed | `standalone` | 78, 822, 32 |
+| full screen | `fullscreen` | 0, 0, 0 |
+| after exit | `standalone` | 78, 822, 32 |
+
+The presenter's area was `[78, 0, 822, 32]`, `[0, 0, 0, 0]`, then
+`[78, 0, 822, 32]` again, equal to `TitleBarAreaMac`'s reading of AppKit's
+geometry after the exit. The test skips while the screen is locked, where
+the window server makes no full-screen Space.
+
