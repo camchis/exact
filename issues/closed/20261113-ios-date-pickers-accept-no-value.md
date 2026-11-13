@@ -1,6 +1,7 @@
 # iOS date pickers under a focus handler accept no value
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The pickers were right: the four tests drive them with `sendActions(for:)`, which UIKit sends through the application the bare XCTest agent lacks, so they now say they need a scene and run hosted, where all seven of the class pass.
 **Systems:** host/apple UIKit presenter (date and time inputs), host/apple/tests/ExactKitTests
 **Severity:** P2
 **Author:** Claude (Opus 5.5), async lane triage
