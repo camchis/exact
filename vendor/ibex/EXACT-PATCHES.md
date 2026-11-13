@@ -890,3 +890,14 @@ transport. Both Darwin transports (`transport/darwin.rs`,
 Data Mode; the portable transport ignores the field.
 Exact sets it on a preload, a request made before the app asks for it
 (LLP 1162.000 D4, LLP 1162 D7). Unset, nothing changes. Replay it on a refresh.
+
+## Local patch 38, rusqlite 0.41
+
+`ibex2-sqlite` requires rusqlite 0.41.1, whose `libsqlite3-sys` 0.39.1
+bundles SQLite 3.54.1: earlier SQLite reads uninitialized page-cache memory
+through a WAL whose page size differs from its database's
+(RUSTSEC-2026-0459). rusqlite 0.41 returns `column_names()` as an iterator,
+takes `&mut` to install the authorizer, and reports a failed prepare as
+`SqlInputError`, whose text appends the whole SQL and an offset;
+`sql_error` reads SQLite's message from it, so a refusal and a batch's
+shortened statement read as before. Replay on a refresh.

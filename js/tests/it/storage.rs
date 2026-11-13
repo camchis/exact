@@ -1491,3 +1491,16 @@ fn forgetting_a_shared_waiter_keeps_the_live_answers_store_write() {
     }
     panic!("live answer did not finish");
 }
+
+/// Off Apple the provider links the SQLite that `libsqlite3-sys` bundles.
+/// SQLite 3.54.0 fixes reads of uninitialized page-cache memory through a
+/// WAL whose page size differs from its database's (RUSTSEC-2026-0459).
+#[cfg(not(target_vendor = "apple"))]
+#[test]
+fn bundled_sqlite_has_the_wal_page_size_fix() {
+    assert!(
+        rusqlite::version_number() >= 3_054_000,
+        "{}",
+        rusqlite::version()
+    );
+}

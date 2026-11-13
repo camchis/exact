@@ -1,6 +1,7 @@
 # Bundled SQLite lacks the fix for reading memory through a crafted WAL
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** rusqlite 0.41.1 and libsqlite3-sys 0.39.1 bundle SQLite 3.54.1, which carries the WAL page-size fix, in every lockfile that resolved the old pair.
 **Systems:** Cargo.lock, vendored Ibex SQLite provider, native SQLite consumers
 **Author:** Codex
 **Date:** 2026-11-12
