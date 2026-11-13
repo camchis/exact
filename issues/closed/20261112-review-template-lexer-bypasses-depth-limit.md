@@ -1,6 +1,7 @@
 # Nested templates can abort the compiler before its expression depth check
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The lexer finds a template's end with a stack of its own, so a template nested thousands deep reaches the parser's `syntax-expression-depth` refusal instead of overflowing the native stack.
 **Systems:** contract/syntax/src/lexer.rs, contract/syntax/src/parser/expr.rs
 **Author:** Codex
 **Date:** 2026-11-12
