@@ -5620,9 +5620,8 @@ Omit `font-family` for the platform's font. `font-family` accepts literal CSS fa
 `font` uses its bundled faces; other names are local installed families,
 whose own italic and bold faces `font-style` and `font-weight` select by CSS's
 matching (a family without the face draws its nearest one, never a synthesized
-slant or smear: LLP 1019 §5). Web and Apple retain the ordered glyph fallback cascade. Linux selects the first
-installed family, then uses cosmic-text's platform glyph fallback; it logs
-this declared limitation for a multi-member stack (LLP 1001).
+slant or smear: LLP 1019 §5). Web, Apple and the painted hosts try authored
+families in order for each glyph, then use platform fallback.
 Under Charlie's 2026-10-11 ruling, a string from state or data may also name
 an installed or generic family list, as in `font-family=family`. The JS web
 target applies it as CSS; macOS, iOS and Linux register session-scoped stacks

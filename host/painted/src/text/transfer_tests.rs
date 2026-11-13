@@ -379,7 +379,7 @@ fn staged_binary_recipe_preserves_a_declared_face() {
     };
     catalog
         .families
-        .push(FamilyChoice::Declared("ExactPlanStack8".into()));
+        .push(vec![FamilyChoice::Declared("ExactPlanStack8".into())]);
     catalog.declared_faces.insert((8, 400, false), id);
     let recipe = super::catalog_recipe::CatalogSnapshot::capture(&catalog)
         .unwrap()
