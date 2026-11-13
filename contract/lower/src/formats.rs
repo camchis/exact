@@ -21,9 +21,10 @@
 //! | `digits` | the ten digits, `""` for ASCII |
 //! | `decimal`, `group` | the symbols |
 //! | `grouping` | three digits: the primary and secondary group sizes, the fewest integer digits grouped |
-//! | `decimalStyle`, `percent` | a positive and a negative template |
+//! | `decimalStyle` | a positive and a negative template |
+//! | `percent` | those, then a percentage's decimal and group symbols and grouping (as `grouping`) |
 //! | `currencyTemplates` | such pairs, by index |
-//! | `currencies` | the roster's 24 codes in its order: a template index and the symbol |
+//! | `currencies` | the roster's 24 codes in its order: a template index, the symbol, and an amount's decimal and group symbols and grouping (as `grouping`; the group `""` when it is not grouped) |
 //! | `compact` | from 10⁰ to the last magnitude with a pattern of its own (a larger number takes the last): none, or the integer digits shown, the template, and each plural category's own that differs, after its letter (`f{#} آلاف`) |
 //! | `plurals` | none, or the plural category letters of 0–199 and of 1.0–9.9 by tenths |
 //! | `medium`, `monthYear`, `short` | a date template, then its month names |

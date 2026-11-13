@@ -87,19 +87,28 @@ function record(l) {
     return body === 1 ? out : fail(`a number body ${body} times`);
   };
   const sym = (type) => parts(nf, -1234567.5).find((p) => p.type === type)?.value ?? "";
-  const ints = parts(nf, 1234567890123).filter((p) => p.type === "integer").map((p) => Array.from(p.value).length);
-  const primary = ints.at(-1), secondary = ints.length > 2 ? ints.at(-2) : primary;
-  if (ints.slice(1, -1).some((n) => n !== secondary)) fail("irregular grouping");
-  const minGroup = parts(nf, 1234).some((p) => p.type === "group") ? 1 : 2;
   const pf = new Intl.NumberFormat(l, { style: "percent" });
+  // An amount of money has its own symbols and grouping, which CLDR may set
+  // apart from a number's (`de-AT`: `€ 1.234,50` beside `1 234,5`) and by
+  // currency (`en-150`: `1.234,50 €`, `1,234.50 US$`).
+  const grouping = (f, scale = 1) => {
+    const ints = parts(f, 1234567890123 / scale).filter((p) => p.type === "integer").map((p) => Array.from(p.value).length);
+    if (ints.length === 1) return "331"; // not grouped: the group symbol is ""
+    const primary = ints.at(-1), secondary = ints.length > 2 ? ints.at(-2) : primary;
+    if (ints.slice(1, -1).some((n) => n !== secondary) || primary > 9 || secondary > 9) fail("irregular grouping");
+    return `${primary}${secondary}${parts(f, 1234 / scale).some((p) => p.type === "group") ? 1 : 2}`;
+  };
   const currencyTemplates = [], currencies = [];
   for (const [code, fraction] of Object.entries(CODES)) {
     const f = new Intl.NumberFormat(l, { style: "currency", currency: code });
     if (f.resolvedOptions().maximumFractionDigits !== fraction) fail(`${code} has other fraction digits`);
+    const big = parts(f, 1234567890123.5);
+    const group = big.find((p) => p.type === "group")?.value ?? "";
+    const decimal = parts(new Intl.NumberFormat(l, { style: "currency", currency: code, minimumFractionDigits: 2 }), 1.5).find((p) => p.type === "decimal").value;
     const pair = [template(parts(f, 1234.5)), template(parts(f, -1234.5))];
     let i = currencyTemplates.findIndex((t) => t[0] === pair[0] && t[1] === pair[1]);
     if (i < 0) i = currencyTemplates.push(pair) - 1;
-    currencies.push([String(i), literal(parts(f, 1).find((p) => p.type === "currency").value)]);
+    currencies.push([String(i), literal(parts(f, 1).find((p) => p.type === "currency").value), literal(decimal), literal(group), grouping(f)]);
   }
   // Compact: for 10^0 up to the last magnitude with a pattern of its own (a
   // larger number shows more digits in the last one's), none ([]) or the
@@ -205,9 +214,12 @@ function record(l) {
     digits: ascii ? "" : native.join(""),
     decimal: sym("decimal"),
     group: sym("group"),
-    grouping: `${primary}${secondary}${minGroup}`,
+    grouping: grouping(nf),
     decimalStyle: [template(parts(nf, 1234.5)), template(parts(nf, -1234.5))],
-    percent: [template(parts(pf, 0.26)), template(parts(pf, -0.26))],
+    // A percentage, too, has its own symbols and grouping (`rhg-BD` groups it by threes).
+    percent: [template(parts(pf, 0.26)), template(parts(pf, -0.26)),
+      literal(parts(new Intl.NumberFormat(l, { style: "percent", minimumFractionDigits: 1 }), 0.015).find((p) => p.type === "decimal").value),
+      literal(parts(pf, 12345678901.23).find((p) => p.type === "group")?.value ?? ""), grouping(pf, 100)],
     currencyTemplates,
     currencies,
     compact,
@@ -283,7 +295,11 @@ console.error(`${Object.keys(full).length} locales, ${refused.length} refused`);
  * relative words and their joining are Foundation's convention, LLP 1116.020
  * D8: the word, title-cased, in the medium date's place). */
 function oracle() {
-  const LOCALES = ["en", "de", "fr", "ja", "ar", "ar-EG", "hi", "pt-BR", "en-GB", "de-CH", "es", "ru", "pl", "zh", "ko", "fa", "he", "sv", "fi", "mn", "my", "vi", "tr"];
+  // de-AT, en-150, en-BG and rhg-BD set money's symbols or grouping apart
+  // from a number's; de-u-nu-latn and en-u-hc-h23 are tables named with a
+  // Unicode extension, the second forcing its hour cycle.
+  const LOCALES = ["en", "de", "fr", "ja", "ar", "ar-EG", "hi", "pt-BR", "en-GB", "de-CH", "es", "ru", "pl", "zh", "ko", "fa", "he", "sv", "fi", "mn", "my", "vi", "tr",
+    "de-AT", "en-150", "en-BG", "rhg-BD", "de-u-nu-latn", "en-u-hc-h23"];
   const INSTANTS = [
     [0, 0], [-0.5, 60], [1790000000000.7, 345], [1790000000000, -720], [1791762120000, -420], [43200000, 0],
     [45000000, 0], [1800000, 0], [-62135596800000, 0], [253402300799999, 0], [951782400000, 0], [-1790000000000.7, 840],
@@ -297,7 +313,11 @@ function oracle() {
     const dtf = (o, tag = l) => new Intl.DateTimeFormat(`${tag}${tag.includes("-u-") ? "" : "-u"}-ca-gregory`, { timeZone: "UTC", ...o });
     for (const [ms, off] of INSTANTS) {
       const d = wallDate(ms, off);
-      for (const hc of ["", "-u-hc-h12", "-u-hc-h23"]) rows.push([l + hc, "formatTime", [ms, off, "short"], dtf({ timeStyle: "short" }, l + hc).format(d)]);
+      // The format slot's spelling (`format_tag`): a forced cycle after a space, none when the table's name forces one.
+      for (const hc of l.includes("-hc-") ? [""] : ["", "h12", "h23"]) {
+        const tag = !hc ? l : l.includes("-u-") ? `${l}-hc-${hc}` : `${l}-u-hc-${hc}`;
+        rows.push([hc ? `${l} ${hc}` : l, "formatTime", [ms, off, "short"], dtf({ timeStyle: "short" }, tag).format(d)]);
+      }
       rows.push([l, "formatDate", [ms, off, "medium"], dtf({ dateStyle: "medium" }).format(d)]);
       rows.push([l, "formatDate", [ms, off, "month-year"], dtf({ month: "long", year: "numeric" }).format(d)]);
     }

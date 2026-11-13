@@ -360,8 +360,8 @@ def native (r : Record) (s : List Char) : List Char :=
 /-- An integer's digits and fraction digits with the locale's symbols and
 grouping: groups of the primary size, then the secondary, when the integer
 has at least the primary size and `least` (at least the locale's) more. -/
-def body (r : Record) (int frac : List Char) (least : Nat) : String :=
-  let g := (fieldOf r 3).toList
+def bodyIn (r : Record) (decimal group grouping : String) (int frac : List Char) (least : Nat) : String :=
+  let g := grouping.toList
   let size (i : Nat) : Nat := match g[i]? with | .some c => c.toNat - '0'.toNat | .none => 3
   let primary := size 0
   let secondary := size 1
@@ -371,7 +371,11 @@ def body (r : Record) (int frac : List Char) (least : Nat) : String :=
     if i > 0 && grouped && Nat.ble primary left && (left - primary) % secondary == 0 then ['\x00', d] else [d]).flatten
   let marked := marked ++ (if frac.isEmpty then [] else '\x01' :: frac)
   String.join ((native r marked).map fun c =>
-    if c == '\x00' then fieldOf r 2 else if c == '\x01' then fieldOf r 1 else c.toString)
+    if c == '\x00' then group else if c == '\x01' then decimal else c.toString)
+
+/-- `bodyIn` with the record's own symbols and grouping. -/
+def body (r : Record) (int frac : List Char) (least : Nat) : String :=
+  bodyIn r (fieldOf r 1) (fieldOf r 2) (fieldOf r 3) int frac least
 
 /-- One of a pair of templates (positive, negative). -/
 def signed (pair : String) (negative : Bool) : String :=
@@ -379,24 +383,29 @@ def signed (pair : String) (negative : Bool) : String :=
     (if negative then 1 else 0) "{#}"
 
 /-- `decimal`, `percent` and `currency`: `rounded`'s digits in the
-locale's template; `none` for a style or code the compiler refuses. -/
+locale's template, a percentage and an amount of money in their own symbols
+and grouping; `none` for a style or code the compiler refuses. -/
 def styledIn (r : Record) (n : F64) (style code : String) : Option String :=
-  let spec : Option (String × String × Nat × Nat × Nat) :=
-    if style = "decimal" then .some (fieldOf r 4, "", 0, 3, 0)
-    else if style = "percent" then .some (fieldOf r 5, "", 0, 0, 2)
+  let own := (fieldOf r 1, fieldOf r 2, fieldOf r 3)
+  let spec : Option (String × String × (String × String × String) × Nat × Nat × Nat) :=
+    if style = "decimal" then .some (fieldOf r 4, "", own, 0, 3, 0)
+    else if style = "percent" then
+      match itemsOf (fieldOf r 5) with
+      | [_, _, dec, grp, grouping] => .some (fieldOf r 5, "", (dec, grp, grouping), 0, 0, 2)
+      | _ => .none
     else if style = "currency" then
       match currencies.findIdx? (·.1 == code), currencies.find? (·.1 == code) with
       | .some i, .some (_, _, d) =>
         match partsOf (itemOf r 7 i) with
-        | [t, sym] => .some (itemOf r 6 t.toNat!, sym, d, d, 0)
+        | [t, sym, dec, grp, grouping] => .some (itemOf r 6 t.toNat!, sym, (dec, grp, grouping), d, d, 0)
         | _ => .none
       | _, _ => .none
     else .none
-  spec.map fun (pair, sym, lo, hi, shift) =>
+  spec.map fun (pair, sym, (dec, grp, grouping), lo, hi, shift) =>
     if !isFinite n then ""
     else
       let (int, frac) := rounded n shift lo hi
-      ((signed pair (signBit n)).replace "{#}" (body r int frac 1)).replace "{¤}" sym
+      ((signed pair (signBit n)).replace "{#}" (bodyIn r dec grp grouping int frac 1)).replace "{¤}" sym
 
 /-- A shown compact number's plural category letter (`x` when the record
 lists none): an integer's by its value (above 199, by 100 plus its last two
@@ -527,12 +536,22 @@ def hourCycle : List String → Option String
     else hourCycle (value :: rest)
   | _ => .none
 
+/-- The hour cycle a tag's Unicode extension forces (`en-US-u-hc-h23`). -/
+def tagCycle (tag : String) : Option String :=
+  hourCycle (("-u-".intercalate ((tag.splitOn "-u-").drop 1)).splitOn "-")
+
 /-- `Plan::format_data`: the record of the table a format locale names
-(`de`, `en-u-hc-h23`) and the hour cycle it forces. -/
+(`de`, `de h23`, `de-u-ca-gregory`: the table's whole name, then after a
+space the forced hour cycle) and the hour cycle it forces: the one after the
+space, else the name's own. -/
 def recordOf (tables : Tables) (locale : String) : Option (Record × Option String) :=
-  let pieces := locale.splitOn "-u-"
+  let pieces := locale.splitOn " "
   let table := pieces.headD ""
-  let cycle := hourCycle (("-u-".intercalate (pieces.drop 1)).splitOn "-")
+  let cycle := match pieces with
+    | [t] => tagCycle t
+    | _ =>
+      let c := " ".intercalate (pieces.drop 1)
+      if c == "h12" || c == "h23" then .some c else .none
   (tables.find? (·.1 == table)).bind fun (_, texts) =>
     (lookupText formatKey texts).bind fun record =>
       if record.isEmpty then .none else .some (record.splitOn "\u001E", cycle)

@@ -823,3 +823,24 @@ fn the_formatters_follow_the_shown_table_and_the_viewer_s_forced_hour_cycle() {
     r.set_place("ja-JP", "Asia/Tokyo", None).unwrap();
     assert_eq!(text(&r, "shown"), "1,234.5 Sep 21, 2026 2:13 PM");
 }
+
+/// A table named with a Unicode extension is that table: its format slot
+/// keeps the whole name, and the viewer's forced cycle follows a space.
+#[test]
+fn a_table_named_with_an_extension_formats_as_itself() {
+    let app = AppDir::new(
+        FORMATS,
+        &[
+            ("strings/en.json", "{}"),
+            ("strings/de-u-ca-gregory.json", "{}"),
+        ],
+    );
+    let plan = app.compile().unwrap();
+    let mut r = launch(&plan, "de-u-ca-gregory", Vec::new());
+    assert_eq!(text(&r, "shown"), "1.234,5 21.09.2026 14:13");
+    r.set_place_formatted("de-u-ca-gregory", "UTC", None, Some("de-DE-u-hc-h12"))
+        .unwrap()
+        .unwrap();
+    assert_eq!(text(&r, "shown"), "1.234,5 21.09.2026 02:13 PM");
+    assert_eq!(r.slot("#format"), Some(&Value::str("de-u-ca-gregory h12")));
+}

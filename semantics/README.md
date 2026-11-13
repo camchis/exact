@@ -1023,7 +1023,9 @@ observation, as the runner's and the JS target's are). Its table's record
 under `Format.formatKey`, a key no table can hold, and `Format.recordOf`,
 `styledIn`, `compactIn`, `dateIn`, `timeIn` and `dayIn` are
 `runner/src/format/locale.rs` transcribed over it. The corpus's
-`localized-formats` reads a German base. Outside the semantics: a localized
+`localized-formats` reads a German base, and `localized-formats-at` a base named
+with an extension (`de-AT-u-nu-latn`) whose money has its own symbols.
+Outside the semantics: a localized
 formatter in a `fn`, whose body the compiler expands where it is called and
 so reads the format slot there, while the semantics evaluates a `fn` closed
 over its parameters (as it does `t` there, which reads the locale slot).

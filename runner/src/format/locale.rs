@@ -71,7 +71,17 @@ impl<'a> Record<'a> {
     /// grouping: groups of the primary size, then the secondary, when the
     /// integer has at least the primary size and `least` more digits.
     fn body(&self, int: &[u8], frac: &[u8], least: usize) -> String {
-        let grouping = self.get(Field::Grouping).as_bytes();
+        let symbols = Symbols {
+            decimal: self.get(Field::Decimal),
+            group: self.get(Field::Group),
+            grouping: self.get(Field::Grouping),
+        };
+        self.body_in(int, frac, least, &symbols)
+    }
+
+    /// [`Record::body`] with other symbols and grouping (an amount of money's).
+    fn body_in(&self, int: &[u8], frac: &[u8], least: usize, symbols: &Symbols<'_>) -> String {
+        let grouping = symbols.grouping.as_bytes();
         let size = |i: usize| grouping.get(i).map_or(3, |b| usize::from(b - b'0'));
         let (primary, secondary) = (size(0), size(1));
         let least = least.max(size(2));
@@ -90,8 +100,8 @@ impl<'a> Record<'a> {
         }
         let mut out = String::with_capacity(ascii.len() * 2);
         self.push_digits(&ascii, &mut out);
-        out.replace('\u{0}', self.get(Field::Group))
-            .replace('\u{1}', self.get(Field::Decimal))
+        out.replace('\u{0}', symbols.group)
+            .replace('\u{1}', symbols.decimal)
     }
 
     /// One of a pair of templates (positive, negative).
@@ -154,16 +164,40 @@ pub(super) fn formatting(
     Some(Value::str(&text))
 }
 
+/// A number's decimal and group symbols and its grouping (the record's
+/// `grouping` field's three digits).
+struct Symbols<'a> {
+    decimal: &'a str,
+    group: &'a str,
+    grouping: &'a str,
+}
+
 /// `decimal`, `percent` and `currency`: [`super::styled`]'s digits in the
-/// locale's template.
+/// locale's template; a percentage and an amount of money in their own
+/// symbols and grouping (`de-AT`'s `€ 1.234,50` beside `1 234,5`).
 fn styled(r: &Record<'_>, n: f64, style: &str, code: &str) -> Option<String> {
+    let mut own = None;
     let (pair, symbol, min, max, shift) = match style {
         "decimal" => (r.get(Field::DecimalStyle), "", 0, 3, 0),
-        "percent" => (r.get(Field::Percent), "", 0, 0, 2),
+        "percent" => {
+            let mut item = r.get(Field::Percent).split('\u{1f}').skip(2);
+            own = Some(Symbols {
+                decimal: item.next()?,
+                group: item.next()?,
+                grouping: item.next()?,
+            });
+            (r.get(Field::Percent), "", 0, 0, 2)
+        }
         "currency" => {
             let i = CURRENCIES.iter().position(|c| c.0 == code)?;
             let digits = CURRENCIES[i].2 as usize;
-            let (template, symbol) = r.item(Field::Currencies, i).split_once('\u{1d}')?;
+            let mut item = r.item(Field::Currencies, i).split('\u{1d}');
+            let (template, symbol) = (item.next()?, item.next()?);
+            own = Some(Symbols {
+                decimal: item.next()?,
+                group: item.next()?,
+                grouping: item.next()?,
+            });
             let pair = r.item(Field::CurrencyTemplates, template.parse().ok()?);
             (pair, symbol, digits, digits, 0)
         }
@@ -173,7 +207,10 @@ fn styled(r: &Record<'_>, n: f64, style: &str, code: &str) -> Option<String> {
         return Some(String::new());
     }
     let (int, frac) = rounded(n, shift, min, max);
-    let body = r.body(&int, &frac, 1);
+    let body = match &own {
+        Some(symbols) => r.body_in(&int, &frac, 1, symbols),
+        None => r.body(&int, &frac, 1),
+    };
     Some(
         r.signed(pair, n.is_sign_negative())
             .replace("{#}", &body)

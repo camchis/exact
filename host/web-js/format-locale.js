@@ -16,11 +16,13 @@ export function formats(rows) {
   Records = new Map(rows.map(([name, record]) => [name, record.split(RS)]));
   localized(format);
 }
-/** `format_tag` (plan/src/strings.rs): the table, then the hour cycle the viewer's format locale forces, h12 or h23. */
+/** `format_tag` (plan/src/strings.rs): the table's whole name, then, after a space, the hour cycle the viewer's format
+ * locale forces (h12 or h23) unless the name forces one: `de h23`, `de-u-ca-gregory`. */
 export function formatTag(table, formatLocale) {
-  const c = cycle(formatLocale.includes("-u-") ? formatLocale.slice(formatLocale.indexOf("-u-") + 3) : "");
-  return c ? `${table}-u-hc-${c}` : table;
+  const c = tagCycle(table) ? null : tagCycle(formatLocale);
+  return c ? `${table} ${c}` : table;
 }
+const tagCycle = (tag) => (tag.includes("-u-") ? cycle(tag.slice(tag.indexOf("-u-") + 3)) : null);
 /** The format slot (LLP 1054.000.003 D6): the locale slot's table with the hour cycle the page's format locale forces
  * (runner/src/runner/time.rs `format_locale_of`). A render has no place: the table alone. */
 export function formatSlot(locale) {
@@ -40,8 +42,8 @@ const signed = (pair, negative) => pair.split(/[\u001f\u001d]/)[negative ? 1 : 0
 /** ASCII digits in the locale's own. */
 const native = (r, s) => (r[F.digits] ? s.replace(/[0-9]/g, (d) => Array.from(r[F.digits])[d]) : s);
 /** An integer's digits and fraction digits with the locale's symbols and grouping (locale.rs `body`). */
-function body(r, int, frac, least) {
-  const g = r[F.grouping], size = (i) => (g[i] === undefined ? 3 : +g[i]), primary = size(0), secondary = size(1);
+function body(r, int, frac, least, symbols = [r[F.decimal], r[F.group], r[F.grouping]]) {
+  const [decimal, group, g] = symbols, size = (i) => (g[i] === undefined ? 3 : +g[i]), primary = size(0), secondary = size(1);
   least = Math.max(least, size(2));
   const grouped = int.length >= primary + least;
   let s = "";
@@ -51,23 +53,24 @@ function body(r, int, frac, least) {
     s += int[i];
   }
   if (frac.length) s += "\u0001" + frac;
-  return native(r, s).replaceAll("\u0000", r[F.group]).replaceAll("\u0001", r[F.decimal]);
+  return native(r, s).replaceAll("\u0000", group).replaceAll("\u0001", decimal);
 }
 
+/** A percentage and an amount of money take their own symbols and grouping (locale.rs `styled`). */
 function styled(r, n, style, code) {
-  let pair, symbol = "", min = 0, max = 3, shift = 0;
+  let pair, symbol = "", min = 0, max = 3, shift = 0, money;
   if (style === "decimal") pair = r[F.decimalStyle];
-  else if (style === "percent") { pair = r[F.percent]; max = 0; shift = 2; }
+  else if (style === "percent") { pair = r[F.percent]; max = 0; shift = 2; money = pair.split(US).slice(2); }
   else if (style === "currency") {
     const i = Object.keys(CODES).indexOf(code);
     if (i < 0) return null;
     min = max = CODES[code];
-    const [t, s] = item(r, F.currencies, i).split(GS);
-    symbol = s; pair = item(r, F.currencyTemplates, +t);
+    const [t, s, ...symbols] = item(r, F.currencies, i).split(GS);
+    symbol = s; pair = item(r, F.currencyTemplates, +t); money = symbols;
   } else return null;
   if (!Number.isFinite(n)) return "";
   const [int, frac] = rounded(n, shift, min, max);
-  return signed(pair, n < 0 || Object.is(n, -0)).replace("{#}", body(r, int, frac, 1)).replace("{¤}", symbol);
+  return signed(pair, n < 0 || Object.is(n, -0)).replace("{#}", body(r, int, frac, 1, money)).replace("{¤}", symbol);
 }
 
 function category(r, int, kept) {
@@ -152,9 +155,10 @@ function day(r, then, now, off, mode, c) {
 
 /** The entry `name` of `args` (its parameters, the format locale last) in the format locale `loc`. */
 function format(name, args, loc) {
-  const at = loc.indexOf("-u-"), r = Records.get(at < 0 ? loc : loc.slice(0, at));
+  // `Plan::format_data`: the table before the space, the forced cycle after it, else the name's own.
+  const at = loc.indexOf(" "), table = at < 0 ? loc : loc.slice(0, at), forced = at < 0 ? undefined : loc.slice(at + 1), r = Records.get(table);
   if (!r) throw new Error(`${name}: no format data for ${loc}`);
-  const c = at < 0 ? null : cycle(loc.slice(at + 3));
+  const c = forced === undefined ? tagCycle(table) : forced === "h12" || forced === "h23" ? forced : null;
   switch (name) {
     case "formatTime": { const w = wall(args[0], args[1]); return w === null ? "" : time(r, w, c); }
     case "formatDate": {

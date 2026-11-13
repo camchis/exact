@@ -140,15 +140,19 @@ pub fn hour_cycle(extension: &str) -> Option<&str> {
     None
 }
 
-/// The format locale (LLP 1054.000.003 D6): the resolved table's name, and
-/// the hour cycle the viewer's regional format forces (`exactTime()`'s
-/// `formatLocale`, `en-US-u-hc-h23`), as `en-u-hc-h23`.
+/// The hour cycle `tag`'s Unicode extension forces (`en-US-u-hc-h23`).
+fn tag_hour_cycle(tag: &str) -> Option<&str> {
+    hour_cycle(tag.find("-u-").map_or("", |at| &tag[at + 3..]))
+}
+
+/// The format locale (LLP 1054.000.003 D6): the resolved table's whole
+/// name, then, apart by a space no tag holds, the hour cycle the viewer's
+/// regional format forces (`exactTime()`'s `formatLocale`,
+/// `en-US-u-hc-h23`), unless the table's own name forces one: `de h23`,
+/// `de-u-ca-gregory`.
 pub fn format_tag(table: &str, format_locale: &str) -> String {
-    let extension = format_locale
-        .find("-u-")
-        .map_or("", |at| &format_locale[at + 3..]);
-    match hour_cycle(extension) {
-        Some(cycle) => format!("{table}-u-hc-{cycle}"),
+    match tag_hour_cycle(format_locale).filter(|_| tag_hour_cycle(table).is_none()) {
+        Some(cycle) => format!("{table} {cycle}"),
         None => table.to_owned(),
     }
 }
@@ -193,14 +197,14 @@ impl Plan {
             .or_else(|| find(self.locales.first()?))
     }
 
-    /// The format data of the table a format locale names (`de`,
-    /// `en-u-hc-h23`: the table's name, then any extension), and the hour
-    /// cycle it forces, `h12` or `h23` (LLP 1054.000.003 D6). `None` for a
-    /// table the plan does not have or that carries no data.
+    /// The format data of the table a format locale names ([`format_tag`]'s
+    /// `de h23`), and the hour cycle it forces, `h12` or `h23`: the one
+    /// after the space, else the table name's own (LLP 1054.000.003 D6).
+    /// `None` for a table the plan does not have or that carries no data.
     pub fn format_data<'a>(&'a self, locale: &'a str) -> Option<(&'a str, Option<&'a str>)> {
-        let (table, extension) = match locale.find("-u-") {
-            Some(at) => (&locale[..at], &locale[at + 3..]),
-            None => (locale, ""),
+        let (table, cycle) = match locale.split_once(' ') {
+            Some((table, cycle)) => (table, Some(cycle).filter(|c| matches!(*c, "h12" | "h23"))),
+            None => (locale, tag_hour_cycle(locale)),
         };
         let data = self
             .locales
@@ -208,7 +212,7 @@ impl Plan {
             .find(|row| self.str(row.name) == table)
             .map(|row| self.str(row.format))
             .filter(|data| !data.is_empty())?;
-        Some((data, hour_cycle(extension)))
+        Some((data, cycle))
     }
 
     /// Strings and their slot come together; each table is sorted by key

@@ -22,11 +22,13 @@ test('every formatter is Intl\'s in each locale, as the runner\'s', () => {
 });
 
 test('the format slot is the table with the hour cycle the page forces', () => {
-  expect(formatTag('de', 'en-US-u-hc-h23')).toBe('de-u-hc-h23');
-  expect(formatTag('de', 'en-US-u-rg-gbzzzz-hc-h12')).toBe('de-u-hc-h12');
+  expect(formatTag('de', 'en-US-u-hc-h23')).toBe('de h23');
+  expect(formatTag('de', 'en-US-u-rg-gbzzzz-hc-h12')).toBe('de h12');
+  expect(formatTag('de-u-ca-gregory', 'en-US-u-hc-h12')).toBe('de-u-ca-gregory h12');
+  expect(formatTag('de-u-hc-h12', 'en-US-u-hc-h23')).toBe('de-u-hc-h12');
   expect(formatTag('de', 'de-DE-u-hc-h11')).toBe('de');
   expect(formatTag('de', 'de-DE')).toBe('de');
-  expect(formatSlot(() => 'fr')()).toBe('fr-u-hc-h12');
+  expect(formatSlot(() => 'fr')()).toBe('fr h12');
   // "" formats en-US, with no record.
   expect(roster.x_formatTime(0, 0, 'short', '')).toBe('12:00 AM');
 });

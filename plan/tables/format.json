@@ -18,7 +18,7 @@
     {
       "name": "format",
       "codec": "opt:slots",
-      "_comment": "@ref LLP 1054.000.003 D6 (amended 2026-11-12): the root string slot holding the locale the formatters format in, the resolved table's name and the viewer's forced hour cycle (`de`, `en-u-hc-h23`); every localized roster entry's call reads it as its last argument. Set exactly when the `locales` rows carry format data. The runner writes it with the locale slot."
+      "_comment": "@ref LLP 1054.000.003 D6 (amended 2026-11-12): the root string slot holding the locale the formatters format in, the resolved table's whole name, then, after a space, the hour cycle the viewer forces unless the name forces one (`de`, `de h23`, `de-u-ca-gregory`); every localized roster entry's call reads it as its last argument. Set exactly when the `locales` rows carry format data. The runner writes it with the locale slot."
     },
     {
       "name": "snapshot_entry",

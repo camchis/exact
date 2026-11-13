@@ -61,7 +61,7 @@ fn every_formatter_is_intl_s_in_each_locale() {
     let rows = rows();
     let mut tags: Vec<&str> = rows
         .iter()
-        .map(|r| r.0.split("-u-").next().unwrap())
+        .map(|r| r.0.split(' ').next().unwrap())
         .collect();
     tags.dedup();
     let plan = plan(&tags);
@@ -130,7 +130,8 @@ fn en_s_data_is_the_built_in_en_us() {
 
 /// A table CLDR lists none of the prefixes of formats as `en`; a table's
 /// region and script choose among CLDR's (`de-CH`'s apostrophes, `ar-EG`'s
-/// digits); only `h12` and `h23` force an hour cycle.
+/// digits); a table is named whole, extension and all; only `h12` and `h23`
+/// force an hour cycle, the viewer's after a space, else the name's own.
 #[test]
 fn a_table_formats_as_its_nearest_listed_locale() {
     let record = contract_lower::formats::record;
@@ -140,7 +141,7 @@ fn a_table_formats_as_its_nearest_listed_locale() {
     assert_eq!(record("DE-ch"), record("de-CH"));
     assert!(contract_lower::formats::records(["en", "en-US"]).is_none());
     assert!(contract_lower::formats::records(["en", "fr"]).is_some());
-    let plan = plan(&["de"]);
+    let plan = plan(&["de", "de-u-ca-gregory", "de-u-hc-h12"]);
     let at = |locale: &str| {
         formatting(
             Stdlib::FormatTime,
@@ -154,8 +155,20 @@ fn a_table_formats_as_its_nearest_listed_locale() {
         )
     };
     assert_eq!(at("de"), Some(Value::str("14:13")));
+    assert_eq!(at("de h12"), Some(Value::str("02:13 PM")));
+    assert_eq!(at("de h11"), Some(Value::str("14:13")));
+    assert_eq!(at("de-u-ca-gregory"), Some(Value::str("14:13")));
+    assert_eq!(at("de-u-ca-gregory h12"), Some(Value::str("02:13 PM")));
     assert_eq!(at("de-u-hc-h12"), Some(Value::str("02:13 PM")));
-    assert_eq!(at("de-u-hc-h11"), Some(Value::str("14:13")));
+    // The format slot's spelling: the name's own cycle stands over the viewer's.
+    let tag = exact_plan::strings::format_tag;
+    assert_eq!(
+        tag("de-u-ca-gregory", "en-US-u-hc-h12"),
+        "de-u-ca-gregory h12"
+    );
+    assert_eq!(tag("de-u-hc-h12", "en-US-u-hc-h23"), "de-u-hc-h12");
+    assert_eq!(tag("de", "en-US-u-rg-gbzzzz-hc-h23"), "de h23");
+    assert_eq!(tag("de", "de-DE-u-hc-h11"), "de");
     // A table the plan lacks is refused, never guessed.
     assert_eq!(at("fr"), None);
 }
