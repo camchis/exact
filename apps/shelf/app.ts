@@ -280,7 +280,9 @@ const sources: Sources = {
           key: String(w.key),
           title: String(w.title),
           author: w.authors?.[0]?.name ?? 'Unknown author',
-          pages: 300, // the subjects endpoint has no page counts; default and let the user edit
+          // The subjects endpoint has no page counts: the length is unknown,
+          // so the book shows and counts no progress.
+          pages: 0,
           coverUrl: w.cover_id ? `https://covers.openlibrary.org/b/id/${w.cover_id}-M.jpg` : '',
         })),
       };

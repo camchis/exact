@@ -1,6 +1,7 @@
 # A discovered Shelf book is stored as 300 pages
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** A discovered work is added with an unknown length (0 pages), so it shows and counts no progress and finishing it moves no page; a reading book of unknown length shows its status in the list rather than page 0 of 0.
 **Systems:** apps/shelf
 **Severity:** P2
 **Author:** Grok 4.7

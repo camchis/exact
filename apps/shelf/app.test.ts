@@ -88,6 +88,26 @@ test('a fresh widget reads the same library as the app, then follows edits', asy
   expect(await call('widgetLibrary', 5678)).toEqual([{ date: 5678, props: { count: 2, latest: 'Piranesi' } }]);
 });
 
+// Open Library's subjects carry no page count, so a discovered work's length
+// is unknown, and finishing it moves no page.
+test('a discovered work is added without a length, and finishing it moves no page', async () => {
+  const { call } = await shelf();
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = (async () => Response.json({ works: [{ key: '/works/OL1W', title: 'Found', authors: [{ name: 'Someone' }] }] })) as unknown as typeof fetch;
+  try {
+    const [work] = (await call('subjectWorks', 'fantasy')).works;
+    expect(work.pages).toBe(0);
+    await call('addBook', work.title, work.author, work.pages, 'want', work.coverUrl, work.key, 1);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+  const found = (await call('library')).books.find((b: { sourceKey: string }) => b.sourceKey === '/works/OL1W');
+  await call('setStatus', found.id, 'done');
+  const done = (await call('library')).books.find((b: { id: string }) => b.id === found.id);
+  expect(done).toMatchObject({ pages: 0, currentPage: 0, status: 'done' });
+  expect((await call('library')).pagesRead).toBe(304 + 120);
+});
+
 // Only a missing file is a first launch. Any other failed read leaves the
 // library not ready and refuses every edit, so the seed never replaces it.
 test('a failed read is not a first launch, and no edit saves over the stored library', async () => {

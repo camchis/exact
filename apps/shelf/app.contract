@@ -841,12 +841,12 @@ component BookRow
           text book.title font="-exact-headline" line-clamp=2 testId=`book-title-${book.id}`
           text book.author font="-exact-subheadline" color="-exact-secondary-label"
           row align-items="center" gap=6
-            text (book.status == "reading" ? `${percent(book.currentPage, book.pages)}% · page ${book.currentPage} of ${book.pages}` : statusLabel(book.status)) font="-exact-footnote"
+            text (book.status == "reading" and book.pages > 0 ? `${percent(book.currentPage, book.pages)}% · page ${book.currentPage} of ${book.pages}` : statusLabel(book.status)) font="-exact-footnote"
               color="-exact-secondary-label"
               testId=`book-status-${book.id}`
             if book.status == "done" and book.rating > 0
               Stars(value=book.rating, tid=`book-stars-${book.id}`)
-          if book.status == "reading"
+          if book.status == "reading" and book.pages > 0
             Meter(value=percent(book.currentPage, book.pages), tid=`book-progress-${book.id}`)
         image "symbol:forward-chevron" aria-hidden=true
           font="-exact-footnote"
