@@ -1,6 +1,7 @@
 # Native URLSearchParams iteration copies the complete query for every entry
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** Ibex's URLSearchParams iterates live itself, keeping the parsed pairs until the query changes, and Exact's per-step snapshot wrapper is removed.
 **Systems:** js/src/pure.js, vendored Ibex URLSearchParams binding
 **Author:** Codex
 **Date:** 2026-11-12

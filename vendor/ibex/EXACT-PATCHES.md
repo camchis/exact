@@ -905,3 +905,15 @@ takes `&mut` to install the authorizer, and reports a failed prepare as
 `SqlInputError`, whose text appends the whole SQL and an offset;
 `sql_error` reads SQLite's message from it, so a refusal and a batch's
 shortened statement read as before. Replay on a refresh.
+
+## Local patch 39, live URLSearchParams iteration parsed once per change
+
+`bindings/url.js` iterates as WebIDL's pair iterators do: each `next()`
+reads the pair at its index in the list as the list is then, and
+`forEach` likewise. The parsed pairs are kept until the query changes (a
+view's URL replaces its components on every change; a list of its own
+drops them on a write), so iterating an unchanged query of N pairs parses
+it once rather than N times. Exact's `js/src/pure.js` wrapper, which made
+iteration live by taking a snapshot per step, is gone.
+`js/tests/it/pure.rs` checks mutation during iteration against Chrome and
+the scaling. Replay on a refresh unless upstream iterates live.

@@ -202,7 +202,26 @@ export function exercise(source: string): string {
     const live=new URLSearchParams('a=1'), iterator=live.entries();
     const seen=[iterator.next().value];live.append('b','2');seen.push(iterator.next().value);
     const visits:string[]=[];live.forEach((v,k)=>{visits.push(k+v);if(k==='a')live.append('c','3');});
-    return JSON.stringify({seen,visits,first,linked,href:url.href,same:params===url.searchParams,entries:Array.from(params),bad:URL.canParse('/x'),parse:URL.parse('not a url'),nul:new URLSearchParams([['\0','\0']]).get('\0')});
+    // An iterator reads the list at its index as the list is at each step
+    const order=new URLSearchParams('a=1&b=2&c=3&d=4'), stepped=order.keys(), steps:unknown[]=[stepped.next().value];
+    order.delete('a');steps.push(stepped.next().value);order.append('e','5');
+    steps.push(stepped.next().value,stepped.next().value,stepped.next().done);
+    order.append('f','6');steps.push(stepped.next().value);
+    // through its owning URL too, and a pair it hands out is the caller's own
+    const owner=new URL('https://example.test/?x=1&y=2'), viewed=owner.searchParams.entries(), views:unknown[]=[viewed.next().value];
+    owner.search='?p=1&q=2&r=3';const pair=viewed.next().value!;pair[0]='changed';views.push(pair,String(owner.searchParams));
+    owner.href='https://example.test/?only=1';views.push(viewed.next().done,owner.searchParams.size);
+    return JSON.stringify({seen,visits,steps,views,first,linked,href:url.href,same:params===url.searchParams,entries:Array.from(params),bad:URL.canParse('/x'),parse:URL.parse('not a url'),nul:new URLSearchParams([['\0','\0']]).get('\0')});
+  }
+  if(source==='searchParamsWork') {
+    // Iterating 2,000 unchanged pairs three ways, within the test's turn budget
+    const n=2000, query=Array.from({length:n},(_,i)=>`k${i}=${i}`).join('&');
+    const params=new URLSearchParams(query), owner=new URL('https://example.test/?'+query);
+    let seen=0;
+    for(const pair of params)seen+=pair.length/2;
+    params.forEach(()=>{seen++;});
+    for(const _ of owner.searchParams.keys())seen++;
+    return String(seen);
   }
   if(source==='standard') {
     // What a web developer expects of a data module (docs/reference.md):
