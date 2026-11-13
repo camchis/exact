@@ -383,3 +383,17 @@ for (const ending of ['resolves', 'rejects', 'destroy-session']) {
     expect(impl.state().sessions.find(s => s.id === copy.id).turns).toBe(2);
   });
 }
+
+// The agent path (§9): a create waiting on the download it started ends when the preferred availability changes.
+for (const after of ['available', 'unavailable']) {
+  test(`a create waiting on a download answers when the model becomes ${after}`, async () => {
+    const impl = implementation({ agent: true, now: () => 0, foreground: () => true, changed() {}, invoke: async () => ({ text: 'null' }) });
+    implementations.push(impl);
+    impl.preferred({ languageModelAvailability: { availability: 'downloadable' } });
+    const created = impl.createLanguageModel({}, { origin: 'app' });
+    expect(await impl.languageModelAvailability()).toMatchObject({ availability: 'downloading' });
+    impl.preferred({ languageModelAvailability: { availability: after } });
+    if (after === 'available') expect(await created).toMatchObject({ id: expect.stringMatching(/^session-/) });
+    else expect(await created).toEqual({ error: 'NotSupportedError' });
+  });
+}

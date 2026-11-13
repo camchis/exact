@@ -1,6 +1,7 @@
 # Web model create throws when a download becomes unavailable
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** A create waiting on the agent's download is resolved with `{error: 'NotSupportedError'}` when the model becomes unavailable, instead of rejected.
 **Systems:** packages/language-model
 **Severity:** P2
 **Author:** Grok 4.7

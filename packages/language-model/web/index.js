@@ -50,7 +50,8 @@ export function implementation({ changed, agent, now, foreground, log, invoke })
   let serial = 0;
   // The agent's words (§9) and its preferred availability, laid over the agent model's.
   let overlay = {}, script = [], scriptSeen = '', rate = TOKEN_MS, agentWindow = WINDOW;
-  // A download a create started, and the creates waiting on it (D5).
+  // A download a create started, and the creates waiting on it (D5): each resolved with null when the model is
+  // available, or with the error its create answers.
   let downloading = null;
   const waiting = [];
   const announce = key => changed(key);
@@ -435,7 +436,8 @@ export function implementation({ changed, agent, now, foreground, log, invoke })
             say('download started (agent)');
             announce(AVAILABILITY);
           }
-          await new Promise((resolve, reject) => waiting.push({ resolve, reject }));
+          const failed = await new Promise(resolve => waiting.push(resolve));
+          if (failed) return failed;
         }
         try { return createdOr(makeSession(args)); } catch (e) { return errorOf(e, 'TypeError'); }
       }
@@ -563,10 +565,10 @@ export function implementation({ changed, agent, now, foreground, log, invoke })
       if (now_.availability === 'available' && (downloading || waiting.length)) {
         downloading = null;
         say('download finished (agent)');
-        for (const w of waiting.splice(0)) w.resolve();
+        for (const w of waiting.splice(0)) w(null);
       } else if (now_.availability === 'unavailable' && waiting.length) {
         downloading = null;
-        for (const w of waiting.splice(0)) w.reject(Object.assign(new Error('the model became unavailable'), { name: 'NotSupportedError' }));
+        for (const w of waiting.splice(0)) w({ error: 'NotSupportedError' });
       }
     },
     /** A call let go (D15 item 2): its prompt's generation aborted. */
