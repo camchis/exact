@@ -1,6 +1,7 @@
 # Apple's compact number formatter rereads options after construction
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The compact-number fallback copies the options it reads at format time when it is constructed, so changing the caller's options object afterwards changes neither its output nor its resolved options.
 **Systems:** js/src/intl.js
 **Severity:** P3
 **Author:** Codex, repository review
