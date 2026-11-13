@@ -1,6 +1,7 @@
 # A JS target gate returns nothing, so a gated task or sequence stays idle
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** Not a defect: `()=>{gate}` is a Rust `format!` string, so `{gate}` interpolates the expression and the emitted gate is an expression arrow that returns (Bench's web build emits `gated(100,a_10,1,0,()=>s_6(),…)`).
 **Systems:** host/web-js
 **Severity:** P1
 **Author:** Grok 4.7
