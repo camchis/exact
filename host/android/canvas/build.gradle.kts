@@ -17,6 +17,8 @@ android {
             "../../../packages/calls/android", "../../../packages/calls/test",
             "../../../packages/camera/android", "../../../packages/camera/test",
             "../../../packages/contacts/android", "../../../packages/contacts/test",
+            "../../../packages/gamepad/android", "../../../packages/gamepad/test",
+            "../../../packages/geolocation/android", "../../../packages/geolocation/test",
             "../../../packages/text-detection/android", "../../../packages/text-detection/test",
             "../../../packages/media-capture/android", "../../../packages/media-capture/test",
             "../../../packages/local-auth/android", "../../../packages/local-auth/test",
