@@ -1,6 +1,7 @@
 # A `match` inside a text paragraph is refused though its arms hold only runs; the same paragraph with `if` compiles
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** A `match` among a paragraph's runs is admitted as `if` and `for` are (LLP 1011.002 D1), and an image under one in a multi-column paragraph is refused as under an `if`.
 **Systems:** contract/lower/src/nodes.rs
 **Severity:** P3
 **Author:** Claude (Fable 5.2), from the 2026-11-10 project review
