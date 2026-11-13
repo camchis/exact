@@ -11,7 +11,7 @@
 //! may name any element, so with one there is no warning; a computed argument
 //! (a prop the caller fills included) is not checked.
 
-use super::{literal, miswiring::arms};
+use super::literal;
 use crate::theme::scan::{exprs, stmts};
 use crate::LowerError;
 use contract_syntax::{Expr, Node, Span};
@@ -103,7 +103,7 @@ impl Ids {
                 Node::Use { .. } => return None,
                 _ => {}
             }
-            stack.extend(arms(node).into_iter().flatten());
+            stack.extend(node.children());
         }
         Some(found)
     }
