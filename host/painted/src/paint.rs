@@ -1059,6 +1059,13 @@ impl Painter {
         let mut paint = BoxPaint::capture(node, walk.scene.kernel, self.dark)
             .presented(&shown.colors)
             .states(node, &shown, self.dark);
+        if let Some(section) = walk.scene.kernel.grouped_card_section(node.id) {
+            if let Some(owner) = walk.scene.kernel.node(section) {
+                paint = paint.section_shadow(&owner, &(walk.scene.presented)(section), self.dark);
+            }
+        } else if walk.scene.kernel.grouped_section_card(node.id).is_some() {
+            paint.shadows.clear();
+        }
         self.split_row(node, &mut paint);
         if self.bare(node) {
             paint.background = [0; 4];

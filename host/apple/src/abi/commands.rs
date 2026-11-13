@@ -597,7 +597,10 @@ impl<D: DataSource> Bridge<D> {
                     opt(&s.footer, &mut json);
                     look(",\"headerLook\":", &s.header_look, &mut json);
                     look(",\"footerLook\":", &s.footer_look, &mut json);
-                    json.push_str(&format!(",\"card\":{}", s.card));
+                    json.push_str(&format!(
+                        ",\"card\":{},\"cardView\":{}",
+                        s.card, s.card_view
+                    ));
                     json.push_str(&format!(
                         ",\"spaceAbove\":{}",
                         s.space_above.map_or("null".into(), |v| v.to_string())

@@ -80,6 +80,7 @@ mod gamepad;
 mod geometry;
 mod glass_tint;
 mod grouped_action;
+mod grouped_card;
 mod grouped_choice;
 mod grouped_list;
 mod grouped_margins;
