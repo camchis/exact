@@ -265,6 +265,9 @@ export function apkDirs(app) {
   return own ? { app: resolve(root, 'app'), canvas: resolve(root, 'canvas'), cache: resolve(root, 'gradle'), kotlin: resolve(root, 'kotlin') }
     : { app: resolve(READER, 'app/build', app.name), canvas: resolve(READER, 'canvas/build', app.name), cache: resolve(READER, '.gradle/apps', app.name), kotlin: resolve(READER, '.kotlin/apps', app.name) };
 }
+/** Where `build <app> --apk` writes the shell's build: the roster it generates (`extensions/`), the merged manifests
+ * (`intermediates/`) and the APK (`outputs/apk/`). `app` is a name or a directory, resolved as the build resolves it. */
+export const apkBuildDir = (app) => apkDirs(resolveApp(app)).app;
 /** The APK `build <app> --apk` makes. */
 const readerApk = (app) => resolve(apkDirs(app).app, 'outputs/apk/release/app-release.apk');
 /** What `build --apk` records beside the APK, for a drive to tell whether it is older than its sources: when the build
