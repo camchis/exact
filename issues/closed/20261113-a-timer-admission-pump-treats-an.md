@@ -1,6 +1,7 @@
 # A timer admission pump treats an advance stop as continue
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The admission check continues only when `advance` answers `true`; a journal line (a refused timer, the fire limit) ends the turn and `drive` schedules the rest.
 **Systems:** host/web-js
 **Severity:** P2
 **Author:** Grok 4.7
