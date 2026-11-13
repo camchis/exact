@@ -2092,9 +2092,10 @@ A TypeScript source's `http:`/`https:` stream whose 2xx body is not
 2026-10-23): each `message` has an ArrayBuffer `data`, the bytes read since the
 mapper's last turn, at arbitrary boundaries (a framing is the mapper's to
 parse), never dropped or coalesced. At most 1 MiB, or the stream's
-`exactIndependentHttp.maxResponseBytes` if smaller, waits for the mapper; a read
-past it ends the stream with `Refused` (`byte stream receive queue exceeds 1
-MiB`) after the bytes already waiting. The body's end is `Network`, `the byte
+`exactIndependentHttp.maxResponseBytes` if smaller, waits in the receive queue. A read that would pass this bound waits until
+the runner takes the queued bytes; the host stops reading in the meantime.
+A slow drain loses no bytes and does not end the stream. The separate limit
+on messages waiting behind an unsettled mapper still applies. The body's end is `Network`, `the byte
 stream ended`. A 204, a 205 and a `HEAD` have no body and stay the one answer.
 The request carries `Accept: text/event-stream`, as every stream's does, unless
 the source names an `accept` header; name one where the server negotiates by
