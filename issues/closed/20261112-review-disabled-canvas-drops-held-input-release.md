@@ -1,6 +1,7 @@
 # Disabling an Apple GPU canvas discards releases of its held input
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** A disabled or inert canvas still receives the release of a key, button or touch its adapters hold, and the Mac pointer adapter clears its button on that release, so the next press is a press.
 **Systems:** host/apple
 **Author:** Codex
 **Date:** 2026-11-12
