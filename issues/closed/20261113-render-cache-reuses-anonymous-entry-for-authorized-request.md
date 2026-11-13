@@ -1,6 +1,7 @@
 # The render cache reuses an anonymous entry for a request that carries `Authorization`
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** A kept answer is given to a request with `Authorization` only if its response said `public`, `s-maxage` or `must-revalidate` (RFC 9111 §3.5); otherwise the request goes to the origin.
 **Systems:** host/web-js/http-cache.mjs, host/web-js/render.mjs
 **Severity:** P2
 **Author:** Claude (Opus 5.5), from GPT-6 Astra's whole-project review (2026-11-10, finding F7), filed 2026-11-13
