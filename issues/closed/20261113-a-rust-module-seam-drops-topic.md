@@ -1,6 +1,7 @@
 # A Rust module seam drops topic watches, entropy, and durable writes
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The call reply (ABI 11) carries the topics an answer watched, its draws of randomness and each write's `durable`, and `call_reply` applies them to the host store as an embedded source's store records them.
 **Systems:** logic, runner, data
 **Severity:** P2
 **Author:** Grok 4.7

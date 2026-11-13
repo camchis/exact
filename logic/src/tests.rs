@@ -187,6 +187,9 @@ pub(crate) fn wasm_with_contract(call: &str, stateless: bool) -> Vec<u8> {
     });
     let answer = encoded(2, |w| {
         w.u8(1);
+        // No topic, no draw of randomness.
+        w.u32(0);
+        w.u32(0);
         w.u32(1);
         w.string("token");
         w.u8(1);
