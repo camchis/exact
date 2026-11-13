@@ -21,6 +21,7 @@ android {
             "../../../packages/geofencing/android", "../../../packages/geofencing/test",
             "../../../packages/geolocation/android", "../../../packages/geolocation/test",
             "../../../packages/text-detection/android", "../../../packages/text-detection/test",
+            "../../../packages/language-model/android", "../../../packages/language-model/test",
             "../../../packages/media-capture/android", "../../../packages/media-capture/test",
             "../../../packages/motion/android", "../../../packages/motion/test",
             "../../../packages/local-auth/android", "../../../packages/local-auth/test",
@@ -36,6 +37,7 @@ dependencies {
     testImplementation("com.google.android.play:age-signals:0.0.4")
     testImplementation("com.google.mlkit:text-recognition:16.0.1")
     testImplementation("com.google.mlkit:barcode-scanning:17.3.0")
+    testImplementation("com.google.mlkit:genai-prompt:1.0.0-beta4")
     testImplementation("junit:junit:4.13.2")
     testImplementation(libs.robolectric)
     testImplementation("androidx.camera:camera-camera2:1.6.2")
