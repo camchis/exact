@@ -1,6 +1,7 @@
 # An Apple file picker can deliver its answer to a replacement tree
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** A picker request carries the `GenerationStamp` it was shown in and its answer, picked or cancelled, is dropped once that generation has ended; the open mark is kept per generation, so a replacement's input opens its own picker at once.
 **Systems:** host/apple/Sources/ExactKit/Picker.swift, host/apple/Sources/ExactKit/Session.swift
 **Author:** Codex
 **Date:** 2026-11-12

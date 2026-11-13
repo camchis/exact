@@ -94,4 +94,46 @@ final class GenerationStampTests: XCTestCase {
         drain()
         XCTAssertFalse(logs(session).contains("presence key:"), "the old batch's check was started")
     }
+
+    // MARK: file picker
+
+    private static let picking = """
+    component App
+      state picked = "none"
+      state cancels = 0
+      action onPick(files: Picked[])
+        picked = match first(files) { case some(f) => f.name, case none => "empty" }
+      action onCancel
+        cancels = cancels + 1
+      view
+        column
+          input type="file" id="attach" change=onPick cancel=onCancel
+
+    """
+
+    private func slots(_ session: ExactSession) throws -> [String: Any] {
+        let state = try XCTUnwrap(try JSONSerialization.jsonObject(with: Data(session.agent(#"{"op":"state"}"#).utf8)) as? [String: Any])
+        return try XCTUnwrap(state["slots"] as? [String: Any])
+    }
+
+    /// A picker shown before a reload answers after it, when the same page
+    /// has put its input at the old one's node id.
+    func testAPickerShownBeforeAReloadAnswersNoInputAfterIt() throws {
+        let session = try session(Self.picking)
+        let old = try XCTUnwrap(session.picker.request("attach"))
+        XCTAssertNil(session.picker.request("attach"), "open: a second showPicker does nothing")
+        XCTAssertTrue(session.apply(try compile(Self.picking)))
+        let new = try XCTUnwrap(session.picker.request("attach"), "the replacement's input opens its own picker at once")
+        XCTAssertEqual(new.view, old.view, "the replacement numbers its nodes afresh")
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID().uuidString).txt")
+        try Data("old".utf8).write(to: file)
+        defer { try? FileManager.default.removeItem(at: file) }
+        session.picker.finish(old, files: [(file, "old.txt")])
+        session.picker.finish(old, files: [])
+        XCTAssertEqual(try slots(session)["picked"] as? String, "none", "the old pick changed the new input")
+        XCTAssertEqual(try slots(session)["cancels"] as? Int, 0, "the old cancel reached the new input")
+        XCTAssertNil(session.picker.request("attach"), "the new input's picker is still open")
+        session.picker.finish(new, files: [])
+        XCTAssertEqual(try slots(session)["cancels"] as? Int, 1, "the current generation's cancel")
+    }
 }
