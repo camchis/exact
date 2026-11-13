@@ -1,6 +1,7 @@
 # A dependency install can take the lock from another live install
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The install lock is an OS lock on a file that is never removed, released when its holder finishes or dies and never for its age, and the bun.lock repair runs under it too.
 **Systems:** build tooling, dependency installation
 **Author:** Codex
 **Date:** 2026-11-12
