@@ -1,6 +1,7 @@
 # An SSE event at exactly the ceiling is refused
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The native and web event-stream parsers count a data field's line feed only once another field follows, so an event whose delivered data is exactly the ceiling passes.
 **Systems:** host
 **Severity:** P3
 **Author:** Grok 4.7
