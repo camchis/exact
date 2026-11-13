@@ -326,7 +326,8 @@ final class TextRasterizer {
     /// The reach adds the ink a job keeps past its box (`maxInkOverflow`), the
     /// largest step between baselines (a line with an inline image), four
     /// times the largest font size (a glyph whose ink reaches past its line)
-    /// and, when the text has a shadow, the shadow's reach.
+    /// and how far the shadows in its pixels are cast up and down
+    /// (`Spec.shadowRows`), however far that is.
     static func lines(_ geometry: LineGeometry, in key: TextRasterKey) -> ([CFRange], [CGFloat]) {
         let baselines = geometry.baselines
         guard let clip = key.clip, geometry.clamped == nil, baselines.count == geometry.ranges.count, baselines.count > 1 else {
@@ -335,9 +336,9 @@ final class TextRasterizer {
         var gap: CGFloat = 0
         for i in 1..<baselines.count { gap = max(gap, baselines[i] - baselines[i - 1]) }
         let size = key.spec.runs.map(\.size).max() ?? 0
-        let shadowed = key.spec.shadow != nil || key.spec.hdrShadow != nil || key.spec.runs.contains { $0.shadow != nil }
-        let reach = TextRasterJob.maxInkOverflow + gap + 4 * size + (shadowed ? TextRasterJob.maxShadowReach : 0)
-        let low = clip.minY - reach, high = clip.maxY + reach
+        // A line above the band reaches it with a shadow cast down, one below with a shadow cast up.
+        let reach = TextRasterJob.maxInkOverflow + gap + 4 * size, shadows = key.spec.shadowRows
+        let low = clip.minY - reach - shadows.down, high = clip.maxY + reach + shadows.up
         guard let first = baselines.firstIndex(where: { $0 >= low }) else { return ([], []) }
         let end = baselines[first...].firstIndex(where: { $0 > high }) ?? baselines.count
         return (Array(geometry.ranges[first..<end]), Array(baselines[first..<end]))
