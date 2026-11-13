@@ -18,7 +18,9 @@ impl AppDir {
         ));
         std::fs::create_dir_all(dir.join("assets")).unwrap();
         std::fs::write(dir.join("app.contract"), source).unwrap();
-        AppDir(dir)
+        // The source graph names canonical paths; macOS's temporary
+        // directory is under a symlink (`/var` is `/private/var`).
+        AppDir(dir.canonicalize().unwrap())
     }
 
     /// Each `lower-asset-path` refusal, its line and message.
