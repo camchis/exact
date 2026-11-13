@@ -1,6 +1,7 @@
 # The LLP reader opens a different document when the requested file is missing
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** Only an existing directory opens its corpus's first document; any other path is read as named, so a missing file fails with its message and the previously open document stays.
 **Systems:** LLP reader data source
 **Author:** Codex
 **Date:** 2026-11-12
