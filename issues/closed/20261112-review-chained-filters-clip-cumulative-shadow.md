@@ -1,6 +1,7 @@
 # Chained CSS filters clip the shadow added by a later filter
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** Each CSS filter function now grows the region from the chain's output so far, so a later shadow or blur reaches past what an earlier one spread, on the box and SVG paths alike.
 **Systems:** kernel/src/svg/scene/filter.rs, native filter rendering
 **Severity:** P2
 **Author:** Codex, repository review
