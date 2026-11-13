@@ -1,6 +1,7 @@
 # Releasing one barcode group ends the shared scan
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** Apple and the web count the runner's argument groups per scan as Android does (interval and the formats' order included), and end a scan only when the last group reading it is released.
 **Systems:** packages/barcode-detection
 **Severity:** P2
 **Author:** Grok 4.7
