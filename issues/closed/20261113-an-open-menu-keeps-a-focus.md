@@ -1,6 +1,7 @@
 # An open menu keeps a focus index after its rows change
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** sync_surface remembers the focused row's node before measuring and selects that node again in the new rows, or clears the focus when it is gone.
 **Systems:** host/linux
 **Severity:** P3
 **Author:** Grok 4.7
