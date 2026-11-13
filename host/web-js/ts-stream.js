@@ -10,7 +10,7 @@ import { bodyFromRefusal, methodOf, readBodyFile } from './ts-body-from.js';
 import { refuseStreamBody } from './uploads.js';
 
 const KINDS = ['Response', 'Network', 'Refused', 'Unsupported', 'Aborted', , , , , , 'Timeout'], said = new TextDecoder(), utf8 = new TextEncoder();
-// Hermes's checks and words on `init` (js/src/prelude.js `fetch`): a
+// Hermes's checks and words on `init` (js/src/fetch.js `request`): a
 // refusal ends the stream with that message, which fails the answer.
 function request(input, init, redirect, protocols) {
   if (typeof init.exactStream !== 'function') throw new TypeError('exactStream maps each event to the answer: (event) => value');
@@ -54,7 +54,7 @@ function uploadOf(init, method, url, redirect) {
   if (redirect !== undefined && redirect !== 'follow') throw new TypeError('exactUploadProgress: an upload follows its redirects');
   return true;
 }
-// `exactLongPoll` (LLP 1016.000 D8), as js/src/prelude.js `longPollOf` checks it.
+// `exactLongPoll` (LLP 1016.000 D8), as js/src/binary.js `longPollOf` checks it.
 function longPollOf(poll, method, url) {
   if (poll === undefined) return undefined;
   if (/^wss?:/i.test(url)) throw new TypeError('exactLongPoll: a long poll is HTTP, not a WebSocket');

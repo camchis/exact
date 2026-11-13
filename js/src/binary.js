@@ -2,14 +2,13 @@
 // prelude.js: native request bytes, base64 for what crosses the seam
 // as JSON, a string's UTF-8 length, a stream message's data, a long
 // poll's terms as the seam carries them (LLP 1016.000 D8), an upload's
-// option and events, a fetch's body and file
-// options, an image call's options and an answer's timers (here, beside the
-// prelude, under its line cap). Natively a
+// option and events, and a fetch's body and file options. Natively a
 // binary message (a byte stream's bytes, a socket's frame; LLP 1016.000)
 // names only its size, and the host fills an ArrayBuffer of it through the
 // bytes door (op 9, js/src/crypto.rs): base64 decoded byte by byte in the
-// interpreter cost 1.8 ms a 12 KB message. Evaluated just before prelude.js,
-// which takes `__exact_binary` and deletes it: natively, and on the web in
+// interpreter cost 1.8 ms a 12 KB message. Evaluated just before the
+// prelude's scripts, whose prelude.js takes `__exact_binary` and deletes
+// it: natively, and on the web in
 // the module realm's iframe (module-glue.js) or its worker (module-worker.js).
 (function (global) {
   "use strict";
@@ -174,48 +173,6 @@ function socketProtocols(value, socket) {
       unprotect: function (name, options) { return call("unprotect", name, options); },
     });
   }
-  // The image calls' options (prelude.js `imageCall`), checked before
-  // anything is queued, as the host's arguments after `from` and `to`:
-  // `compressImage`'s two numbers and type (LLP 1069.002 A1, A1.11), then its
-  // edit, and `transformImage`'s all, each as the one JSON value the codec
-  // reads (LLP 1133.019 D17).
-  var IMAGE_WORDS = { flip: ["horizontal", "vertical"], resizeQuality: ["pixelated", "low", "medium", "high"], metadata: ["keep", "no-location", "none"] };
-  function imageOptions(api, options, transform) {
-    var out = {}, crop;
-    function fail(says) { throw new TypeError(api + ": " + says); }
-    function take(name, ok, says) {
-      var value = options[name];
-      if (value === undefined) return;
-      if (!ok(value)) fail(name + " must be " + says);
-      out[name] = value;
-    }
-    function word(name) { take(name, function (w) { return IMAGE_WORDS[name].indexOf(w) >= 0; }, IMAGE_WORDS[name].map(function (w) { return JSON.stringify(w); }).join(" or ")); }
-    function finite(n) { return typeof n === "number" && isFinite(n); }
-    function side(n) { return Number.isInteger(n) && n >= 1 && n <= 16384; }
-    if (transform ? options !== undefined && (!options || typeof options !== "object") : !options || typeof options !== "object") fail(transform ? "options must be an object" : "options must be {maxDimension, maxBytes}");
-    options = options || {};
-    crop = options.crop;
-    take("rotate", finite, "a finite number of degrees");
-    word("flip");
-    if (crop !== undefined) {
-      if (!crop || typeof crop !== "object" || ![crop.x, crop.y, crop.width, crop.height].every(finite) || !(crop.width > 0 && crop.height > 0)) fail("crop must be {x, y, width, height}, finite, with a positive width and height");
-      out.crop = { x: crop.x, y: crop.y, width: crop.width, height: crop.height };
-    }
-    if (!transform) {
-      var dimension = options.maxDimension, bytes = options.maxBytes, type = options.type === undefined ? "image/jpeg" : options.type;
-      if (!Number.isInteger(dimension) || dimension < 1 || dimension > 8192) fail("maxDimension must be an integer from 1 to 8192");
-      if (!Number.isInteger(bytes) || bytes < 1 || bytes > 67108864) fail("maxBytes must be an integer from 1 to 67108864");
-      if (type !== "image/jpeg" && type !== "image/png") fail("type must be \"image/jpeg\" or \"image/png\"");
-      return [dimension, bytes, type].concat(Object.keys(out).length ? [JSON.stringify(out)] : []);
-    }
-    take("resizeWidth", side, "an integer from 1 to 16384");
-    take("resizeHeight", side, "an integer from 1 to 16384");
-    word("resizeQuality");
-    take("type", function (t) { return typeof t === "string" && /^image\/[a-z0-9.+-]+$/.test(t); }, "a media type such as \"image/jpeg\"");
-    take("quality", function (q) { return typeof q === "number" && q >= 0 && q <= 1; }, "a number from 0 to 1");
-    word("metadata");
-    return [JSON.stringify(out)];
-  }
   // `exactBodyFrom` and `exactBodyTo` (LLP 1108 D6 R2), checked as the web's
   // ts-body-from.js checks them: a refusal's words, or undefined.
   function filePath(name, path) {
@@ -376,110 +333,7 @@ function socketProtocols(value, socket) {
     }
     return { socketOwner: socketOwner, listenOwner: listenOwner, listenEvent: listenEvent, hand: hand };
   }
-  // An answer's own timers (LLP 1027.000 D1 as amended 2026-10-28), for
-  // prelude.js, here under its line cap. `setTimeout` arms one due on the
-  // runner's clock as the call began (`clock`, host door op 21), owned by the
-  // answer running (`owner`, which refuses one outside an answer). An answer
-  // that awaits only its timers parks on the earliest (`wait`), and the
-  // runner asks it again once its clock is there (`fire`): one callback a
-  // turn, so the microtasks each queues run before the next, as a browser
-  // runs them between tasks. An answer that gives its value or is let go
-  // clears the rest (`drop`): their callbacks never run. `setInterval`, the
-  // frame callbacks and the clock reads stay refused. Hermes's rejection
-  // tracker schedules its report with `setTimeout` too: that one runs alone,
-  // at the prelude's next `checkpoint`, which is when a browser fires
-  // `unhandledrejection`.
-  function timers(owner, clock, journal, report, sources) {
-    var armed = new Map(), reports = [], signals = new WeakMap(), next = 1, now = 0;
-    function fixed(name, value) { Object.defineProperty(global, name, { value: value, writable: false, configurable: false }); }
-    // The runner's clock as the call began; where none is (at bake), the last time a timer ran at. Not kept
-    // monotonic: a runner that restarts at zero beside this realm (a dev reload) is the clock from then on.
-    function time() { var c = clock(), t = Number(c); if (c !== undefined && c !== "" && t === t) now = t; return now; }
-    function arm(api, run, ms, args) {
-      var call = owner(api), id = next++;
-      armed.set(id, { call: call, due: Math.ceil(time() + ms), run: run, args: args });
-      return id;
-    }
-    fixed("setTimeout", function setTimeout(callback, delay) {
-      if (typeof callback === "function" && report(callback)) { reports.push({ id: next, run: callback }); return next++; }
-      if (typeof callback !== "function") throw new TypeError("setTimeout(): the callback must be a function; a string of code is never run");
-      return arm("setTimeout()", callback, Math.max(Number(delay) | 0, 0), Array.prototype.slice.call(arguments, 2)); // `long`, as WebIDL converts it
-    });
-    fixed("clearTimeout", function clearTimeout(id) {
-      var timer = armed.get(id);
-      if (timer) timer.call.ran = true; // Its parked deadline must be read again (LLP 1162 D3).
-      armed.delete(id);
-      reports = reports.filter(function (r) { return r.id !== id; });
-    });
-    ["setInterval", "requestAnimationFrame", "requestIdleCallback"].forEach(function (name) {
-      fixed(name, function () { throw new Error(name + "() is unavailable in data sources: an answer waits with setTimeout; pass time as an argument"); });
-    });
-    ["clearInterval", "cancelAnimationFrame", "cancelIdleCallback"].forEach(function (name) { fixed(name, function () {}); });
-    if (global.AbortSignal) global.AbortSignal.timeout = function timeout(ms) {
-      var n = Number(ms);
-      if (!(n >= 0 && n <= 9007199254740991)) throw new TypeError("AbortSignal.timeout(): the delay is a number of milliseconds from 0");
-      var controller = new global.AbortController();
-      var abort = function () { controller.abort(new global.DOMException("signal timed out", "TimeoutError")); };
-      var id = arm("AbortSignal.timeout()", abort, Math.floor(n), []);
-      // Its deadline outlives the timer, which its answer's end drops: a request carrying it still has it.
-      signals.set(controller.signal, { id: id, due: armed.get(id).due, abort: abort });
-      return controller.signal;
-    };
-    // A timeout signal's deadline, or the earliest among the signals one was composed of (`sources`).
-    function deadline(signal) {
-      var s = signal && signals.get(signal), composed = !s && signal && sources(signal);
-      if (composed) composed.forEach(function (input) { var t = signals.get(input); if (t && (!s || t.due < s.due)) s = t; });
-      return s;
-    }
-    function first(call, by) {
-      var found;
-      armed.forEach(function (t, id) { if (t.call === call && t.due <= by && (!found || t.due < found[1].due)) found = [id, t]; });
-      return found;
-    }
-    return {
-      // The earliest of `call`'s timers: when it is due, or undefined.
-      wait: function (call) { var t = first(call, Infinity); return t ? (call.timerDue = t[1].due) : undefined; },
-      armed: function (call) { return first(call, Infinity) !== undefined; },
-      // When `call`'s earliest timer comes due before the fetch carrying
-      // `signal` ends on its own deadline (`left`, which the host keeps): its
-      // time, or undefined. The runner resumes the answer then if no reply came.
-      race: function (call, signal) {
-        var t = first(call, Infinity), s = deadline(signal);
-        return t && !(s && !signal.aborted && s.due <= t[1].due) ? (call.timerDue = t[1].due) : undefined;
-      },
-      now: time,
-      // `call`'s earliest timer due by the clock `at` runs: the runner's, or,
-      // where none is (at bake), the last time a timer ran at. `due`: the
-      // runner says the timer it waited for is due, so that one runs.
-      fire: function (call, at, due) {
-        var t = Number(at);
-        if (at !== "" && t === t) now = t;
-        if (due) now = Math.max(now, call.timerDue || 0);
-        t = first(call, now);
-        if (!t) return;
-        armed.delete(t[0]);
-        try { t[1].run.apply(undefined, t[1].args); }
-        catch (e) { journal("data: a timer's callback threw: " + (e && e.message !== undefined ? e.message : String(e))); }
-      },
-      drop: function (call) { armed.forEach(function (t, id) { if (t.call === call) armed.delete(id); }); },
-      // An `AbortSignal.timeout` still to fire, or one composed of it: the ms
-      // left, the deadline a fetch carrying it gives the host; `expire` aborts
-      // it when that passes, its timer dropped or not, as a browser's fires:
-      // a fetch its answer let go runs to its end (LLP 1146 D2), and another
-      // answer may carry the same signal.
-      left: function (signal) { var s = deadline(signal); return s && !signal.aborted ? Math.max(1, s.due - time()) : undefined; },
-      expire: function (signal) { var s = deadline(signal); if (s && !signal.aborted) { armed.delete(s.id); s.abort(); } },
-      checkpoint: function () {
-        var ran = reports.length > 0;
-        while (reports.length) {
-          var report = reports.shift();
-          try { report.run(); } catch (e) { /* the tracker's own; nothing to tell */ }
-        }
-        return ran;
-      },
-    };
-  }
-  // An answer's reply as JSON (prelude.js `ok`), where a list element that is plain data frozen to its leaves
+  // An answer's reply as JSON (reply.js `ok`), where a list element that is plain data frozen to its leaves
   // keeps its JSON by identity and is spliced back, never walked again: a transcript's window holds its last
   // page's rows (rt1's crossing plan). Frozen plain data, no Proxy in it, can't change once its prototypes
   // are frozen, which hardening does natively; only the native runtime (its byte door) keeps anything, since
@@ -860,11 +714,9 @@ function socketProtocols(value, socket) {
     keptReply: keptReply,
     responses: responses,
     copyBytes: copyBytes,
-    timers: timers,
     fileRefusal: fileRefusal,
     cacheMode: cacheMode,
     FetchError: FetchError,
-    imageOptions: imageOptions,
     toBase64: toBase64,
     utf8Length: utf8Length,
     messageData: messageData,
@@ -877,107 +729,4 @@ function socketProtocols(value, socket) {
     presence: presence,
     sockets: sockets,
   });
-})(globalThis);
-
-// Work that outlives its answer (LLP 1146 D2): a fetch with effects whose
-// answer was let go is adopted, not rejected (`__exact_adopt`), and its reply
-// reaches the let-go answer's continuation in a module turn, which the
-// executor runs outside every answer and commit (js/src/module_work.rs), so
-// what that continuation writes to the store stands on its own. A live
-// answer's step that such a turn settles runs in that answer's own turn, so
-// its reads, writes and fetches are its own. prelude.js takes
-// `__exact_module_work` and deletes it; it is here, in binary.js, so that
-// every realm that evaluates the prelude has it.
-(function (global) {
-  "use strict";
-  // The prelude's hooks: `host` (the door) and `live(call)` (a call still answering).
-  global.__exact_module_work = function (hooks) {
-    var host = hooks.host;
-    // The turn running now, by its call's id: an answer's, MODULE's, or null
-    // (a let-go chain, a background delivery, module evaluation). An id, so
-    // that no ended call's value is kept alive by it.
-    var MODULE = Object.freeze({ id: -1 });
-    var turn = null;
-    var ready = new Map();           // live answer's call -> [steps for its own turn]
-    var discarded = [];              // steps of answers let go before their turn, run with no store
-    var tearingDown = false;
-    var adopted = 0;                 // adopted fetches in flight
-    function waiting() { var n = 0; ready.forEach(function (steps) { n += steps.length; }); return n; }
-    // What may still settle an answer waiting on module work, for the executor.
-    function note() { host(22, "state", JSON.stringify({ outstanding: adopted + waiting() })); }
-    function runDiscarded() {
-      turn = null;
-      for (var n = 0; discarded.length && n < 1024; n++) discarded.shift()();
-    }
-    return Object.freeze({
-      MODULE: MODULE,
-      // The turn now (the executor's `__exact_turn`): an answer's call, MODULE or null.
-      setTurn: function (t) {
-        turn = t ? t.id : null;
-        var steps = t && t !== MODULE ? ready.get(t) : null;
-        if (steps) { ready.delete(t); steps.forEach(function (s) { s(); }); note(); }
-      },
-      // Finish readied storage chains when no further answer turn can run
-      teardown: function () {
-        tearingDown = true;
-        ready.forEach(function (steps) { steps.forEach(function (s) { discarded.push(s); }); });
-        ready.clear();
-        runDiscarded();
-        note();
-      },
-      // The async helper asks before each step whether it runs here. In a
-      // module or background turn a live answer's step waits for its own turn;
-      // anything else runs where it is, the let-go answer's continuation
-      // included. `step(key, arg)` is the helper's next step, bound only when
-      // deferred: this runs before every step of every async function.
-      route: function (at, step, key, arg) {
-        if (tearingDown || !at || (turn !== null && turn !== MODULE.id) || !hooks.live(at)) return false;
-        if (!ready.has(at)) ready.set(at, []);
-        ready.get(at).push(function () { step(key, arg); });
-        note();
-        return true;
-      },
-      // After a module turn, with no store: what let-go answers had waiting.
-      runDiscarded: runDiscarded,
-      // An answer let go: its steps waiting for its turn move to the steps
-      // the let-go chain runs with no store, and stop counting as
-      // outstanding. How many moved.
-      forgot: function (call) {
-        var steps = ready.get(call);
-        if (!steps) return 0;
-        ready.delete(call);
-        steps.forEach(function (s) { discarded.push(s); });
-        note();
-        return steps.length;
-      },
-      inModuleTurn: function () { return turn === MODULE.id; },
-      readied: function (call) { return ready.has(call); },
-      adopted: function () { adopted++; note(); },
-      landed: function () { adopted--; note(); },
-      outstanding: function () { return adopted + waiting() > 0; },
-    });
-  };
-})(globalThis);
-
-// A parked answer needs a turn only when its chain or its next operation moved (LLP 1162 D3).
-(function (global) {
-  "use strict";
-  global.__exact_waiting_answers = function (calls, pending, work, headOwner) {
-    return function (ids) {
-      var own = new Set(), unclaimed = false, at = headOwner(), ready = [];
-      pending.forEach(function (p) {
-        if (p.claimed || p.stream || p.module) return;
-        if (p.call && p.call.status === "pending" && !p.call.letGo && calls.has(p.call.id)) own.add(p.call.id);
-        else unclaimed = true;
-      });
-      JSON.parse(ids).forEach(function (id) {
-        var c = calls.get(id);
-        if (!c) return;
-        var claims = unclaimed && c.status === "pending" && !c.storage;
-        if (claims) unclaimed = false;
-        if (c.ran || c.status !== "pending" || work.readied(c) || own.has(id) || c.storage && (!at || at === c) || claims) ready.push(id);
-      });
-      return JSON.stringify(ready);
-    };
-  };
 })(globalThis);

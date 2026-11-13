@@ -24,7 +24,7 @@ import { generatedInputFiles } from '../../game/inputs.mjs';
 // Developer builds bake development trust; EXACT_UPDATE_TRUST=production
 // requires signing keys, and the deploy verb always selects production.
 import { grantOrigins } from './navigation/grant-origins.js';
-import { buildHostGlue, gateAgent } from '../web-js/glue.mjs';
+import { buildHostGlue, gateAgent, modulePrelude } from '../web-js/glue.mjs';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
@@ -265,9 +265,11 @@ const hostDir = resolve(stage, '.host');
 function copyHostFiles(group) {
   for (const [name, source] of Object.entries(webHostFiles(group))) {
     if (!name.endsWith('.js')) { copyFileSync(resolve(root, source), resolve(stage, name)); continue; }
+    // The module realm's prelude is joined from its scripts here: the module group is copied without the host glue's build.
+    const code = name === 'module-prelude.js' ? modulePrelude(root)
+      : readFileSync(source.startsWith('target/web-host/') ? resolve(hostDir, name) : resolve(root, source), 'utf8');
     // Production ships executable code, without source comments and long
     // local names. Keep exports and property names intact across modules.
-    const code = readFileSync(source.startsWith('target/web-host/') ? resolve(hostDir, name) : resolve(root, source), 'utf8');
     const result = minifySync(name, production ? gateAgent(code, name) : code, { module: name !== 'module-prelude.js' && name !== 'module-binary.js' });
     if (result.errors.length) throw new Error(`${name}: ${JSON.stringify(result.errors)}`);
     writeFileSync(resolve(stage, name), result.code);
