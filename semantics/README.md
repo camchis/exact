@@ -567,8 +567,12 @@ source as it is.
 3. **Prove.** A reachability invariant of one slot is
    `Reachable.slotIn`: the values the slot starts with (`SlotOrigin`:
    unfold the program's `states`), and for every action a handler of the
-   view or a task names, the body keeps it (`BodyKeeps`). An action body
-   is unfolded by `wp` (`BodyKeeps.of_wp`); `simp` with the `EvalR` rules
+   view, a task or a mutation's `then` names, the body keeps it (`BodyKeeps`).
+   Queue mutation slots use the same rule: `Reachable.slotInvariant` also
+   carries the waiting sends' answer property (`QueuedIn`) through drains.
+   [Queued sends](#queued-sends-and-gated-tasks-llp-1092) describes the
+   corresponding event and advance rules. An action body is unfolded by
+   `wp` (`BodyKeeps.of_wp`); `simp` with the `EvalR` rules
    (`EvalR.str_iff`, `EvalR.var_local`, …) turns it into a statement about
    values. A body that never touches the slot is dismissed by `decide`
    (`Stmt.noAssigns`, `BodyKeeps.untouched`); a body that calls an action
@@ -1064,6 +1068,19 @@ queue mutation, on both sides. The corpus has `mutations/queue-*` (`queue-then`:
 queue with a `then` beside a timer) and `timers/gated-*` (`gated-frame`), and the generator writes queue mutations (sent more than
 once on a path) and gated tasks over the states alone.
 
+The one-slot invariants include queue mutation slots. `SlotInvariant x V c`
+combines `SlotIn x V c.slots` with `QueuedIn x V c.queued`:
+`∀ q ∈ c.queued, q.1 = x → ∀ v, V (.some v)`. Boot has no waiting sends;
+`BodyKeeps` supplies the answer property for new sends, and a drain either
+lands such an answer, removes a refused send, or keeps it stalled. Poisoning
+clears the waiting sends. `Reachable.slotIn` projects the slot property;
+`Reachable.slotInvariant`, `Event.step_slotInvariant` and
+`Reachable.advance_slotInvariant` carry both. `Contract/Invariant.lean` has
+a checked example with two sends to one queue, a drain, refusal and poisoning.
+The equality rule `Reachable.advance_untouched` and the slot-only event rule
+`Event.step_slotIn` still require a slot no drain writes: waiting answers
+can change a queue mutation's slot even when no clock action touches it.
+
 What it does not carry, as restrictions:
 
 - `pending(m)` is false for a queue mutation whose send waits (the oracle
@@ -1072,9 +1089,6 @@ What it does not carry, as restrictions:
 - A send behind one in flight (every answer here is synchronous) is the
   runner's and the conformance plans' tests (`contract/cli/tests/it/queue.rs`,
   `host/web-js/conformance/queue.contract`).
-- The one-slot invariants (`Reachable.slotIn`, `Event.step_slotIn`,
-  `Reachable.advance_untouched`) are proved of slots that are not a queue
-  mutation's, whose answers an advance lands (`QUEUE.md`).
 - The component-level semantics (`Contract.CompSem`) refuses both, so
   `difftest expansion` writes and reads programs without them.
 
