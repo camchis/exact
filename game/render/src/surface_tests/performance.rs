@@ -70,21 +70,20 @@ fn gpu_time_is_measured_only_for_a_reader_and_only_with_timestamps() {
     surface.set_performance_reporting(true);
     for i in 2..8 {
         fixture::render(&gpu, &mut surface, &frame(i as f64 * 167.)).unwrap();
-        // Let the frame finish, resolve and map without another frame.
-        for _ in 0..3 {
-            gpu.device
-                .poll(wgpu::PollType::wait_indefinitely())
-                .unwrap();
-            if let Some(timing) = &mut surface.gpu_timing {
-                timing.poll(&gpu.device, &gpu.queue);
-            }
-        }
+        // The frame finishes; the next frame's poll resolves and maps it.
+        gpu.device
+            .poll(wgpu::PollType::wait_indefinitely())
+            .unwrap();
     }
     assert_eq!(surface.gpu_timing.is_some(), timestamps);
     assert!(
         surface.gpu_timing.as_ref().is_none_or(|t| !t.armed()),
         "a reader's timing keeps no agent samples"
     );
+    // At rest, the snapshot's own poll publishes the last mapped frame.
+    gpu.device
+        .poll(wgpu::PollType::wait_indefinitely())
+        .unwrap();
     let report: serde_json::Value =
         serde_json::from_str(&surface.take_performance(0.).unwrap()).unwrap();
     if timestamps {
@@ -93,10 +92,23 @@ fn gpu_time_is_measured_only_for_a_reader_and_only_with_timestamps() {
     } else {
         assert!(report.get("gpuMs").is_none(), "no timestamp queries: none");
     }
+    let state = surface.agent(r#"{"op":"state"}"#).unwrap();
+    assert!(
+        !state.contains("\"gpuMs\""),
+        "a reader's timing is not the agent's"
+    );
     surface.set_performance_reporting(false);
-    fixture::render(&gpu, &mut surface, &frame(9. * 167.)).unwrap();
     assert!(
         surface.gpu_timing.is_none(),
         "the last reader gone, none left"
+    );
+    fixture::render(&gpu, &mut surface, &frame(9. * 167.)).unwrap();
+    assert!(surface.gpu_timing.is_none());
+    surface.set_performance_reporting(true);
+    fixture::render(&gpu, &mut surface, &frame(10. * 167.)).unwrap();
+    surface.agent(r#"{"op":"state","perf":true}"#).unwrap();
+    assert!(
+        surface.gpu_timing.is_none(),
+        "arming perf drops a reader's sample-less timing at once"
     );
 }

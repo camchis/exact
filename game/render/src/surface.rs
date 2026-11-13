@@ -353,7 +353,9 @@ impl<G: Game, P: Executor, const ASSETS: bool, H: crate::Hooks> Surface
     fn clock(&mut self, seekable: bool) {
         self.seekable = seekable;
         if let Some(report) = &mut self.perf.reporting {
-            report.clock(seekable);
+            if report.clock(seekable) {
+                let _ = self.gpu_timing.as_mut().map(|t| t.take_window());
+            }
         }
         self.resting = false;
         self.idle_tick = None;
@@ -671,6 +673,11 @@ impl<G: Game, P: Executor, const ASSETS: bool, H: crate::Hooks> Surface
         sim.input(e);
     }
     fn set_performance_reporting(&mut self, enabled: bool) {
+        // A reader's timing goes with it; the agent's starts the next window fresh.
+        if !enabled && !self.perf.armed() {
+            self.gpu_timing = None;
+        }
+        let _ = self.gpu_timing.as_mut().map(|t| t.take_window());
         if enabled {
             self.perf
                 .reporting
@@ -681,7 +688,12 @@ impl<G: Game, P: Executor, const ASSETS: bool, H: crate::Hooks> Surface
         }
     }
     fn take_performance(&mut self, now_ms: f64) -> Option<String> {
-        self.perf.reporting.as_ref()?;
+        // A clock-mode change starts a fresh window, GPU samples included.
+        let fresh = self.perf.reporting.as_mut()?.clock(self.seekable);
+        let gpu = match (&mut self.gpu_timing, &self.render) {
+            (Some(timing), Some((r, _))) => timing.snapshot(&r.device, &r.queue),
+            _ => None,
+        };
         let live = performance::Live {
             thermal: self.timing.thermal_state,
             quality: self.rung.map(|rung| rung.level.keyword()),
@@ -690,11 +702,9 @@ impl<G: Game, P: Executor, const ASSETS: bool, H: crate::Hooks> Surface
             audio: performance::audio(self.presentation.audio_state(), self.interrupted),
             memory: (self.render.as_ref())
                 .map(|(renderer, _)| (renderer.texture_bytes(), renderer.mesh_buffer_bytes())),
-            gpu: self.gpu_timing.as_mut().and_then(|t| t.take_window()),
+            gpu: gpu.filter(|_| !fresh),
         };
-        let report = self.perf.reporting.as_mut()?;
-        report.clock(self.seekable);
-        report.take(now_ms, &live)
+        self.perf.reporting.as_mut()?.take(now_ms, &live)
     }
     fn published(&mut self) -> Option<String> {
         self.sim.as_mut().and_then(Sim::take_published)
@@ -808,6 +818,12 @@ impl<G: Game, P: Executor, const ASSETS: bool, H: crate::Hooks> Surface
                 if r.perf || r.perf_reset {
                     sim.measure_spans(crate::perf::clock_ms, r.perf_reset);
                 }
+                // A reader's timing keeps no samples to report percentiles
+                // from: arming or resetting perf replaces it at the next frame.
+                if (r.perf || r.perf_reset) && self.gpu_timing.as_ref().is_some_and(|t| !t.armed())
+                {
+                    self.gpu_timing = None;
+                }
                 if r.perf_reset {
                     self.perf.reset();
                     if let Some(timing) = &mut self.gpu_timing {
@@ -883,14 +899,16 @@ impl<G: Game, P: Executor, const ASSETS: bool, H: crate::Hooks> Surface
                     }
                 }
             }
-            if let Some(timing) = &mut self.gpu_timing {
+            // Only the agent's armed timing is the agent's to report.
+            if let Some(timing) = self.gpu_timing.as_mut().filter(|t| t.armed()) {
                 if let Some((renderer, _)) = &self.render {
                     timing.poll(&renderer.device, &renderer.queue);
                 }
                 timing.append(&mut reply);
             }
             if let Some(events) = trace_events {
-                render::append_trace(&mut reply, events, self.gpu_timing.as_ref());
+                let timing = self.gpu_timing.as_ref().filter(|t| t.armed());
+                render::append_trace(&mut reply, events, timing);
             }
             reply.push_str("}}");
         }

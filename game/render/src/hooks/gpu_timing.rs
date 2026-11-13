@@ -263,6 +263,12 @@ impl GpuTiming {
         let (sum, count, max) = std::mem::take(&mut self.window);
         (count > 0).then(|| (sum / f64::from(count), max))
     }
+    /// [`Self::take_window`] after a poll: a resting canvas runs no frame
+    /// that would finish its readbacks.
+    pub fn snapshot(&mut self, device: &wgpu::Device, queue: &wgpu::Queue) -> Option<(f64, f64)> {
+        self.poll(device, queue);
+        self.take_window()
+    }
     pub fn query(&self) -> Option<&wgpu::QuerySet> {
         if self.error.is_some() {
             return None;

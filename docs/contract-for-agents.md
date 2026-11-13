@@ -4214,8 +4214,9 @@ execution of the window's frames, from the first pass's start to the last
 pass's end by GPU timestamps, read back a frame or two late: on Metal natively
 (macOS, iOS, tvOS), on the web only where the browser grants
 `timestamp-query`, and on the Linux family and Windows where the adapter has
-timestamp queries; `none` elsewhere and for a window with no sample. The
-timestamps are written only while a plan reads the resource. `cpuSubmitMs` and
+timestamp queries; `none` elsewhere and for a window with no sample. A canvas
+writes timestamps only while a plan reads the resource (or the agent's `perf`
+is armed). `cpuSubmitMs` and
 `cpuSubmitMaxMs` are the mean and longest wall time of the queue submission of
 the frames the canvas drew in the window, on every host (on Apple the
 submission also schedules the frame's presentation); a frame shared by several

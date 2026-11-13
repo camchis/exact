@@ -406,7 +406,8 @@ impl Module {
             .filter(|id| (self.instances.get(id)).is_some_and(|i| i.performance.enabled()))
             .collect();
         let submit = |encoder: wgpu::CommandEncoder| {
-            crate::performance::time(!timed.is_empty(), || gpu.queue.submit([encoder.finish()])).1
+            let commands = encoder.finish();
+            crate::performance::time(!timed.is_empty(), || gpu.queue.submit([commands])).1
         };
         #[cfg(any(target_os = "macos", target_os = "ios", target_os = "tvos"))]
         let mut first = first;

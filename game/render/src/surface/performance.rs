@@ -58,15 +58,18 @@ pub(crate) struct Report {
     rendered: bool,
 }
 impl Report {
-    pub fn clock(&mut self, seekable: bool) {
+    /// Take the clock's mode; `true` when it changed, which drops the window.
+    pub fn clock(&mut self, seekable: bool) -> bool {
         let live = !seekable;
-        if self.live.is_some_and(|previous| previous != live) {
+        let changed = self.live.is_some_and(|previous| previous != live);
+        if changed {
             self.last_snapshot_ms = None;
             self.clear_window();
             self.pending = None;
             self.pending_gap = None;
         }
         self.live = Some(live);
+        changed
     }
     pub fn encoded(
         &mut self,
