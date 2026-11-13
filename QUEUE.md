@@ -9,7 +9,7 @@
 
 - **Grouped section pointer hover on iPad (#379).** Forward hover from UIKit’s visible cells, header and footer to the logical section, clearing it on exit, reuse and removal. The section’s own hover recognizer is on its hidden authored view, so a real pointer cannot activate its shadow.
 
-- realworld (68.1 KiB brotli against 45) and caltrain (46.9 KiB against 25) are over their web byte budgets on main at 879be020f (`bun scripts/metrics.mjs --web-bytes`).
+- realworld (68.1 KiB brotli against 45), caltrain (50.0 KiB against 25) and video-player (29.3 KiB against 17) are over their web byte budgets on main at 69668888a (`bun scripts/metrics.mjs --web-bytes`).
 - `exact-runner`'s incremental test (`every_app_plan_updates_incrementally_exactly_as_it_does_in_full`, the geofence fixture) fails on main with unchanged runner code (seen by three lanes on Linux).
 - `HeaderMacTests.testASearchInputIsTheBarsSearchItemHoldingTheInputsOwnField` fails on main: the search item's field editor is nil (`HeaderMacTests.swift:943`).
 - **The web module substitute ignores `deniedAnswers` and `whilePrompt`** (2026-11-13, read in the reviews of q0539; not run). `host/web-js/modules.js` honours a manifest's `checks`, `continues` and `facts` but not these two keys, so on the web asking for motion permission while it is denied answers an error rather than the status, and reading the accelerometer while permission is `prompt` returns a sample rather than an error (`packages/motion/exact.json`).
