@@ -3,9 +3,9 @@
 import { test } from 'bun:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
-import { delimiter, dirname, resolve, sep } from 'node:path';
+import { basename, delimiter, dirname, resolve, sep } from 'node:path';
 import { resolveApp, buildBake, bakeTarget } from './app.mjs';
 import { contractCompiler, snapshotOf, materializeSnapshot, disposeSnapshot } from './deploy.mjs';
 import { pinned } from './test-workspace.mjs';
@@ -989,5 +989,24 @@ test('a node_modules that differs from bun.lock is named by package', async () =
       writeFileSync(resolve(dir, 'node_modules', name, 'package.json'), JSON.stringify({ name, version }));
     }
     assert.deepEqual(lockMismatches(dir), ['left 1.0.0, bun.lock 1.2.3', 'gone missing, bun.lock 2.0.0']);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+// `rustup-init --default-toolchain none`, and a command started in an app's directory, which pins nothing.
+test('the host target is the pinned toolchain\'s when rustup has no default', () => {
+  const root = resolve(import.meta.dir, '..');
+  const sysroot = spawnSync('rustc', ['--print', 'sysroot'], { cwd: root, encoding: 'utf8' }).stdout.trim();
+  if (basename(dirname(sysroot)) !== 'toolchains') return; // not rustup's
+  const dir = realpathSync(mkdtempSync(resolve(tmpdir(), 'exact-no-default-')));
+  try {
+    mkdirSync(resolve(dir, 'rustup/toolchains'), { recursive: true });
+    symlinkSync(sysroot, resolve(dir, 'rustup/toolchains', basename(sysroot)));
+    const env = { ...process.env, RUSTUP_HOME: resolve(dir, 'rustup'), RUSTUP_AUTO_INSTALL: '0' };
+    delete env.RUSTUP_TOOLCHAIN;
+    assert.notEqual(spawnSync('rustc', ['-vV'], { cwd: dir, env }).status, 0, 'rustup has no default here');
+    const code = `console.log((await import(${JSON.stringify(resolve(root, 'scripts/app.mjs'))})).bakeTarget('linux'))`;
+    const run = spawnSync(process.execPath, ['-e', code], { cwd: dir, env, encoding: 'utf8' });
+    assert.equal(run.status, 0, run.stderr);
+    assert.equal(run.stdout.trim(), bakeTarget('linux'));
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });

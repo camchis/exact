@@ -913,9 +913,10 @@ export function bakeTarget(platform) {
   if (platform === 'ios') return 'aarch64-apple-ios';
   // The Linux host is also a supported headless executable on macOS. This
   // is the actual target Cargo will build here, never a guessed architecture.
-  const result = spawnSync('rustc', ['-vV'], { encoding: 'utf8' });
+  // The pinned toolchain's rustc, as the build's: rustup may have no default, and an app's directory names none.
+  const result = spawnSync('rustc', ['-vV'], { cwd: ROOT, env: PINNED_RUST ? { ...process.env, RUSTUP_TOOLCHAIN: PINNED_RUST } : process.env, encoding: 'utf8' });
   const host = /^host: (.+)$/m.exec(result.stdout ?? '')?.[1];
-  if (result.status !== 0 || !host) throw new Error('rustc did not report its host target');
+  if (result.status !== 0 || !host) throw new Error(`rustc did not report its host target: ${result.error?.message ?? result.stderr?.trim() ?? `exit ${result.status}`}`);
   return host;
 }
 /** Cargo's metadata for a development bake, asked once for a lock and a set of

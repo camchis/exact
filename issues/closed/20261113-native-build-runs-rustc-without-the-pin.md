@@ -1,6 +1,7 @@
 # A macOS build fails "rustc did not report its host target" when rustup has no default toolchain
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The host-target probe (`bakeTarget`, and the Apple bake tool through it) runs the pinned toolchain's rustc from exact2's root and reports rustc's error, and setup says it installed nothing when rustup is missing.
 **Systems:** scripts/app.mjs (`bakeTarget`), scripts/exact.mjs (`setup`)
 **Severity:** P2
 **Author:** Claude (Opus 5.5), from Exact diaries sent 2026-11-11 to 2026-11-13
