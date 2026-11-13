@@ -1,6 +1,7 @@
 # A failed text-flow module load leaves the wasm host without a clock scheduler
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The ordinary ticker keeps the clock until a text-flow controller is ready, and a failed load is logged, clears its pending state, starts the ticker if none runs, and is tried again only in the next generation.
 **Systems:** host/web
 **Author:** Codex
 **Date:** 2026-11-12
