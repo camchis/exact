@@ -15,7 +15,8 @@
 //!   answers `reserved`. A missing value is reserved from build 22000,
 //!   or when the build cannot be read; an explicit zero permits registration.
 //! - **Attention** flashes the taskbar button until the window comes to
-//!   the front, or three times for an informational request
+//!   the front, or three times for an informational request, or the
+//!   author's `windows.count` times, which beats `critical`
 //!   ([FlashWindowEx](https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-flashwindowex)).
 //!   A hidden window has no taskbar button, so nothing is asked.
 //! - **The login item** is a value under `HKCU\…\CurrentVersion\Run` named
@@ -47,6 +48,18 @@ fn chord(keys: &str) -> Result<(u32, u32), &'static str> {
         bits |= bit;
     }
     Ok((bits, virtual_key(key).ok_or("invalid")?))
+}
+
+/// How attention flashes, `(until the window comes to the front, flashes)`:
+/// the author's count when there is one (LLP 1133.025 D8), else until the
+/// front for a critical request and three times for an informational one.
+#[cfg_attr(not(windows), allow(dead_code))]
+fn flash(critical: bool, count: Option<u32>) -> (bool, u32) {
+    match count {
+        Some(n) => (false, n),
+        None if critical => (true, 0),
+        None => (false, 3),
+    }
 }
 
 /// `VK_SNAPSHOT`, the Print Screen key.
@@ -407,7 +420,7 @@ mod imp {
             Ok(())
         }
 
-        fn attention(&self, critical: bool) -> Result<(), String> {
+        fn attention(&self, critical: bool, count: Option<u32>) -> Result<(), String> {
             let hwnd = self.hwnd.get() as HWND;
             if hwnd.is_null() || unsafe { IsWindowVisible(hwnd) } == 0 {
                 return Err("the window is hidden, so it has no taskbar button to flash".into());
@@ -415,11 +428,12 @@ mod imp {
             if unsafe { GetForegroundWindow() } == hwnd {
                 return Err("the window is in front".into());
             }
+            let (until_front, count) = super::flash(critical, count);
             let info = FLASHWINFO {
                 cbSize: std::mem::size_of::<FLASHWINFO>() as u32,
                 hwnd,
-                dwFlags: FLASHW_TRAY | if critical { FLASHW_TIMERNOFG } else { 0 },
-                uCount: if critical { 0 } else { 3 },
+                dwFlags: FLASHW_TRAY | if until_front { FLASHW_TIMERNOFG } else { 0 },
+                uCount: count,
                 dwTimeout: 0,
             };
             unsafe { FlashWindowEx(&info) };
@@ -488,7 +502,16 @@ mod imp {
 
 #[cfg(test)]
 mod tests {
-    use super::{available_chord, chord, login_launch, run_value};
+    use super::{available_chord, chord, flash, login_launch, run_value};
+
+    #[test]
+    fn an_authors_count_is_the_flashes_even_for_a_critical_request() {
+        assert_eq!(flash(false, None), (false, 3));
+        assert_eq!(flash(true, None), (true, 0));
+        assert_eq!(flash(false, Some(1)), (false, 1));
+        assert_eq!(flash(false, Some(7)), (false, 7));
+        assert_eq!(flash(true, Some(7)), (false, 7));
+    }
 
     #[test]
     fn a_chord_is_its_modifier_bits_and_virtual_key() {

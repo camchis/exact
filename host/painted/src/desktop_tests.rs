@@ -52,8 +52,10 @@ impl Services for Fake {
         self.said.borrow_mut().push(format!("check {keys}"));
         Err("in-use")
     }
-    fn attention(&self, critical: bool) -> Result<(), String> {
-        self.said.borrow_mut().push(format!("attention {critical}"));
+    fn attention(&self, critical: bool, count: Option<u32>) -> Result<(), String> {
+        self.said
+            .borrow_mut()
+            .push(format!("attention {critical} {count:?}"));
         Err("the window is in front".into())
     }
     fn login(&self) -> Login {
@@ -189,6 +191,19 @@ fn the_windows_implementations_use_the_hosts_services() {
         json!({"extension": "dock", "send": "requestAttention", "args": {"critical": true}}),
     );
     assert_eq!(attended, json!({}));
+    let attend =
+        |args: Json| json!({"extension": "dock", "send": "requestAttention", "args": args});
+    for args in [
+        json!({"windows": {"count": 1}}),
+        json!({"windows": {"count": 7.0}}),
+        json!({"critical": true, "windows": {"count": 7}}),
+    ] {
+        assert_eq!(call(&mut p, attend(args)), json!({}));
+    }
+    for count in [json!(0), json!(2.5), json!(-1), json!("3")] {
+        let refused = call(&mut p, attend(json!({"windows": {"count": count}})));
+        assert_eq!(refused["error"], "TypeError", "{count}: {refused}");
+    }
 
     assert_eq!(
         *fake.said.borrow(),
@@ -198,7 +213,10 @@ fn the_windows_implementations_use_the_hosts_services() {
             "check Meta+K",
             "unregister 1 snap Meta+Shift+2",
             "settings",
-            "attention true",
+            "attention true None",
+            "attention false Some(1)",
+            "attention false Some(7)",
+            "attention true Some(7)",
         ]
     );
 

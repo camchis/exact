@@ -1,6 +1,7 @@
 # Windows Dock ignores the requested flash count
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The Windows Dock reads `windows.count`, refuses one that is not a whole number of at least 1 with TypeError, and passes it through the desktop services to `FLASHWINFO.uCount`, where it takes the place of a critical request's flashing.
 **Systems:** @exact/dock, Windows desktop attention
 **Author:** Codex
 **Date:** 2026-11-12

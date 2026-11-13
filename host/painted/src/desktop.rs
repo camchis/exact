@@ -46,9 +46,11 @@ pub trait Services {
     fn unregister_hotkey(&self, session: &str, id: &str, keys: &str);
     /// Whether `keys` could be registered now, keeping nothing.
     fn check_hotkey(&self, keys: &str) -> Result<(), Refusal>;
-    /// Ask for the person's attention on the app's taskbar button or tile;
-    /// `Err` says why nothing was asked.
-    fn attention(&self, critical: bool) -> Result<(), String>;
+    /// Ask for the person's attention on the app's taskbar button or tile:
+    /// `count` flashes when the author names a number, which takes the
+    /// place of a critical request's flashing; `Err` says why nothing was
+    /// asked.
+    fn attention(&self, critical: bool, count: Option<u32>) -> Result<(), String>;
     /// The login item's registration as it stands.
     fn login(&self) -> Login;
     /// Register the login item (`Some(hidden)`) or remove it (`None`).
