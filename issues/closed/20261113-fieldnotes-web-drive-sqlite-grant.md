@@ -1,6 +1,7 @@
 # Fieldnotes' web drive is refused its own SQLite grant on the wasm target
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The host's admission was right: the drive's own seeding passed the grant's text to `createSqlite`, which takes a parsed grant set, and now passes the set the host admitted from the app's declaration.
 **Systems:** apps/fieldnotes, host/web storage
 **Severity:** P2
 **Author:** Claude (Opus 5.5), async lane triage
