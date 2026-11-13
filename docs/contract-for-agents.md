@@ -925,6 +925,19 @@ component Water
 
 ## Data requests and side effects
 
+Import a module's shared sources and sends from its interface package. A
+platform's own names and types come from its implementation in both Contract
+and TypeScript. Tracking consent, for example, is `@exact/tracking-consent/apple`:
+elsewhere its status reads denied and unavailable, and its requests fail
+`NotSupportedError` (LLP 1133.028 D12–D13).
+
+An implementation import must name the implementation bound on the targets it
+covers. An implicit replacement fails the bake; an explicit selection in
+`app.json` makes the imported name use its declared default or refusal there.
+The agent identifies an implementation's own name as
+`<extension>.<name>#<import-path>` in `state.extensions` and `prefer extension`;
+shared names keep `<extension>.<name>`.
+
 Choose the mechanism from its lifetime:
 
 | Requirement | Mechanism |
