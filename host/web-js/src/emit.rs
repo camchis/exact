@@ -1186,7 +1186,13 @@ impl Em<'_> {
                     let source = serde_json::to_string(v.as_str().unwrap_or_default()).unwrap();
                     self.markdown(i, &e, &format!("()=>{source}"), plan.code(b.expr));
                 }
-                continue;
+                // Refused SVG literals still run their binding to journal the refusal.
+                if b.kind != BindingKind::Prop
+                    || !exact_runner::bridge::prop_value(b.id, &v)
+                        .is_err_and(|e| crate::svg_lengths::refused(&e))
+                {
+                    continue;
+                }
             }
             let f = self
                 .bound(i, &e, &b, scope)
@@ -1208,6 +1214,10 @@ impl Em<'_> {
                         format!("()=>{{const v=({f})();return v==null?v:!v}}")
                     } else if prop == PropId::GlassGroup {
                         format!("()=>{{const v=({f})();return v===-1?\"auto\":v}}")
+                    } else if let Some(value) =
+                        crate::svg_lengths::binding(&mut self.uses, prop, &f, &e)
+                    {
+                        value
                     } else if matches!(prop, PropId::Wakelock | PropId::Orientationlock) {
                         // The value as computed, which wakelock.js and orientationlock.js journal.
                         let k = ["wake", "orient"][usize::from(prop == PropId::Orientationlock)];

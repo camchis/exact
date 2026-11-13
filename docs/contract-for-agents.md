@@ -4088,9 +4088,11 @@ of SVG text/tspan `x`/`y`/`dx`/`dy`. Relative units and function text such as
 `calc()`, `env()` and `var()` are refused in literals and literal template parts
 (LLP 1055.000 D4). Literal concatenations are checked together; an incomplete
 fragment that could finish an accepted unit is left to runtime. Literal choices in
-conditionals, matches and inlined derives are checked too. Bound values must use
-the same units. Marker `refX` also accepts `left`/`center`/`right`, and `refY`
-accepts `top`/`center`/`bottom`; native hosts currently place these keywords at 0.
+conditionals, matches and inlined derives are checked too. Bound values use the
+same grammar: an unsupported computed value clears the attribute and journals
+`runtime-svg-length` on every target. Marker `refX` also accepts
+`left`/`center`/`right`, and `refY` accepts `top`/`center`/`bottom`; native hosts
+currently place these keywords at 0.
 `foreignObject` renders directly on the web, but draws nothing through SVG `use`.
 The compiler warns at a `use` whose unambiguous, unconditional literal target contains
 one (`lower-svg-use-foreign-object`). Native hosts refuse `foreignObject` at run
