@@ -1,6 +1,7 @@
 # A MIDI report that arrives before the grant is dropped
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** midi.js keeps the last port report received before the grant is known and applies it when the grant arrives.
 **Systems:** host/web-js, host/web
 **Severity:** P2
 **Author:** Grok 4.7
