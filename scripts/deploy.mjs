@@ -53,7 +53,7 @@ import { assertOwnTarget, bakedEntryAssets, cargoReproducibilityFlags, readManif
 import { gameShells } from "../game/app/shells.mjs";
 import { streamBundle, unbundledTextures } from './texture-families.mjs';
 import { blobPath, channelOrigin, openOrigin, OriginUnavailable, sha256, streamPath, parseWebRoot, webRootPath, webRootStream, webReleasePath, validateChannel } from './origin.mjs';
-import { admitHead, latestRecord, nextSeq } from './deploy-heads.mjs';
+import { admitHead, keepRecord, latestRecord, nextSeq } from './deploy-heads.mjs';
 export { admitHead, inspectHead } from './deploy-heads.mjs';
 import { filesystemLock, removePrivateTree } from './filesystem.mjs';
 import { listBuildFiles, listPublicFiles, readStaticCandidate } from '../host/web/serve.mjs';
@@ -1005,6 +1005,7 @@ export async function publishStream({ origin, row, bundle, compat, app, signer, 
       envelope: head, ...(index ? { assets: JSON.parse(index.bytes.toString('utf8')) } : {}),
     };
     await origin.put(recordPath, Buffer.from(JSON.stringify(record, null, 2) + '\n', 'utf8'), { immutable: true });
+    keepRecord(origin, stream, `${release}.json`, seq);
     try {
       await origin.putHead(stream, bytes, { previousDigest });
     } catch (error) {

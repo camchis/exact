@@ -2,6 +2,9 @@
 // everything the stream has authenticated (LLP 1030.000 D3 item 5): scripts/deploy.mjs's classifier and
 // publisher read both.
 import { verify } from 'node:crypto';
+import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { dirname, resolve } from 'node:path';
 import { refuse, canonicalBytes, fileCard, publicKeyFromRaw, indexCard, readAssetIndex, validateRawIntegers } from './deploy-signing.mjs';
 import { OriginUnavailable, sha256, streamPath } from './origin.mjs';
 
@@ -96,21 +99,58 @@ async function authenticatedReleaseFloor(origin, app, stream) {
   if (names === null && origin.kind !== 'directory') return { known: false, empty: false, floor: null };
   if (names === null || names.length === 0) return { known: true, empty: true, floor: null };
   let floor = null;
+  const kept = keptRecords(origin, stream), added = {};
   for (const name of names.filter((entry) => entry.endsWith('.json'))) {
+    if (Object.hasOwn(kept.seqs, name)) { floor = Math.max(floor ?? 0, kept.seqs[name]); continue; }
     const bytes = await origin.get(`${streamPath(stream)}/releases/${name}`);
     if (!bytes) throw new OriginUnavailable(`the listed release record ${origin.describe()}/${streamPath(stream)}/releases/${name} disappeared while establishing the authenticated sequence floor`);
-    try {
-      const text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
-      const record = JSON.parse(text);
-      if (!record.envelope || typeof record.envelope !== 'object' || Array.isArray(record.envelope)) continue;
-      const recordApp = { ...app, displayName: record.envelope.app?.name };
-      const envelopeBytes = Buffer.from(JSON.stringify(record.envelope), 'utf8');
-      const admission = inspectHead({ bytes: envelopeBytes, json: record.envelope, sha256: sha256(envelopeBytes) }, recordApp, stream);
-      if (admission.usable && admission.authenticated) floor = Math.max(floor ?? 0, admission.seq);
-    } catch { /* an unauthenticated audit record has no say in the floor */ }
+    const record = authenticatedRecord(bytes, app, stream);
+    if (record) floor = Math.max(floor ?? 0, added[name] = record.envelope.stream.seq);
   }
+  kept.keep(added);
   return { known: true, empty: false, floor };
 }
+
+/** A release record whose embedded envelope authenticates for `stream`, else null: the wrapper is audit metadata, and
+ *  an unauthenticated record has no say in the floor nor any capability authority. */
+function authenticatedRecord(bytes, app, stream) {
+  try {
+    const record = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
+    if (!record.envelope || typeof record.envelope !== 'object' || Array.isArray(record.envelope)) return null;
+    const recordApp = { ...app, displayName: record.envelope.app?.name };
+    const envelopeBytes = Buffer.from(JSON.stringify(record.envelope), 'utf8');
+    const admission = inspectHead({ bytes: envelopeBytes, json: record.envelope, sha256: sha256(envelopeBytes) }, recordApp, stream);
+    return admission.usable && admission.authenticated ? record : null;
+  } catch { return null; }
+}
+
+/** The seq of each release record of an AppDrop stream that this machine has authenticated, by name, so the next
+ *  publication reads only the records it has not: a record is written once and never replaced, and reading the
+ *  whole history over the network made each push cost a request per release ever published. Only an authenticated
+ *  seq is kept, and it only raises the floor, so a record changed since cannot lower it; one that did not
+ *  authenticate is read again. Only names the origin still lists count, as when every record is read. A directory
+ *  origin's records are local reads, so none is kept for one. */
+function keptRecords(origin, stream) {
+  if (origin.kind !== 'appdrop') return { seqs: {}, keep() {} };
+  const cache = process.env.XDG_CACHE_HOME?.startsWith('/') ? process.env.XDG_CACHE_HOME : resolve(homedir(), '.cache');
+  const file = resolve(cache, 'exact/release-seqs', `${sha256(`${origin.describe()}\n${streamPath(stream)}`)}.json`);
+  const seqs = {};
+  try {
+    for (const [name, seq] of Object.entries(JSON.parse(readFileSync(file, 'utf8')))) if (Number.isSafeInteger(seq) && seq >= 0) seqs[name] = seq;
+  } catch { /* none kept, or unreadable: every record is read */ }
+  return { seqs, keep(added) {
+    if (!Object.keys(added).length) return;
+    try {
+      mkdirSync(dirname(file), { recursive: true });
+      const temporary = `${file}.${process.pid}`;
+      writeFileSync(temporary, JSON.stringify({ ...seqs, ...added }));
+      renameSync(temporary, file);
+    } catch { /* the next publication reads these records again */ }
+  } };
+}
+
+/** Keep the record a publication wrote as authenticated (`keptRecords`): it holds the seq its own signed envelope names. */
+export const keepRecord = (origin, stream, name, seq) => keptRecords(origin, stream).keep({ [name]: seq });
 
 /** Allocate above everything the stream has authenticated: an admitted head
  * and the maximum signed immutable history. A head rolled back on the origin
@@ -140,16 +180,21 @@ async function nextOriginSeq(origin, app, stream, admission, at) {
 export async function latestRecord(origin, app, stream) {
   const names = await origin.list(`${streamPath(stream)}/releases`, { includeHidden: true });
   if (!names?.length) return null;
-  const records = [];
-  for (const name of names.filter((n) => n.endsWith('.json'))) {
+  // Each record not kept is read; then the one with the largest seq, unless it was among them (`keptRecords`).
+  const kept = keptRecords(origin, stream), added = {}, read = new Map(), seqs = {};
+  const recordAt = async (name) => {
     const bytes = await origin.get(`${streamPath(stream)}/releases/${name}`);
-    try {
-      const record = JSON.parse(bytes.toString('utf8'));
-      const recordApp = {...app, displayName:record.envelope?.app?.name};
-      const admission = inspectHead({bytes:Buffer.from(JSON.stringify(record.envelope))}, recordApp, stream);
-      if(admission.usable && admission.authenticated) records.push(record);
-    } catch { /* unauthenticated audit metadata has no capability authority */ }
+    return bytes ? authenticatedRecord(bytes, app, stream) : null;
+  };
+  for (const name of names.filter((n) => n.endsWith('.json'))) {
+    if (Object.hasOwn(kept.seqs, name)) { seqs[name] = kept.seqs[name]; continue; }
+    const record = await recordAt(name);
+    if (record) { read.set(name, record); seqs[name] = added[name] = record.envelope.stream.seq; }
   }
-  records.sort((a,b)=>a.envelope.stream.seq-b.envelope.stream.seq);
-  return records.at(-1) ?? null;
+  kept.keep(added);
+  for (const name of Object.keys(seqs).sort((a, b) => seqs[b] - seqs[a])) {
+    const record = read.get(name) ?? await recordAt(name);
+    if (record) return record;
+  }
+  return null;
 }
