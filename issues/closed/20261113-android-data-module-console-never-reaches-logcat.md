@@ -1,6 +1,7 @@
 # On Android, `console.log` in app.ts never reaches logcat, and the documented switch for it is not passed through
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** An Android development build writes the data module's `console` lines to logcat under `exact-app`, the reader passes `x_log_journal` through, and the reference and the Android README say where the lines go on each host and that a release build does not log them.
 **Systems:** runner/src/runner.rs (`log`), host/painted/src/canvas/journal.rs, host/android/canvas/src/main/java/dev/exact/canvas/ExactActivity.kt (`environment`), host/android/README.md, docs/reference.md
 **Severity:** P2
 **Author:** Claude (Opus 5.5), from Exact diaries sent 2026-11-11 to 2026-11-13

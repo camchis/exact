@@ -177,8 +177,11 @@ reading each, in each of four sessions, never more than 1 MB apart.
 
 `x_log_journal=1` at launch (exact2's `EXACT_LOG_JOURNAL`, `host/painted/src/canvas/journal.rs`) writes the app's
 journal to logcat as the host comes to hold each line, with the milliseconds since boot began: that is how the times
-above were read (`adb logcat -v time`, from ActivityManager's "Start proc" line). Without it nothing is read or
-written.
+above were read (`adb logcat -v time`, from ActivityManager's "Start proc" line). Like every launch extra, only a
+development build reads it.
+
+A development build always writes the data module's `console` lines to logcat under the tag `exact-app` (`adb logcat
+-s exact-app`); a release build does not.
 
 The published v5 Hermes bundle has ICU Unicode support but no `Intl` (LLP 1107 §4.1).
 An Intl-enabled bundle with receipt-bound English ICU data enables Ibex's
