@@ -1230,8 +1230,9 @@ surface of your own takes `backgroundMaterial`: `"glass"` or `"glass-clear"` is
 `"material"`, `"thick"` and `"chrome"` (each with `-light` and `-dark`) are UIKit's materials,
 `"dark"`, `"light"`, `"extra-light"`, `"regular"` and `"prominent"` its plain blurs (`UIBlurEffect`
 `.dark` and so on: no material's grey wash, as expo-blur's `tint="dark"`), and `"sidebar"`,
-`"menu"`, `"popover"`, `"hud-window"` the Mac's. The web and Linux draw a blur that
-approximates each. A glass button is `buttonStyle="glass"` or
+`"menu"`, `"popover"`, `"hud-window"` the Mac's. On macOS, `"sidebar"` blends with the
+content behind the window. The node's own fill and content still paint above it.
+The web and Linux draw a blur that approximates each. A glass button is `buttonStyle="glass"` or
 `"prominent-glass"`, and `glassGroup=<points>` on a box merges the glass inside it as
 SwiftUI's `GlassEffectContainer` does. On iOS a glass a tap adds to a group grows out of the
 nearest glass within that spacing, and one it removes is drawn back into it.
