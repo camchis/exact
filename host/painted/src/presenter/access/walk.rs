@@ -16,12 +16,7 @@ impl<D: DataSource> Presenter<D> {
         if b.top == Some(id) {
             return;
         }
-        let (hidden, inert) = self.host.route_visibility(id);
-        if hidden
-            || inert
-            || node.style.display == Display::None
-            || node.props.bool(PropId::AccessibilityElementsHidden) == Some(true)
-        {
+        if self.access_excluded(&node) {
             return;
         }
         if let Some(said) = node.props.bool(PropId::AccessibilityDisabled) {
@@ -50,6 +45,16 @@ impl<D: DataSource> Presenter<D> {
         }
     }
 
+    /// Whether `node` and what is under it are left out: hidden, inert, not
+    /// displayed or `aria-hidden`.
+    fn access_excluded(&self, node: &NodeRef<'_>) -> bool {
+        let (hidden, inert) = self.host.route_visibility(node.id);
+        hidden
+            || inert
+            || node.style.display == Display::None
+            || node.props.bool(PropId::AccessibilityElementsHidden) == Some(true)
+    }
+
     fn access_walk_contents(&self, b: &mut Build, node: NodeRef<'_>, mut scope: Scope) {
         let id = node.id;
         let aria = node.props.str(PropId::AccessibilityRole);
@@ -57,15 +62,21 @@ impl<D: DataSource> Presenter<D> {
         // A grouped list's toggle row is one node, as Material's list item
         // with a trailing switch is to TalkBack: the switch's kind and
         // state, named by the row, else the switch, else the row's words.
-        // A press on it is a press on the switch.
+        // A press on it is a press on the switch. A switch left out of the
+        // tree leaves the row as it is, and the switch's `aria-disabled` is
+        // the node's, as it would be its own.
         let kernel = self.host.kernel();
-        let toggle = kernel.grouped_toggle(id).and_then(|t| kernel.node(t));
+        let toggle = (kernel.grouped_toggle(id).and_then(|t| kernel.node(t)))
+            .filter(|t| !self.access_excluded(t));
         if let Some((target, kind)) =
             toggle.and_then(|t| Some((t, ControlKind::of(t.node_type, t.props)?)))
         {
             let (role, mut flags, range, value) = self.access_control(&target, kind);
             if target.props.bool(PropId::Disabled) == Some(true) {
                 flags = (flags | flag::DISABLED) & !(flag::CLICK | flag::LONG_CLICK);
+            }
+            if let Some(said) = target.props.bool(PropId::AccessibilityDisabled) {
+                scope.disabled = said;
             }
             let name = (self.access_label(&node))
                 .or_else(|| self.access_label(&target))

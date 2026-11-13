@@ -131,13 +131,16 @@ const MENU: &str = r#"component App
 "#;
 
 /// A grouped list's toggle rows: one named by its text, one by its switch's
-/// label and disabled, under a section's header.
+/// label and disabled, under a section's header; one whose switch is hidden
+/// from assistive technology and one whose switch is inert; one whose switch
+/// is `aria-disabled`, and in an `aria-disabled` section one whose switch
+/// says it is not.
 const TOGGLES: &str = r#"component App
   state dark = false
   action flip(checked: bool)
     dark = checked
   view
-    list appearance="auto" listStyle="inset-grouped" width=320 height=400
+    list appearance="auto" listStyle="inset-grouped" width=320 height=600
       section
         header
           text "Display"
@@ -147,6 +150,22 @@ const TOGGLES: &str = r#"component App
         row
           text "Sound"
           input type="checkbox" switch checked=true disabled=true aria-label="Play sounds" testId="sound"
+        row
+          text "Hidden"
+          input type="checkbox" switch checked=dark change=flip aria-hidden=true
+        row
+          text "Inert"
+          input type="checkbox" switch checked=dark change=flip inert=true
+        row
+          text "Muted"
+          input type="checkbox" switch checked=dark change=flip aria-disabled=true
+      section aria-disabled=true
+        row
+          text "Managed"
+          input type="checkbox" switch checked=dark change=flip
+        row
+          text "Allowed"
+          input type="checkbox" switch checked=dark change=flip aria-disabled=false
 "#;
 
 /// The shell's painter for a bar or a window: it draws nothing.
@@ -503,7 +522,7 @@ fn a_control_is_its_kind_with_its_state_and_what_is_hidden_is_no_node() {
 /// on it flips the switch.
 #[test]
 fn a_grouped_toggle_row_is_one_switch_named_by_its_row() {
-    let mut p = boot(TOGGLES, (320., 400.), 0);
+    let mut p = boot(TOGGLES, (320., 600.), 0);
     let nodes = statement(&mut p).nodes;
     let said: Vec<_> = (nodes.iter())
         .filter(|n| n.role != role::SCROLLER)
@@ -520,6 +539,13 @@ fn a_grouped_toggle_row_is_one_switch_named_by_its_row() {
                 "Play sounds",
                 flag::CHECKABLE | flag::CHECKED | flag::DISABLED
             ),
+            // A switch left out of the tree leaves its row's words.
+            (role::TEXT, "Hidden", 0),
+            (role::TEXT, "Inert", 0),
+            // Its `aria-disabled` is the row's, and overrides the section's.
+            (role::SWITCH, "Muted", check | flag::DISABLED),
+            (role::SWITCH, "Managed", check | flag::DISABLED),
+            (role::SWITCH, "Allowed", check),
         ]
     );
     let dark = named(&nodes, "Dark mode");
