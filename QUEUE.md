@@ -1569,14 +1569,6 @@ and the Linux headless CPU renderer without claiming display frame timing.
   copied into the run after the build, would let an unchanged deploy reuse them. The
   `exact-filesystem` helper also rebuilds inside each deploy's capture, where its tool
   target sits.
-- Default deploys republish the web root (2026-09-24, deploy lane): two cold deploys
-  of unchanged Caltrain left every native stream `current` but changed the
-  `.exact/install/` pages, which carry their build time, and `app.wasm` and
-  `gpu_bg.wasm`, which recorded the run's target path until 113abeaa remapped it.
-  Browsers fetch the new root; native clients are unaffected. The Rust module build
-  remaps only its target directory: an app outside this repo with a module (none
-  yet) would also need the capture root its exact2 path dependencies arrive under
-  remapped, as `wasmRemapFlags` does for web builds.
 - **Other `fs.watch` consumers under Bun** (2026-09-23): on this Mac, Bun 1.4.2's `fs.watch` (file and recursive directory) delivered no event in 45 s while `watchFile` polling fired in 2 ms (oven-sh/bun#43870); a Contract save reached the update-lab page 10–40 s late or never. `watchModuleSources` in `host/web/dev.mjs` now polls at 100 ms as well. Still fs.watch-only: `rustOutputWatch` (the `current` pointer; the baker's reply covers the common case), the compiler-input directory watch at `dev.mjs` line ~863 (files there already poll), and `watchStaticTrees` in `serve.mjs` (asset, deck, and shader edits). Same fix or a shared poller.
 
 - LLP 1024 §9 guardrails (Charlie, 2026-09-27): enforce the prop update size budget (a named refusal status) and flag per-frame prop churn in the journal. Neither is enforced yet.

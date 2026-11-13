@@ -76,7 +76,8 @@ function methodsFor(manifest, platform) {
  * the origin it was read from. A terminal method's `command` is shown for a
  * person to copy, never run. `reach` is null where the build did not compute
  * it (a JS development build has no bake receipt), never an empty claim;
- * `build.source` and `build.dirty` are null where git did not answer. */
+ * `build.source` and `build.dirty` are null where git did not answer.
+ * Release builds leave `builtAt` null so identical builds keep identical pages. */
 export function installData(manifest, build = {}) {
   const errors = installProblems(manifest);
   if (methodsFor(manifest, 'web').some(m => !validURL(m.url, 'browser'))) errors.push('install.web: invalid browser URL');

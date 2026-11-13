@@ -23,6 +23,44 @@ import { DirectoryOrigin, webReleasePath } from './origin.mjs';
 import { developmentLinks } from '../host/apple/build.mjs';
 const manifest = {name:'Interview',app:{id:'com.interview.app',name:'Interview'}};
 
+test('wasm install provenance keeps source facts and records a build time only in development', () => {
+  mkdirSync(join(import.meta.dir, '../target'), { recursive: true });
+  const dir = mkdtempSync(join(import.meta.dir, '../target/install-provenance-'));
+  try {
+    const source = readFileSync(join(import.meta.dir, '../host/web/build.mjs'), 'utf8');
+    const start = source.indexOf('const sourceRevision ='), end = source.indexOf('const escapeHtml =', start);
+    assert.ok(start >= 0 && end > start);
+    const generate = new Function('spawnSync', 'stage', 'app', 'buildReceipt', 'buildEnv', 'bakedReceipt', 'writeInstallPages', source.slice(start, end));
+    for (const trust of ['production', 'development']) for (const known of [true, false]) {
+      generate((command, args, options) => {
+        assert.equal(command, 'git');
+        assert.deepEqual(options, { cwd: dir, encoding: 'utf8', timeout: 5000, killSignal: 'SIGKILL' });
+        return { status: known ? 0 : 128, stdout: args[0] === 'rev-parse' ? 'abc1234567\n' : ' M app.contract\n' };
+      },
+        dir, { dir, manifest }, { binary: { sha256: 'a'.repeat(64) } }, { EXACT_UPDATE_TRUST: trust }, { reach: { rows: [] } }, writeInstallPages);
+      const { build, reach } = JSON.parse(readFileSync(join(dir, '.exact/install.json')));
+      assert.equal(build.source, known ? 'abc1234567' : null);
+      assert.equal(build.dirty, known ? true : null);
+      assert.equal(build.mode, trust === 'production' ? 'Release build' : 'Development build');
+      assert.equal(build.id, 'a'.repeat(64));
+      assert.deepEqual(reach, []);
+      if (trust === 'production') assert.equal(build.builtAt, null);
+      else assert.equal(new Date(build.builtAt).toISOString(), build.builtAt);
+    }
+    // A timed-out process can leave partial stdout without establishing metadata.
+    for (const stalled of ['rev-parse', 'status']) {
+      generate((_command, args, options) => ({ status: args[0] === stalled ? null : 0,
+        ...(args[0] === stalled ? { signal: options.killSignal, error: Object.assign(new Error('timed out'), { code: 'ETIMEDOUT' }) } : {}),
+        stdout: args[0] === 'rev-parse' ? 'abc1234567\n' : ' M app.contract\n' }),
+        dir, { dir, manifest }, { binary: { sha256: 'a'.repeat(64) } }, { EXACT_UPDATE_TRUST: 'production' }, { reach: { rows: [] } }, writeInstallPages);
+      const { build } = JSON.parse(readFileSync(join(dir, '.exact/install.json')));
+      assert.equal(build.source, stalled === 'rev-parse' ? null : 'abc1234567');
+      assert.equal(build.dirty, stalled === 'status' ? null : true);
+      assert.equal(build.builtAt, null);
+    }
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
 test('static ancestor notifications reconcile nested trees and retain refused replacements', () => {
   const dir = mkdtempSync(join(tmpdir(), 'exact-static-ancestor-'));
   const app = join(dir, 'app'), source = join(app, 'gpu/shaders'), target = join(dir, 'served/shaders');

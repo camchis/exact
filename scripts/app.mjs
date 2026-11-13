@@ -245,29 +245,33 @@ export const runnerOwnedSource = name => ['exactDelivery', 'exactViewport', 'exa
 
 const ROOT = resolve(fileURLToPath(new URL('..', import.meta.url)));
 
-/** Source paths inside the wasm (panic locations) name no machine: the
+/** Source paths inside Rust artifacts (panic locations) name no machine: the
  * toolchain's sources as std's own rlibs do (`/rustc/<commit>`), Cargo's
- * home as `cargo`, and the checkout, the app and the target relatively, so
+ * home as `cargo`, and the capture, checkout, app and target relatively, so
  * the bytes that hashes and signatures cover are the same on every machine
- * and in every checkout. Every web-profile wasm build passes the same flags,
- * so they share one set of artifacts. Later prefixes win (rustc's rule). */
+ * and in every checkout. Later prefixes win (rustc's rule). */
 const rustcFacts = new Map();
-export function wasmRemapFlags(app, toolchain = null) {
-  const cwd = app?.workspace ?? ROOT, key = `${cwd}\0${toolchain ?? ''}`;
-  const env = toolchain ? { ...process.env, RUSTUP_TOOLCHAIN: toolchain } : process.env;
-  const rustc = (...args) => spawnSync('rustc', args, { cwd, env, encoding: 'utf8' }).stdout ?? '';
+export function rustRemapFlags(app, toolchain = null, env = process.env) {
+  const cwd = app?.workspace ?? ROOT, key = `${cwd}\0${toolchain ?? env.RUSTUP_TOOLCHAIN ?? ''}`;
+  const rustcEnv = toolchain ? { ...env, RUSTUP_TOOLCHAIN: toolchain } : env;
+  const rustc = (...args) => spawnSync('rustc', args, { cwd, env: rustcEnv, encoding: 'utf8' }).stdout ?? '';
   if (!rustcFacts.has(key)) rustcFacts.set(key, { commit: /^commit-hash: (\S+)$/m.exec(rustc('-vV'))?.[1], sysroot: rustc('--print', 'sysroot').trim() });
   const { commit, sysroot } = rustcFacts.get(key);
-  const pairs = [[resolve(process.env.CARGO_HOME ?? resolve(homedir(), '.cargo')), 'cargo']];
+  const pairs = [[resolve(env.CARGO_HOME ?? resolve(homedir(), '.cargo')), 'cargo']];
   if (sysroot && commit) pairs.push([resolve(sysroot, 'lib/rustlib/src/rust'), `/rustc/${commit}`]);
+  if (env.EXACT_SOURCE_ROOT) pairs.push([resolve(env.EXACT_SOURCE_ROOT), 'source']);
   pairs.push([ROOT, '']);
   if (app && resolve(app.workspace) !== ROOT) pairs.push([resolve(app.workspace), '']);
   if (app) pairs.push([resolve(app.target), 'target']);
+  return pairs.map(([from, to]) => `--remap-path-prefix=${from}=${to}`);
+}
+// Every web-profile wasm build shares these flags and one set of artifacts.
+export function wasmRemapFlags(app, toolchain = null) {
   // Target rustflags replace [build].rustflags: retain the game's determinism promise.
-  const flags = [...pairs.map(([from, to]) => `--remap-path-prefix=${from}=${to}`),
+  const flags = [...rustRemapFlags(app, toolchain),
     ...(app?.manifest?.game ? ['-C', 'llvm-args=-fp-contract=off'] : []),
     ...(toolchain === WEB_TOOLCHAIN ? WEB_RUSTFLAGS : [])];
-  return targetRustflags('wasm32-unknown-unknown', flags, { cwd });
+  return targetRustflags('wasm32-unknown-unknown', flags, { cwd: app?.workspace ?? ROOT });
 }
 
 // A Bun older than package.json's pin is refused before anything builds.

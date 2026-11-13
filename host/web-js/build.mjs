@@ -1081,7 +1081,7 @@ if (!production || !opt('--plan')) {
   // whatever the shell's EXACT_UPDATE_TRUST; with no bake receipt its reach is unknown.
   const [source, changes] = await revision ?? [null, null];
   const id = createHash('sha256').update(readFileSync(resolve(out, 'app.plan'))).update(readFileSync(resolve(out, 'app.js'))).digest('hex');
-  writeInstallPages(out, readManifest(appDir, app), { id, source, dirty: changes === null ? null : !!changes, builtAt: new Date().toISOString(),
+  writeInstallPages(out, readManifest(appDir, app), { id, source, dirty: changes === null ? null : !!changes, builtAt: production ? null : new Date().toISOString(),
     mode: production ? 'Release build' : 'Development build' });
 }
 // The type check, which ran while the page bundled: its diagnostics are the

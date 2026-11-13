@@ -525,9 +525,13 @@ const manifestNotes = [];
 const webManifest = webAppManifest(app.manifest, app.displayName, manifestNotes, app.dir);
 for (const note of manifestNotes) console.log(note);
 writeFileSync(resolve(stage, 'manifest.json'), JSON.stringify(webManifest, null, 2) + '\n');
-const sourceRevision = spawnSync('git', ['rev-parse', '--short=10', 'HEAD'], {cwd:app.dir,encoding:'utf8'});
-const sourceChanges = spawnSync('git', ['status', '--porcelain'], {cwd:app.dir,encoding:'utf8'});
-writeInstallPages(stage, app.manifest, {id:buildReceipt.binary.sha256, source:sourceRevision.status === 0 ? sourceRevision.stdout.trim() : null, dirty:sourceChanges.status === 0 && !!sourceChanges.stdout.trim(), builtAt:new Date().toISOString(), mode:buildEnv.EXACT_UPDATE_TRUST === 'production' ? 'Release build' : 'Development build', reach:bakedReceipt.reach?.rows ?? []});
+const sourceRevision = spawnSync('git', ['rev-parse', '--short=10', 'HEAD'], {cwd:app.dir,encoding:'utf8',timeout:5000,killSignal:'SIGKILL'});
+const sourceChanges = spawnSync('git', ['status', '--porcelain'], {cwd:app.dir,encoding:'utf8',timeout:5000,killSignal:'SIGKILL'});
+writeInstallPages(stage, app.manifest, { id: buildReceipt.binary.sha256,
+  source: sourceRevision.status === 0 ? sourceRevision.stdout.trim() : null,
+  dirty: sourceChanges.status === 0 ? !!sourceChanges.stdout.trim() : null,
+  builtAt: buildEnv.EXACT_UPDATE_TRUST === 'production' ? null : new Date().toISOString(),
+  mode: buildEnv.EXACT_UPDATE_TRUST === 'production' ? 'Release build' : 'Development build', reach: bakedReceipt.reach?.rows ?? [] });
 const escapeHtml = (t) => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
 // The shell's <style> ships without its comments and indentation: they are
 // for readers of host/web/index.html, and every served document's first bytes

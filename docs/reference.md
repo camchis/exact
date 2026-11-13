@@ -4091,9 +4091,11 @@ time. Edit the table, never the generated code.
 Every web build includes `/.exact/install/`, with explicit `web/`, `ios/` and
 `macos/` pages. Each shows stacked Web, iOS and macOS sections; unavailable
 platforms are gray. Web works by default and shows its destination URL. Native
-methods appear only when configured. The header shows build/source/timestamp
-and serving context. Optional `brand.logo` and `brand.wordmark` reuse app images
-or a text wordmark with an asset font; the footer uses the gray Exact mark.
+methods appear only when configured. The header shows the build id, available
+source facts and serving context. Development builds record their build time;
+release builds leave it unrecorded. Optional `brand.logo` and `brand.wordmark`
+reuse app images or a text wordmark with an asset font; the footer uses the gray
+Exact mark.
 Beside the pages, `/.exact/install.json` carries the same content as data (the
 app, its build, each platform's methods in order with labels resolved, and what
 it can reach), for a native client such as Exact2 Go to draw its own install

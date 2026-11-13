@@ -10,7 +10,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSy
 import { homedir, tmpdir } from 'node:os';
 import nodePath, { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { HOST_DEV, cargoReproducibilityFlags, developmentBuildEnv, readBuilds, resolveApp, rustPolicy } from './app.mjs';
+import { HOST_DEV, cargoReproducibilityFlags, developmentBuildEnv, readBuilds, resolveApp, rustPolicy, rustRemapFlags } from './app.mjs';
 import { channelOrigin } from './origin.mjs';
 
 const ROOT = resolve(fileURLToPath(new URL('..', import.meta.url)));
@@ -235,8 +235,8 @@ function matchesCfg(selector, facts) {
 function compile(app, targets, env, profile) {
   const packageName = rustPackage(app);
   // A module's bytes must not depend on where it was built: a cold deploy's
-  // cache is a new directory each time. Code generated under OUT_DIR records
-  // its path, and a Mach-O library names itself by its output path.
+  // cache is a new directory each time. Path dependencies and code generated
+  // under OUT_DIR record their paths; a Mach-O library names its output path.
   const modules = resolve(app.target,'rust-modules');
   const moduleEnv = {...env,CARGO_TARGET_DIR:modules};
   delete moduleEnv.RUSTFLAGS; delete moduleEnv.CARGO_ENCODED_RUSTFLAGS;
@@ -248,7 +248,7 @@ function compile(app, targets, env, profile) {
   }
   const messages = targets.flatMap(target => {
     const {flags, configuration} = moduleFlags(app, target, env);
-    const targetEnv = {...moduleEnv, CARGO_ENCODED_RUSTFLAGS:[...flags, `--remap-path-prefix=${modules}=/rust-modules`,
+    const targetEnv = {...moduleEnv, CARGO_ENCODED_RUSTFLAGS:[...flags, ...rustRemapFlags(app, null, env), `--remap-path-prefix=${modules}=/rust-modules`,
       ...(target.includes('apple') ? ['-Clink-arg=-Wl,-install_name,@rpath/app.module.dylib'] : []),
     ].join('\x1f')};
     return run(app, 'cargo', ['build', ...cargoReproducibilityFlags(app), ...configuration, '--lib', '-p', packageName,
