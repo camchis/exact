@@ -492,7 +492,7 @@ impl<D: DataSource> Presenter<D> {
         } else if let Some(anchor) = open.anchor.filter(|_| !modal) {
             top::area::origin(
                 &node.computed_style(exact_kernel::StyleMask::INHERITED),
-                &k.env(),
+                &k.env_of(node.id),
                 anchor,
                 (f.width, f.height),
                 self.viewport,
@@ -579,7 +579,7 @@ impl<D: DataSource> Presenter<D> {
         let k = self.host.kernel();
         Some(Inputs {
             epoch: k.epoch(),
-            env: k.env(),
+            env: k.env_of(id),
             frame: k.node(id)?.frame,
             viewport: self.viewport,
             root_font: k.root_font_size(),

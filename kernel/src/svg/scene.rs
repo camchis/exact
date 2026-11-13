@@ -498,6 +498,9 @@ impl<'k> Resolver<'k, '_> {
         if !node.node_type.is_svg_element() || !node.node_type.renders() {
             return None;
         }
+        // Each element's lengths may read the safe area where it is (LLP 1123 D9)
+        let env = self.kernel.arena().env_of(node.slot);
+        let vp = Viewport { env: &env, ..vp };
         if !self.budget.cost(budget::ITEM) {
             return None;
         }
@@ -699,6 +702,8 @@ impl<'k> Resolver<'k, '_> {
         style: &StyleProps,
         vp: Viewport,
     ) -> Option<(f32, f32, f32, f32)> {
+        let env = self.kernel.arena().env_of(node.slot);
+        let vp = Viewport { env: &env, ..vp };
         match node.node_type {
             NodeType::SvgGroup => {
                 let mut acc: Option<(f32, f32, f32, f32)> = None;

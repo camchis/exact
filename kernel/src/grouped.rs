@@ -13,7 +13,7 @@ use crate::generated::{
 };
 use crate::id::ViewId;
 use crate::kernel::{Kernel, NodeRef};
-use crate::style::{ColorValue, Env};
+use crate::style::ColorValue;
 
 /// Box styles a standard cell cannot preserve (LLP 1084 D7, LLP 1115 D1).
 /// A row's minimum height remains UIKit's; a column's alignment is authored.
@@ -370,8 +370,7 @@ impl Kernel {
         };
         // A section's percentage margin is of the list's content box
         let basis = crate::svg::scene::content_box(self, &self.node(view)?).2;
-        let env = self.arena().env_of(self.node(view)?.key.index);
-        authored_space(&mut list, &shown, &env, basis);
+        authored_space(&mut list, &shown, self.arena(), basis);
         Some(list)
     }
 
@@ -786,11 +785,13 @@ fn collapse(a: f32, b: f32) -> f32 {
 /// margins that meet there collapsed, as block margins do (§6.4). A margin
 /// is the author's when its row says so (LLP 1115.000 D2), whatever its
 /// number; the sheet's (LLP 1084 §2) stands in for the platform's gap.
-fn authored_space(list: &mut GroupedList, shown: &[NodeRef<'_>], env: &Env, basis: f32) {
+fn authored_space(list: &mut GroupedList, shown: &[NodeRef<'_>], arena: &NodeArena, basis: f32) {
     use crate::style::Dimension;
     let mut below: Option<(f32, bool)> = None;
     for (section, node) in list.sections.iter_mut().zip(shown) {
-        let points = |d: Dimension| d.at_basis(env, basis);
+        // Each section's margins are its own lengths (LLP 1123 D9)
+        let env = arena.env_of(node.key.index);
+        let points = |d: Dimension| d.at_basis(&env, basis);
         let top = points(node.style.margin_top.clone());
         let authored = node.style.written.has(StyleId::MarginTop);
         section.space_above = match below {

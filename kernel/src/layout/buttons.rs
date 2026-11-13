@@ -156,6 +156,7 @@ impl LayoutTree {
 /// Geometry is resolved against the containing block, never the button offer.
 pub(super) fn measure(
     record: &mut ButtonRecord,
+    slot: u32,
     arena: &NodeArena,
     measurer: &mut dyn TextMeasurer,
     known: Size<Option<f32>>,
@@ -180,7 +181,7 @@ pub(super) fn measure(
     frame.height = known.height.map_or(0.0, |h| h + inset.top + inset.bottom);
     request
         .style
-        .resolve_geometry(arena.env(), record.parent_width, frame);
+        .resolve_geometry(&arena.env_of(slot), record.parent_width, frame);
     record.answer(request, measurer)
 }
 

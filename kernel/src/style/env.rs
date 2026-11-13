@@ -386,18 +386,17 @@ impl Env {
 
     /// `var(--exact-safe-area-inset-<edge>)`'s value (LLP 1123 D9): the
     /// node's this environment was made for. One with none is the
-    /// document's, whose length would read the session root's inset under a
-    /// route's bar: a debug build stops there, naming the per-node resolver;
-    /// a release build reads the session root's.
+    /// document's, whose length reads the session root's inset where a
+    /// route's bar is: a reader that took it is a mistake, which a test
+    /// stops at and a development build reports once ([`misread`]).
     pub fn local_inset(&self, edge: Edge) -> f32 {
-        debug_assert!(
-            self.local.is_some(),
-            "var(--exact-safe-area-inset-{}) resolved against the document's environment: \
-             resolve a box's lengths with NodeArena::env_of or Kernel::env_of",
-            edge.name()
-        );
-        self.local
-            .map_or_else(|| self.root_inset(edge), |l| l[edge as usize])
+        match self.local {
+            Some(local) => local[edge as usize],
+            None => {
+                misread(edge);
+                self.root_inset(edge)
+            }
+        }
     }
 
     /// The session root's local inset at `edge` (LLP 1123 D9): the host's,
@@ -880,5 +879,39 @@ impl Env {
             },
             ..self.clone()
         }
+    }
+}
+
+/// Whether a process stops at a local inset read against the document's
+/// environment: one with `EXACT_STRICT_LOCAL_INSETS=1`, which the repository
+/// sets for what Cargo runs (`.cargo/config.toml`: `cargo test`, `cargo run`)
+/// and for the Swift host tests (`host/apple/xctest.mjs`). An app the build
+/// scripts make and launch has none.
+static STRICT: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+static WARNED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// A box's local inset read against the document's environment (LLP 1123
+/// D9): the reader should have taken the box's own (`NodeArena::env_of`,
+/// `Kernel::env_of`). A test stops there ([`STRICT`], and the kernel's own
+/// tests always); otherwise the read takes the session root's inset, which
+/// a development build says once on the console.
+fn misread(edge: Edge) {
+    use std::sync::atomic::Ordering::Relaxed;
+    let strict = cfg!(test)
+        || *STRICT.get_or_init(|| {
+            std::env::var_os("EXACT_STRICT_LOCAL_INSETS").is_some_and(|v| v == "1")
+        });
+    let message = || {
+        format!(
+            "var(--exact-safe-area-inset-{}) resolved against the document's environment: \
+             resolve a box's lengths with NodeArena::env_of or Kernel::env_of (LLP 1123 D9)",
+            edge.name()
+        )
+    };
+    if strict {
+        panic!("{}", message());
+    }
+    if cfg!(debug_assertions) && !WARNED.swap(true, Relaxed) {
+        eprintln!("exact: {}; the session root's inset stands in", message());
     }
 }
