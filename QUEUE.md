@@ -1752,7 +1752,6 @@ and the Linux headless CPU renderer without claiming display frame timing.
   `IDWriteFontResource::CreateFontFace` with design-space values, obtained by
   un-normalizing Parley's coordinates (including `avar` and `fvar`) or carrying
   the requested values. Repeat the audit before admitting variable faces.
-- The JS build should ask a `render=build` route's `pages=` source and render each page (`host/web-js/src/emit.rs` `build_pages` skips parameterised routes; only the Rust render entry asks the source). An app `exact new` made cannot pre-render `/product/:id` today (docs/agent-pitfalls.md, "Websites").
 
 - Game audio: after a large upward pitch change on a one-shot, the web output can be stopped about 168.5 ms of source before its end (1→16, 10.53 ms of playback), and a downward change leaves silence until the simulation ends the voice.
 

@@ -19,7 +19,7 @@ import { canonicalBytes, readAssetIndex } from '../../scripts/deploy-signing.mjs
 import { copyShaders, developmentURLScheme, resolveApp, webDist, webHostFiles } from '../../scripts/app.mjs';
 import { settingChanges } from '../../js/bake/src/__exact_env.mjs';
 import { acceptsHTML, appDocumentPath, prefersMarkdown, webRequestURL, parseWebRoot, sha256, webReleasePath, webRootPath } from '../../scripts/origin.mjs';
-import { canonical, matchPattern } from '../web-js/route-pattern.js';
+import { canonical, filePathOf, matchPattern } from '../web-js/route-pattern.js';
 import { guardFlags } from '../../scripts/help.mjs';
 
 import { INSTALL_FILES, INSTALL_PUBLIC, INSTALL_ROOT, installRoute, installNetworkPage } from '../../scripts/install-page.mjs';
@@ -836,9 +836,10 @@ export function buildTreeFileAsync(dist, pathname, accept = '', { miss = false }
 function* treeFile(dist, pathname, accept, miss) {
   let path;
   try { path = installRoute(decodeURIComponent(pathname)); } catch { return null; }
-  // No dot path, but the auth callback page's (LLP 1069.006 D4: `/.exact/auth/…`), the install pages and their
-  // data (LLP 1030.003 D6a), and the deep-link association file (`PUBLIC_FILES`).
-  if (!path.startsWith('/') || path.includes('\\') || path.includes('\0') || (!PUBLIC_FILES.has(path) && path.replace(/^\/\.exact\/auth\//, '/').split('/').some((part) => part.startsWith('.')))) return null;
+  // Hidden paths serve only a declared build page, the auth callback (LLP 1069.006 D4: `/.exact/auth/…`), the
+  // install pages and their data (LLP 1030.003 D6a), or the deep-link association file (`PUBLIC_FILES`).
+  if (!path.startsWith('/') || path.includes('\\') || path.includes('\0') || path.split('/').some(part => part === '.' || part === '..')) return null;
+  const hidden = !PUBLIC_FILES.has(path) && path.replace(/^\/\.exact\/auth\//, '/').split('/').some(part => part.startsWith('.'));
   const navigation = acceptsHTML(accept), page = navigation && appDocumentPath(pathname, true);
   // Asked again, three times at most: a build put in place as it was looked up
   // moves the tree it resolved away under it (its files then resolve to
@@ -852,9 +853,18 @@ function* treeFile(dist, pathname, accept, miss) {
       try { if (at.startsWith(prefix) && realpathSync(at) === at && statSync(at).isFile()) return { path: at, route }; } catch { /* none */ }
       return null;
     };
-    const exact = file(path);
+    const named = filePathOf(pathname).replace(/\/?$/, '/index.html'), decoded = path.replace(/\/?$/, '/index.html');
+    let index = file(named);
+    // A hidden path is only a build route's page, whose file keeps its escapes; an asset directory's is decoded.
+    if (hidden || (!index && named !== decoded && !/%2f/i.test(pathname))) {
+      const routes = yield* servedRouteTable(root);
+      if (!stillBuild(dist, was)) continue;
+      const built = routes?.[matchPattern(routes, canonical(pathname))]?.render === 'build';
+      if (hidden) return built ? index : null;
+      if (!built) index = file(decoded);
+    }
+    const exact = /%2f/i.test(pathname) ? null : file(path);
     if (exact) return exact;
-    const index = file(path.replace(/\/?$/, '/index.html'));
     // Only a navigation gets the shell; a dotted last segment is a page only when it is no file's extension or a
     // route matches it (`appDocumentPath`).
     if (navigation) {
