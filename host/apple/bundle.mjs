@@ -127,11 +127,9 @@ export function assembleMac({intents, shared, library, moduleLibraries = [], ser
       for (const file of [...loaded, ...(canvasGpuBuilt ? [canvasGpuLoadName] : []), ...(modulesBuilt ? [modulesLoadName] : []), ...serviceDylibs.map(svc => svc.load)]) run('codesign', ['--force', '--sign', sha1 ?? '-', '--timestamp=none', resolve(executables, file)], { stdio: 'ignore' });
       copyNativeResources(app, contents, buildReceipt.binary.metadata.nativeResources ?? []);
       // Prebuilt frameworks keep their linker output and are signed before the bundle (LLP 1154 D3).
-      for (const lib of [...(library ? [library] : []), ...moduleLibraries]) {
-        const placed = placeLibrary(lib, resolve(contents, 'Frameworks'));
-        stripProductionExecutable(resolve(placed, lib.link), { production, dsym: resolve(symbols, `${basename(placed)}.dSYM`), strip: false });
-        run('codesign', ['--force', '--sign', sha1 ?? '-', '--timestamp=none', placed], { stdio: 'ignore' });
-      }
+      placeMacLibraries(resolve(contents, 'Frameworks'), { library, moduleLibraries },
+        (placed) => run('codesign', ['--force', '--sign', sha1 ?? '-', '--timestamp=none', placed], { stdio: 'ignore' }),
+        (lib, placed) => stripProductionExecutable(resolve(placed, lib.link), { production, dsym: resolve(symbols, `${basename(placed)}.dSYM`), strip: false }));
       if (shared) {
         const frameworks = resolve(contents, 'Frameworks');
         mkdirSync(frameworks, { recursive: true });
@@ -190,7 +188,7 @@ export function assembleMac({intents, shared, library, moduleLibraries = [], ser
       for (const file of [...loaded, ...(canvasGpuBuilt ? [canvasGpuLoadName] : []), ...(modulesBuilt ? [modulesLoadName] : []), ...serviceDylibs.map(svc => svc.load)]) run('codesign', ['--force', '--sign', sha1 ?? '-', '--timestamp=none', resolve(executables, file)], { stdio: 'ignore' });
       copyNativeResources(app, contents, buildReceipt.binary.metadata.nativeResources ?? []);
       const frameworks = resolve(contents, 'Frameworks');
-      if (library) run('codesign', ['--force', '--sign', sha1 ?? '-', '--timestamp=none', placeLibrary(library, frameworks)], { stdio: 'ignore' });
+      placeMacLibraries(frameworks, { library, moduleLibraries }, (placed) => run('codesign', ['--force', '--sign', sha1 ?? '-', '--timestamp=none', placed], { stdio: 'ignore' }));
       if (shared) {
         mkdirSync(frameworks, { recursive: true });
         cpSync(shared.framework, resolve(frameworks, 'ExactCore.framework'), { recursive: true, verbatimSymlinks: true });
@@ -206,6 +204,18 @@ export function assembleMac({intents, shared, library, moduleLibraries = [], ser
     }
     return bundlePath;
 }
+/** The app's prebuilt frameworks (LLP 1154 D3), its own and its native modules' dynamic xcframeworks, each placed in
+ * `frameworks` and signed (`sign`) before the bundle; `each` sees each one first. The Mac app and its sample host both
+ * carry them: the module code in either loads them from `@loader_path/../Frameworks`. */
+export function placeMacLibraries(frameworks, { library, moduleLibraries = [] }, sign, each = () => {}) {
+  return [...(library ? [library] : []), ...moduleLibraries].map((lib) => {
+    const placed = placeLibrary(lib, frameworks);
+    each(lib, placed);
+    sign(placed);
+    return placed;
+  });
+}
+
 export function assembleIOS({intents, shared, library, moduleLibraries = [], serviceDylibs, triple, app, paths, binDir, bin, clipBin, device, development, appleReach, tv, bakedCompat, bakedPlan, ipa, linkRoot, swiftc, buildReceipt, rosterKeys, sdkName, production, distribution, stampSdk, libDir, gpuArtifacts, looseArms, modulesBuilt, modulesLoadName, hasSvg, svgBuilt, svgLoadName, svgFilterBuilt, svgFilterLibraryName, canvasGpuBuilt, canvasGpuLoadName, args, unsigned, prof, ph, sha1, composition, destination, target, sdk, hasGpu, dylib, alarm = null}, {runApple, appleArtifacts, macInfoPlist, copyAppleStaticTrees, writeUsageStrings, receipt, shippedReceipt, assertAppleIdentity, placeAppleArtifact, infoPlist, distributionKeys, copyAppleGpuProducts, entitlements, appClip}) {
   assertLibraryNames([library, ...moduleLibraries, shared && { placed: shared.framework }].filter(Boolean));
   // The bundle, assembled from scratch (new inodes, see above), with the app's assets (a phone reads no other
