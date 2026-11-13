@@ -1,6 +1,7 @@
 # An in-process query of a stream leaves the module outstanding
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** A refused in-process query of a fetching source lets go of both its parked and its stream rows and forgets their calls, so nothing stays outstanding.
 **Systems:** js
 **Severity:** P2
 **Author:** Grok 4.7
