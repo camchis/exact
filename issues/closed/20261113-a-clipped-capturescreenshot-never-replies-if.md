@@ -1,6 +1,7 @@
 # A clipped captureScreenshot never replies if the frame goes away
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** Automation keeps each capture's reply beside its evaluations and ends it with NotFoundError when the frame ends, and the viewport callback answers NotFoundError when the frame or its web view is gone.
 **Systems:** host/apple
 **Severity:** P2
 **Author:** Grok 4.7
