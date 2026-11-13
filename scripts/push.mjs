@@ -231,15 +231,20 @@ export async function pusher(opts) {
     requireReleasePins(app);
     const started = performance.now();
     const found = await streams(origin, app, channel, env);
-    const native = found.find((s) => ['native', 'tiered'].includes(s.cohort.compat.inputs.rustMode));
-    const built = typescript ? bakeTypescript(tools.typescript, app, env)
-      : await buildRust(app, { compat: found[0].cohort.compat, env, nativeTarget: native?.cohort.compat.target ?? null, profile: 'release', baker });
-    if (!built) refuse(`${app.name} has neither a TypeScript module (app.ts) nor a rust.module.package; push carries a plan baked with its module`);
+    // A Rust module is built for each native target a stream's binary runs, as deploy builds it; a wasm stream takes
+    // any of them, whose wasm variant is the same.
+    const nativeTargets = [...new Set(found.filter((s) => ['native', 'tiered'].includes(s.cohort.compat.inputs.rustMode)).map((s) => s.cohort.compat.target))];
+    const variants = new Map();
+    if (typescript) variants.set(null, bakeTypescript(tools.typescript, app, env));
+    else for (const target of nativeTargets.length ? nativeTargets : [null]) variants.set(target, await buildRust(app, { compat: found[0].cohort.compat, env, nativeTarget: target, profile: 'release', baker }));
+    if (!variants.values().next().value) refuse(`${app.name} has neither a TypeScript module (app.ts) nor a rust.module.package; push carries a plan baked with its module`);
     const bakedIn = seconds(started);
     const release = defaultRelease(gitHead()).replace(/^r-/, 'p-');
     const snapshot = { id: gitHead(), commit: gitHead(), dirty: true };
-    const results = [];
+    // Every stream's update is made and checked before any is published, so one its binary cannot take publishes none.
+    const updates = [];
     for (const { stream, head, cohort, platform, build: binary } of found) {
+      const built = variants.get(cohort.compat.target) ?? variants.values().next().value;
       const graph = planGraph(tools.graph, app, built.plan, cohort, env);
       const inputs = cohort.compat.inputs;
       const assets = head ? await carriedAssets(origin, app, head, inputs) : bakedAssets(app, binary, env);
@@ -250,8 +255,10 @@ export async function pusher(opts) {
       const checked = classifyArtifacts(build, cohort, signingKey);
       if (!checked.bundle) refuse(`${platform} ${stream.compatibilityId.slice(0, 8)} cannot take this as an update — ${checked.missing.join('; ')}. It needs a new binary: bun scripts/deploy.mjs ${app.name}`);
       const row = { kind: 'stream', platform, channel, compatibilityId: stream.compatibilityId, action: 'bundle', receipt: cohort };
-      results.push(await publishStream({ origin, row, bundle, compat: cohort.compat, app, signer, release, snapshot, opts: { seqAbove: opts.seqAbove }, log: () => {}, build }));
+      updates.push({ row, bundle, compat: cohort.compat, build });
     }
+    const results = [];
+    for (const update of updates) results.push(await publishStream({ origin, ...update, app, signer, release, snapshot, opts: { seqAbove: opts.seqAbove }, log: () => {} }));
     for (const r of results) {
       const what = r.action === 'current' ? 'already current' : `seq ${r.seq}: ${r.changes.map((c) => c.name).join(', ')}`;
       console.log(`  ${r.platform} ${r.compatibilityId.slice(0, 8)} — ${what}`);

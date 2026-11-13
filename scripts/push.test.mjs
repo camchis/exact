@@ -15,13 +15,16 @@ import {unbundledTextures} from './texture-families.mjs';
 // root whose cohort's binary has prelude runtime 4 and whose baked module
 // needs `runtime` (its receipt's). Bun's native subprocess import bypasses
 // module mocks; explicit bindings also isolate deployment tests.
-function harness(classify=()=>({bundle:true}), runtime=4, {bake, cohortRuntime=4, grants='', watch=fs.watch}={}) {
+function harness(classify=()=>({bundle:true}), runtime=4, {bake, cohortRuntime=4, grants='', watch=fs.watch, targets}={}) {
   const root=fs.mkdtempSync(resolve(tmpdir(),'exact-push-profile-'));
   const app={id:'fixture',name:'fixture',dir:root,target:root,manifest:{app:{origin:root},deploy:{signing:{keys:{test:'public'}}}}};
   const compat={id:'a'.repeat(32),target:'fixture',inputs:{app:'fixture',platform:'linux',store:{L:'A'},rustMode:'native',grantCeiling:grants,keys:{test:'public'},typescriptRuntime:cohortRuntime}};
   const graph={artifacts:[{name:'app.plan',requires:{sources:{}},sha256:'plan'}]};
   const cohort={version:1,compat,binary:'binary',sources:{}};
   const build={trust:'production',compat,graph};
+  // `targets`: a production build for each [target, rustMode], each its own cohort.
+  const builds=targets?targets.map(([target,rustMode],i)=>({trust:'production',compat:{...compat,id:String(i).repeat(32),target,inputs:{...compat.inputs,rustMode}},graph})):[build];
+  const bundled=[];
   const calls=[], published=[], bundles=[], destinations=[], rows=[];
   const sealed=(name,env)=>{
     calls.push(name);
@@ -34,9 +37,9 @@ function harness(classify=()=>({bundle:true}), runtime=4, {bake, cohortRuntime=4
     channelOf,validateChannel,resolve,relative,homedir,ROOT:fileURLToPath(new URL('..',import.meta.url)),
     process:{env:{EXACT_GAME_PROOF_PROFILE:'gpu-dev',EXACT_UPDATE_TRUST:'development'}},
     console:{log(){}},Refusal:Error,refuse(message){throw Error(message)},
-    loadSigner:()=>({keyId:'test'}),resolveApp:()=>app,readBuilds:()=>[build],
+    loadSigner:()=>({keyId:'test'}),resolveApp:()=>app,readBuilds:()=>builds,
     bakedEntryAssets,bakeOutput:()=>resolve(root,'bake'),
-    cohortReceipt:()=>cohort,classifyArtifacts:classify,
+    cohortReceipt:b=>b===build?cohort:{version:1,compat:b.compat,binary:'binary',sources:{}},classifyArtifacts:classify,
     openOrigin:mock(spec=>({writable:true,list:async path=>{destinations.push({origin:spec,path});return []},describe:()=>spec})),
     channelOrigin,sha256:()=> 'digest',blobPath:x=>x,streamPath:()=> 'stream',
     defaultRelease:()=> 'r-fixture',admitHead(){throw Error('unexpected head')},
@@ -46,8 +49,8 @@ function harness(classify=()=>({bundle:true}), runtime=4, {bake, cohortRuntime=4
       return {action:'current',platform:'linux',compatibilityId:compat.id};
     },
     RustBaker:class {constructor(app,env){sealed('resident',env)}close(){calls.push('close')}},
-    async buildRust(app,opts){sealed('rust',opts.env);expect(opts.profile).toBe('release');return {plan:Buffer.from('plan')}},
-    rustBundle:(app,bundle,build)=>({bundle,build}),
+    async buildRust(app,opts){sealed('rust',opts.env);expect(opts.profile).toBe('release');return {plan:Buffer.from('plan'),target:opts.nativeTarget}},
+    rustBundle:(app,bundle,build,built)=>{bundled.push([build.compat.target,built.target]);return {bundle,build}},
     spawnSync(tool,args,opts){
       if(tool==='git')return {status:0,stdout:'b'.repeat(40)};
       const name=tool==='cargo'?'tools':args[0]==='graph'?'graph':'typescript';
@@ -68,7 +71,7 @@ function harness(classify=()=>({bundle:true}), runtime=4, {bake, cohortRuntime=4
   const functions=source.slice(source.indexOf('function parseArgs('),source.indexOf('\nif (process.argv[1]'))
     .replace('export async function pusher','async function pusher');
   const pusher=new Function(...Object.keys(bindings),functions+'\nreturn pusher;')(...Object.values(bindings));
-  return {root,app,build,calls,published,bundles,destinations,rows,bindings,pusher};
+  return {root,app,build,calls,published,bundles,bundled,destinations,rows,bindings,pusher};
 }
 
 test.each([
@@ -123,6 +126,27 @@ test('push sends a TypeScript module that uses nothing newer to an older binary'
     expect(await pusher({_:[root],origin:root,keys:root})).toBe(0);
     expect(calls).toContain('publish');
     expect(published[0].graph.artifacts.every(a=>a.requires.typescriptRuntime===4)).toBe(true);
+  } finally {fs.rmSync(root,{recursive:true,force:true})}
+});
+
+// A Rust module is built for each native target a stream's binary runs, whichever comes first, and each stream gets its
+// own; one stream that cannot take the update publishes none.
+test('push builds a Rust module for each native target and checks every stream before publishing', async () => {
+  const x86='x86_64-unknown-linux-gnu', arm='aarch64-unknown-linux-gnu';
+  for (const targets of [[[x86,'native'],[arm,'tiered'],['wasm32-unknown-unknown','wasm']],[[arm,'native'],['wasm32-unknown-unknown','wasm'],[x86,'native']]]) {
+    const {root,bundled,published,pusher}=harness(undefined,4,{targets});
+    try {
+      expect(await pusher({_:[root],origin:root,keys:root})).toBe(0);
+      const native=targets.filter(([,mode])=>mode!=='wasm').map(([t])=>t);
+      expect(bundled.filter(([cohort])=>cohort!=='wasm32-unknown-unknown')).toEqual(native.map(t=>[t,t]));
+      expect(new Set(bundled.map(([,built])=>built))).toEqual(new Set(native));
+      expect(published.map(b=>b.compat.target)).toEqual(targets.map(([t])=>t));
+    } finally {fs.rmSync(root,{recursive:true,force:true})}
+  }
+  const {root,published,pusher}=harness(build=>build.compat.target===arm?{bundle:false,missing:['rustTarget']}:{bundle:true},4,{targets:[[x86,'native'],[arm,'native']]});
+  try {
+    await expect(pusher({_:[root],origin:root,keys:root})).rejects.toThrow('cannot take this as an update — rustTarget');
+    expect(published).toEqual([]);
   } finally {fs.rmSync(root,{recursive:true,force:true})}
 });
 
