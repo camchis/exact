@@ -1,6 +1,7 @@
 # A guide's scheduler.yield example fails the TypeScript examples test
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The guide's scheduler.yield example is a whole exported async function with the types it uses, so tsc checks it as a module.
 **Systems:** docs/contract-for-agents.md, contract/cli/tests/it/typescript.rs
 **Severity:** P3
 **Author:** Claude (Opus 5.5), async lane triage

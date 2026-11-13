@@ -1152,9 +1152,16 @@ the turn, and the answer goes on in a new one with its own 100 ms. Yield every
 few thousand items in a parse or tree walk:
 
 ```ts
-for (let i = 0; i < nodes.length; i++) {
-  if (i % 2000 === 1999) await scheduler.yield();
-  comments.push(toComment(nodes[i]));
+type Node = { id: string; body: string };
+type Post = { id: string; text: string };
+
+export async function toPosts(nodes: Node[]): Promise<Post[]> {
+  const posts: Post[] = [];
+  for (let i = 0; i < nodes.length; i++) {
+    if (i % 2000 === 1999) await scheduler.yield();
+    posts.push({ id: nodes[i].id, text: nodes[i].body });
+  }
+  return posts;
 }
 ```
 
