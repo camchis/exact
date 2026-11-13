@@ -24,8 +24,15 @@ impl NameSpans {
 pub struct Hidden {
     /// The name, as written.
     pub name: String,
+    /// The word that declared it (`fn`, `state`, `action`), or `use` for a
+    /// name a refused `use` line imported.
+    pub kind: String,
     /// The component whose member it named; `None` for a declaration.
     pub component: Option<String>,
+    /// The first and last lines of that component, where alone its member's
+    /// name is read; `None` for a declaration, and for a member of a
+    /// component some of whose members are in another file.
+    pub lines: Option<(u32, u32)>,
 }
 
 /// One source file.

@@ -181,6 +181,7 @@ mod realworld_then;
 mod recorder_start;
 mod recorder_transcript;
 mod records;
+mod recovery;
 mod refreshes;
 mod refusal_remedies;
 mod rem;

@@ -337,7 +337,7 @@ export async function driveServer(dir, storage, say = (line) => console.error(li
     // drive's lease given up, never the database deleted or kept as it was.
     const others = files('drive').filter(([file, pid]) => file !== mine && alive(pid)).map(([, pid]) => pid);
     if (fresh && (others.length || await answering(server.url))) {
-      await stop();
+      off(); rmSync(mine, { force: true });
       throw new Error(`agent: --storage ${storage} is to start empty, but ${others.length ? `another drive (pid ${others.join(', ')}) is using` : 'something already answers at'} ${server.url}, the app server${db ? ', on its database' : ''}: let it end, or name another store`);
     }
     if (await answering(server.url)) {
