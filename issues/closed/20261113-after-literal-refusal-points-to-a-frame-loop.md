@@ -1,6 +1,7 @@
 # A retry with a growing wait has no direct form, and the refusal points to a task that wakes every frame
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The literal-timer refusal recommends gated fixed-delay backoff steps; the guide explains their wake behavior.
 **Systems:** contract/lower/src/timers.rs (`lower-timer-literal`), rules/DEFERRED.md (gated timers), docs/contract-for-agents.md
 **Severity:** P3
 **Author:** Claude (Opus 5.5), from Exact diaries sent 2026-11-11 to 2026-11-13

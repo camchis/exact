@@ -3479,6 +3479,27 @@ round's tick (`when screen == "play"`), a flight's frames
 one gated task, and each is the root's: a child component declares none
 (`type-child-resource`), so a sheet a component draws has its task in the root.
 
+**Retry backoff.** For a bounded ladder of delays, use one gated task per step.
+Only the active step has a timer, which wakes once at its deadline:
+
+```text
+  state waiting = false
+  state attempt = 1
+  task retry1 when waiting and attempt == 1
+    after(250, again)
+  task retry2 when waiting and attempt == 2
+    after(500, again)
+  task retry3 when waiting and attempt >= 3
+    after(1000, again)
+```
+
+Have `again` clear `waiting` and send the request. On failure, increment `attempt`
+and set `waiting` again; reset `attempt` to 1 on success. A new attempt then arms
+its step's timer. If the step stays active between retries, use `key=attempt` to
+restart its timer. Computed intervals remain refused. A wait that must track a
+continuous value can use a gated `every(frame, check)` and compare
+`performanceNow()` with its deadline; see "Following the transport" for tempo.
+
 **Repeating while a condition holds.** Use a task with `when` and `every`. The
 timer runs only while the condition is true. Any action that makes it false
 stops the timer.
