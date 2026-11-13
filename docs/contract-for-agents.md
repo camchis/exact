@@ -4177,8 +4177,13 @@ resident set on Linux and Android), `none` on the web and Windows;
 and renderer's heap, and `none` natively, where that heap is the process's;
 `textureMemoryBytes` counts the delivered textures resident on the device
 (render targets are not counted) and `geometryMemoryBytes` the renderer's
-vertex and index buffers, on every host once the renderer exists. GPU and
-audio measurements remain unavailable. The 16 KiB snapshot limit is separate from the public surface
+vertex and index buffers, on every host once the renderer exists.
+`audioState` is a game's audio output where its host gives it one (the web,
+Apple, Windows): `running`, `suspended` (hidden, or waiting for a gesture),
+`interrupted` (a call or alarm on iOS) or `closed` (no device: under the
+agent's virtual clock, or not yet opened); `none` on the Linux family and for
+a game without audio. `gpuMs`, `gpuMaxMs`, `cpuSubmitMs` and
+`cpuSubmitMaxMs` are not measured on any host yet and stay `none`. The 16 KiB snapshot limit is separate from the public surface
 record's limit.
 
 A GPU HUD can show its last successful publication while its world loads:

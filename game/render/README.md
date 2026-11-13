@@ -717,7 +717,8 @@ the first frame after rest. `thermalState`, `quality`, `maxFps` and `idle` are
 read when the snapshot is taken, not over the window, as are `textureMemoryBytes`
 (the delivered textures resident on the device, render targets excluded) and
 `geometryMemoryBytes` (the shared vertex and index buffers' allocated bytes);
-the GPU module adds the process's footprint and, on the web, its own heap. CPU encoding is distinct
+the GPU module adds the process's footprint and, on the web, its own heap. `audioState` is the game audio output's (`running`, `suspended`,
+`interrupted`, `closed`) where the target has a player. CPU encoding is distinct
 from queue submission and GPU execution; unsupported timing, memory and audio
 fields stay unavailable. No simulation state, save or hash contains these readings.
 

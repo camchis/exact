@@ -41,6 +41,10 @@ pub trait Executor: Default {
     }
     /// Called synchronously on key/pointer down, within the browser's gesture.
     fn unlock(&mut self) {}
+    /// The audio output's state for a performance snapshot; `None` without one.
+    fn audio_state(&self) -> Option<&'static str> {
+        None
+    }
 }
 impl Executor for () {}
 
@@ -678,6 +682,7 @@ impl<G: Game, P: Executor, const ASSETS: bool, H: crate::Hooks> Surface
             quality: self.rung.map(|rung| rung.level.keyword()),
             max_fps: self.max_fps(),
             idle: self.resting,
+            audio: performance::audio(self.presentation.audio_state(), self.interrupted),
             memory: (self.render.as_ref())
                 .map(|(renderer, _)| (renderer.texture_bytes(), renderer.mesh_buffer_bytes())),
         };

@@ -22,9 +22,17 @@ pub(crate) struct Live {
     pub max_fps: u32,
     /// The canvas is at rest: it asks for no frames until something changes.
     pub idle: bool,
+    /// The audio output's state, where the surface has one.
+    pub audio: Option<&'static str>,
     /// Device bytes of the resident delivered textures and of the shared
     /// vertex and index buffers, once the renderer exists.
     pub memory: Option<(u64, u64)>,
+}
+
+/// The output's `state` as a snapshot names it: an interruption (a call, an
+/// alarm) suspends the output, and the snapshot says which suspension it is.
+pub(crate) fn audio(state: Option<&'static str>, interrupted: bool) -> Option<&'static str> {
+    state.map(|state| if interrupted { "interrupted" } else { state })
 }
 
 #[derive(Default)]
@@ -151,6 +159,9 @@ impl Report {
             // The module honors caps down to 5 Hz (exact_gpu::Module::max_fps).
             write!(out, ",\"maxFps\":{}", live.max_fps.max(5)).unwrap();
         }
+        if let Some(state) = live.audio {
+            write!(out, ",\"audioState\":\"{state}\"").unwrap();
+        }
         if let Some((textures, geometry)) = live.memory {
             write!(
                 out,
@@ -181,6 +192,13 @@ impl Report {
 mod tests {
     use super::*;
     #[test]
+    fn an_interrupted_output_says_so_and_no_output_says_nothing() {
+        assert_eq!(audio(Some("suspended"), true), Some("interrupted"));
+        assert_eq!(audio(Some("running"), false), Some("running"));
+        assert_eq!(audio(None, true), None);
+    }
+
+    #[test]
     fn live_facts_are_read_at_the_snapshot_and_unknown_ones_are_absent() {
         let mut report = Report::default();
         report.clock(true);
@@ -205,6 +223,7 @@ mod tests {
             "maxFps",
             "idle",
             "textureMemoryBytes",
+            "audioState",
         ] {
             assert!(value.get(absent).is_none(), "{absent}");
         }
@@ -214,6 +233,7 @@ mod tests {
             quality: Some("mid"),
             max_fps: 2,
             idle: true,
+            audio: Some("running"),
             memory: Some((4096, 1024)),
         };
         let value: serde_json::Value =
@@ -222,6 +242,7 @@ mod tests {
         assert_eq!(value["quality"], "mid");
         assert_eq!(value["maxFps"], 5, "caps below 5 Hz draw at 5 Hz");
         assert_eq!(value["idle"], true);
+        assert_eq!(value["audioState"], "running");
         assert_eq!(value["textureMemoryBytes"], 4096);
         assert_eq!(value["geometryMemoryBytes"], 1024);
     }

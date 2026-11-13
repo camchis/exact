@@ -1432,6 +1432,9 @@ impl<P: crate::Executor> crate::Executor for ModelExecutor<P> {
     fn suspend(&mut self, suspended: bool) {
         self.inner.suspend(suspended);
     }
+    fn audio_state(&self) -> Option<&'static str> {
+        self.inner.audio_state()
+    }
     fn sync(&mut self, world: &exact_game::World, generation: u64, playing: bool, seekable: bool) {
         self.inner.sync(world, generation, playing, seekable);
     }
