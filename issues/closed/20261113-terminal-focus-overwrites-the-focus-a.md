@@ -1,6 +1,7 @@
 # Terminal focus overwrites the focus a blur handler set
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** focus keeps a focus the blur's commit set, and a target that commit made ineligible, instead of assigning the caller's target, and a key's field default edits only a field still focused and eligible after the key's handler.
 **Systems:** host/terminal
 **Severity:** P2
 **Author:** Grok 4.7
