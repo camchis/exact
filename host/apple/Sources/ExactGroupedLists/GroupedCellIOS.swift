@@ -36,10 +36,46 @@ final class GroupedCell: UICollectionViewListCell {
         return .customView(configuration: .init(customView: button, placement: .trailing(displayed: .always)))
     }
 
+    /// Its toggle row's switch. A `UITableViewCell` with a switch as its `accessoryView` is one
+    /// element, as each row of Settings is: the row's name with the switch's value and traits, and
+    /// activating it flips the switch. A list cell's custom accessory is not that on every iOS
+    /// (17's VoiceOver read the switch after the row, with no name), so this cell says it itself.
+    weak var toggle: UISwitch? { didSet { if toggle !== oldValue { own = markedNotEnabled ? .notEnabled : [] } } }
+    /// Its own traits while it is a toggle's element. UIKit's accessibility answers a list cell's
+    /// traits from its subviews, the switch among them, so these are kept apart from both.
+    private var own: UIAccessibilityTraits = []
+    override var isAccessibilityElement: Bool {
+        get { toggle != nil || super.isAccessibilityElement }
+        set { super.isAccessibilityElement = newValue }
+    }
+    override var accessibilityValue: String? {
+        get { toggle?.accessibilityValue ?? super.accessibilityValue }
+        set { super.accessibilityValue = newValue }
+    }
+    override var accessibilityTraits: UIAccessibilityTraits {
+        get { toggle.map { own.union($0.accessibilityTraits) } ?? super.accessibilityTraits }
+        // An insert or remove reads the union first: what only the switch says stays the switch's,
+        // except the `.notEnabled` that `interact` marks the cell with itself. A row that is no
+        // toggle is configured while its old switch is still a subview, which UIKit reads in.
+        set {
+            guard let toggle else { return super.accessibilityTraits = newValue.subtracting(.toggleButton) }
+            var switchOnly = toggle.accessibilityTraits.subtracting(own)
+            if markedNotEnabled { switchOnly.remove(.notEnabled) }
+            own = newValue.subtracting(switchOnly)
+        }
+    }
+    override func accessibilityActivate() -> Bool {
+        guard let toggle else { return super.accessibilityActivate() }
+        if toggle.isEnabled {
+            toggle.setOn(!toggle.isOn, animated: true)
+            toggle.sendActions(for: .valueChanged)
+        }
+        return true
+    }
     #endif
 
     var row: UInt32?
-    /// Whether `interact` put `.notEnabled` in its traits.
+    /// Whether `interact` put `.notEnabled` in its traits, set before it does.
     var markedNotEnabled = false
     /// The node of its row's switch or detail button.
     var target: UInt32?
@@ -124,4 +160,9 @@ extension UICollectionViewListCell {
 
 #if os(iOS)
 extension GroupedCell: GroupedMenuSurface {}
+
+extension GroupedCell: AgentOwned {
+    /// A toggle row's element is its switch's: `tree --ax` joins it to the control.
+    package var agentViewId: UInt32? { toggle == nil ? nil : target }
+}
 #endif
