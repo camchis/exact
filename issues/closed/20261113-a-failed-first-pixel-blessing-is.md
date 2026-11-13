@@ -1,6 +1,7 @@
 # A failed first-pixel blessing is latched and the bundle can be quarantined
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The store writes the blessing before it assigns memory, and the client latches it only after the write succeeds, so a failed write can be retried.
 **Systems:** update
 **Severity:** P2
 **Author:** Grok 4.7
