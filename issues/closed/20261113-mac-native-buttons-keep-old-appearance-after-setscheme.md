@@ -1,6 +1,7 @@
 # On macOS a native button keeps the appearance it was configured in after `setScheme` changes the app's
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** Native buttons refresh their appearance and authored face colours when the owning view’s effective appearance changes.
 **Systems:** host/apple/Sources/ExactKit/Mac/ButtonConfigurationMac.swift, host/apple/Sources/ExactKit/Mac/NativeButtonsMac.swift, host/apple/Sources/ExactKit/Mac/NodeViewMac.swift
 **Severity:** P2
 **Author:** Claude (Opus 5.5), from Exact diaries sent 2026-11-11 to 2026-11-13
