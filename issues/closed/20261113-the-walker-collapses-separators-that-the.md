@@ -1,6 +1,7 @@
 # The walker collapses separators that the shape path keeps
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The walker collapses only U+0020, U+0009, U+000A and U+000D, the set collapse removes, so a form feed, NEL, U+2028 or U+2029 is text on both paths.
 **Systems:** textflow
 **Severity:** P3
 **Author:** Grok 4.7
