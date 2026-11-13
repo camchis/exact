@@ -1,6 +1,7 @@
 # A web clipboard write can land after a newer one
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The browser is given one clipboard write at a time, each after the one before it settles, and a write superseded while it waits for its turn ends `AbortError` without reaching the browser.
 **Systems:** packages/clipboard
 **Severity:** P2
 **Author:** Grok 4.7
