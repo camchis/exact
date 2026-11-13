@@ -1,6 +1,7 @@
 # A failed old microphone or camera reopen ends the newer live capture
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** A failed microphone or camera reopen ends its track only while its lease is still the current one, as a successful reopen already adopts only then.
 **Systems:** packages/media-capture/web/index.js, packages/media-capture/web/video.js
 **Author:** Codex
 **Date:** 2026-11-12
