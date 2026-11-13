@@ -222,7 +222,7 @@ Large    each of those screens again at the largest text size (ios: the simulato
          after; web: a 53 px root, iOS's body there, at 390x844, and the tests run again there
          to read up to 12 screens they pass through). Reports spills past an edge, squeezing and
          overlap, with remedies that give text room. The web comparison leaves out content iOS
-         projects into its navigation bar. A smaller or fixed font is the tell, as is a line-clamp
+         projects into its navigation bar and its tab bar. A smaller or fixed font is the tell, as is a line-clamp
          in a list's row or hyphens="auto" on several words (a UILabel hyphenates only a word longer
          than its line; grouped list rows hyphenate as cells do). Counted ("3 at the largest text size"), never failing.
 Native   windows: headless at app.json's window size, then the desktop's window (windows-window.png); android: the APK, light and dark. Neither checks, reads the largest text or scrolls yet.

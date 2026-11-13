@@ -51,7 +51,7 @@ import { guardFlags } from './help.mjs';
 import { holderOf, takePort } from './port-lock.mjs';
 import { backendOriginSelection, privateNetwork, selectBackendOrigin } from '../js/bake/src/typescript.mjs';
 import { contractVerify, semanticsSummary } from './verify-semantics.mjs';
-import { byRule, groups, ruleOf, largeRemedy, iosNavigationContent } from './verify-findings.mjs';
+import { byRule, groups, ruleOf, largeRemedy, iosNavigationContent, iosTabBar } from './verify-findings.mjs';
 import { cargoDiagnosticFilter } from './cargo-check.mjs';
 export { byRule, groups, ruleOf, largeRemedy };
 
@@ -705,7 +705,8 @@ const ANDROID = 'not on Android yet: check\'s findings (each screen is captured 
 // simulator's own size, which UIKit's controls and Exact's text both follow; the web, where a builder iterates, sets the root
 // font size to iOS's body at that size on the phone's width. Only the kinds of finding a larger text makes are kept, each with
 // a remedy that keeps the text's size: a smaller font is the platform tell this pass exists to prevent. The web omits
-// content iOS projects into its navigation bar: its authored web boxes do not measure UIKit's title and items.
+// what iOS projects into its navigation bar and its tab bar: the web's boxes there do not measure UIKit's title, items
+// and tabs.
 export const LARGEST = 'accessibility-extra-extra-extra-large', LARGEST_PX = 53;
 const LARGE_KINDS = new Set(['overflow', 'clipped', 'overlap', 'squeezed']), PAGES = 6;
 /** LLP 1116.020 D4: each font size the app's own Contract fixes (no-tells.mjs `fixedSizesIn`), which no spill shows (a fixed
@@ -762,7 +763,7 @@ export async function largestText(s, screen) {
     await s.clock('settle');
     const [{ judge, line, accepts }, tree] = await Promise.all([import('./agent-check.mjs'), s.op({ op: 'tree' })]);
     const nodes = new Map((tree.nodes ?? []).map((n) => [n.id, n])), looked = new Set(), found = new Map();
-    const projected = web ? await iosNavigationContent(nodes, async id => (await s.op({ op: 'layout', id })).node?.style) : new Set();
+    const projected = web ? new Set([...await iosNavigationContent(nodes, async id => (await s.op({ op: 'layout', id })).node?.style), ...iosTabBar(nodes)]) : new Set();
     let obs; const shots = [];
     // A screen at a time, as check reads one: the page is scrolled to the first node with a testId that no reading has
     // held yet, at most PAGES times (a list's rows off the screen have no cells to read). Never to projected content:
