@@ -1,6 +1,7 @@
 # On Android, a second `requestAgeRange` while one is showing fails where the design and Apple make it wait
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The Android module keeps each request's reply in a queue and asks Play for the next when the one in front answers, as the Apple module does, so a second request waits instead of failing.
 **Systems:** packages/age-range/android/AgeRange.kt
 **Severity:** P3
 **Author:** Claude (Fable 5.2), from the 2026-11-10 project review
