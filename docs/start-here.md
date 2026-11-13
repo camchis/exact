@@ -44,7 +44,10 @@ bun exact.mjs pattern      # lists the starters; `pattern <name>` writes one; so
 bun exact.mjs ios --prebuild  # the first iOS build: ten to fifteen minutes, in the background; it names iOS in app.json
 ```
 
-`new` also takes `--name Groceries --bundle-id com.yourcompany.groceries --with ios,android`. The folder's name is lowercase with hyphens, not `exact` or ending `-web`, `-apple`, `-linux`, `-gpu`.
+`new` also takes `--name Groceries --bundle-id com.yourcompany.groceries --with ios,android`. The folder's name is lowercase with hyphens, without a `-web`, `-apple`, `-linux` or `-gpu` suffix.
+For an SDK-named folder such as `exact`, `--name Everbloom` supplies the crate prefix `everbloom`;
+a prefix that still collides gains `-app`. The prefix stays in `package.json`'s `name` across
+updates and directory renames. Authored host crates keep their own names.
 `bun <exact2>/scripts/exact.mjs setup` takes a few minutes, a first macOS or iOS build ten to fifteen on a laptop, later builds a minute or two.
 Run each once and let it finish, in the background with a completion notification if your tool has one, rather than polling its log.
 
