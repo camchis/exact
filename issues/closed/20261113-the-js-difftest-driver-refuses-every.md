@@ -1,6 +1,7 @@
 # The JS difftest driver refuses every radio type event
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The JS drive delivers a radio's `type` when the text is that radio's own value (its `value` attribute, else "on") and refuses any other, as the runner does.
 **Systems:** semantics
 **Severity:** P2
 **Author:** Grok 4.7
