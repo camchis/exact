@@ -1,6 +1,7 @@
 # An old Apple presence callback can complete a replacement runner's call
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The presence op carries a `GenerationStamp` from the batch that asked, so neither a queued start nor a platform completion reaches a session whose generation has since ended.
 **Systems:** host/apple, runner/src/runner/modules/presence.rs
 **Author:** Codex
 **Date:** 2026-11-12
