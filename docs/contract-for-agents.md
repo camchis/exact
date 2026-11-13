@@ -4430,7 +4430,12 @@ edges, and on release it springs to the point along the edges of an area 8 point
 the window, past the safe area and above any keyboard, that is nearest where its
 momentum would carry it; accessibility actions move it to an edge, keeping its position
 along the other axis. Close, at its top left, or the checked **Frame Health** dismisses
-it. Touches outside it reach the app. LLP 1079.000 §7.2 describes its rows: Live, Paused
+it. On iOS, Minimize leaves a small status and frame rate at the same edge, below
+the status bar, while measurement continues; tap it to restore the card. Dragging and
+accessibility actions move either form, and rotation and keyboard changes keep it
+within the window.
+Minimize also stays available below Details and on the compact card. Touches outside
+the visible form reach the app. LLP 1079.000 §7.2 describes its rows: Live, Paused
 or Idle; the requested rate and any system limit; frame rate
 and missed frames for the last 0.5 s and 5 s; pacing; and charts of frame rate and
 frame time, or a table of work time, late frames, maximum frame time and pacing
@@ -4438,7 +4443,7 @@ changes. A tap on a chart expands it; a tap on the title defines each figure; Sh
 at its top right, asks what to share, Agent Report, Summary or Image, and opens the
 system's share sheet with that one item; where the card measures the screen, it offers
 two agent reports, the screen's and Exact's frames'. The card states no pass or fail of its own;
-Details, beside Share, swaps everything below the header for `perf frames health`'s
+Details, beside Share, swaps the figures and charts for `perf frames health`'s
 three results over the last 5 s with their reasons and the counts behind them, in rows
 that scroll within the card. These are timing proxies; actual presentation and
 native-only animation cadence are unmeasured. While the card is shown, bounded hitch
