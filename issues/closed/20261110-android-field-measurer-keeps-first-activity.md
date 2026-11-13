@@ -1,6 +1,7 @@
 # The Android field measurer keeps the first activity, and what it drew, for the life of the process
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** `Fields.measure` makes its thread's measuring `EditText` in the application context with the activity's theme resource (`Fields.detached`), so the measurer kept for the life of exact2's thread holds no activity.
 **Systems:** host/android/canvas/src/main/java/dev/exact/canvas/Fields.kt, host/android/canvas/src/main/java/dev/exact/canvas/ExactActivity.kt
 **Severity:** P3
 **Author:** Claude (Fable 5.2), from the 2026-11-10 project review
