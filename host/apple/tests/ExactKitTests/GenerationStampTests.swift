@@ -2,6 +2,9 @@ import Foundation
 import XCTest
 @testable import ExactKit
 
+// It compiles its plans with the Contract compiler through `Process`, which iOS lacks; the
+// generation rules it tests are shared code, run on macOS.
+#if os(macOS)
 /// A platform answer reaches only the session generation that asked
 /// (`GenerationStamp`): a reload keeps the session but starts a runner that
 /// numbers its calls and nodes from the start again.
@@ -259,3 +262,4 @@ final class GenerationStampTests: XCTestCase {
         XCTAssertTrue(reply.contains("error"), "this runner has no call 1: \(reply)")
     }
 }
+#endif
