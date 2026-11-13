@@ -680,7 +680,7 @@ package final class NodeView: NSView, NSTextViewDelegate, NSTextFieldDelegate {
         repaintThrough(); queueScrollEvent(); scrollEndMoved()
     }
     private var scrollEventQueued = false
-    private var lastScrollEvent = CGPoint.zero
+    var lastScrollEvent = CGPoint.zero
     var scrollEnd: ScrollEnd?
     private func queueScrollEvent() {
         guard handlers.contains("scroll"), !scrollEventQueued else { return }
@@ -947,7 +947,7 @@ package final class NodeView: NSView, NSTextViewDelegate, NSTextFieldDelegate {
     // UIKit/AppKit collapse the native extent; keep that transient reset out of
     // scroll events and restore only when the box returns.
     var beforeLayoutScroll: CGPoint?
-    private var hiddenScroll: CGPoint?
+    var hiddenScroll: CGPoint?
     var hasScrollLayoutBox: Bool {
         var ancestor: NSView? = self
         while let current = ancestor {
@@ -1045,7 +1045,7 @@ package final class NodeView: NSView, NSTextViewDelegate, NSTextFieldDelegate {
         }
         updateTextAccessibility()
         updateRoleAccessibility()
-        if kind == "image", let src = props["imageSource"], src != imageSource { loadImage(src) }
+        if kind == "image", let src = props["imageSource"], src != imageSource { renewSource(); loadImage(src) }
         if kind == "image", props["imageSource"] == nil, imageSource != nil {
             loadGeneration += 1
             presenter?.session?.rasters.cancel(id)

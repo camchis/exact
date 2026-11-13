@@ -585,3 +585,56 @@ fn rows_the_data_moves_still_play_their_layout_transition() {
         host.advance(now);
     }
 }
+
+/// A row rebound to another item (LLP 1078) keeps its views: the batch says
+/// `renew` for each before any props or style for it, and creates none of
+/// them; off, as by default, the same scroll says `renew` for none.
+#[test]
+fn a_rebound_row_is_renewed_before_its_props_and_never_created() {
+    let ops = |batch: &str| -> Vec<(String, u64)> {
+        let v: serde_json::Value = serde_json::from_str(batch).unwrap();
+        v["ops"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|op| {
+                let id = op["id"].as_u64().unwrap_or(0);
+                (op["op"].as_str().unwrap().to_owned(), id)
+            })
+            .collect()
+    };
+    for reuse in [false, true] {
+        let (mut bridge, _, _) = fixture(SOURCE);
+        bridge.set_row_reuse(reuse);
+        let top = facts(&snapshot(&bridge), 4_000.);
+        let batch = send(&mut bridge, &top, 10.);
+        assert!(batch.contains("\"error\":null"), "{batch}");
+        let ops = ops(&batch);
+        let renewed: Vec<u64> = ops
+            .iter()
+            .filter(|(op, _)| op == "renew")
+            .map(|(_, id)| *id)
+            .collect();
+        if !reuse {
+            assert!(renewed.is_empty(), "off: {batch}");
+            continue;
+        }
+        assert!(renewed.len() > 10, "rows were rebound: {batch}");
+        for id in &renewed {
+            let at = ops.iter().position(|o| o.0 == "renew" && o.1 == *id);
+            for (i, (op, of)) in ops.iter().enumerate() {
+                if of != id {
+                    continue;
+                }
+                assert_ne!(op, "create", "a renewed view is not created: {batch}");
+                assert_ne!(op, "destroy", "nor destroyed: {batch}");
+                if op == "props" || op == "style" {
+                    assert!(at < Some(i), "renew comes before its {op}: {batch}");
+                }
+            }
+        }
+        let kernel = bridge.host.as_ref().unwrap().runner().kernel();
+        assert!(kernel.find_by_test_id("row-0").is_empty());
+        assert!(snapshot(&bridge).rows.iter().any(|row| row.index == 125));
+    }
+}

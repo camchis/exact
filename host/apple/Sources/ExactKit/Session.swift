@@ -522,7 +522,7 @@ public final class ExactSession {
         canvases = SurfacesLink.installed?.canvases() ?? NoCanvases()
         webviews = WebViews()
         frames = Frames()
-        presenter.session = self
+        presenter.session = self; RowReuse.adopt(self)
         canvases.session = self
         webviews.session = self
         natives.session = self
@@ -1383,7 +1383,7 @@ public final class ExactSession {
     }
     /// The appearance last reported for the session, and each node view found painting motion in another (a sheet's override, say), by id.
     private(set) var schemeDark: Bool?
-    private(set) var viewDark: [UInt32: Bool] = [:]
+    var viewDark: [UInt32: Bool] = [:]
     private var pendingViewDark: [(UInt32, Bool)] = []
     var colorsOwed = false
     fileprivate(set) var awaitingTree = false // committed to a new runner whose tree is not in: a report would reach the old views

@@ -3737,7 +3737,10 @@ Android; its words are the ones `app.json` gives `android`.
 No hatch runs before first pixel. A node's end runs while its view is still
 there, so take back there whatever the hatch added. On iOS a hatched node is a
 view of its own and its list row is not reused unless the hatch sets
-`element.reusable`; `logs` says what each word gives up.
+`element.reusable`; `logs` says what each word gives up. On the Mac a row that
+leaves a virtualized list's window can be rebound to the item the list needs
+next (LLP 1078): its hatched node hears `ended`, then `built` for the new item,
+as a new node would.
 
 **Into Contract only as a person could.** A handle acts on an authored node:
 `click()`, `focus()`, `blur()`, and `input(text)`, which replaces a text

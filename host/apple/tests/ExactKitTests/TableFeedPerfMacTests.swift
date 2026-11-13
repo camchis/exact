@@ -26,8 +26,10 @@ final class TableFeedPerfMacTests: XCTestCase {
     func testARowIsMountedOnceInItsCellWhileTenThousandScroll() throws {
         let f = try TableFixture(count: 10_000)
         fixture = f
-        let moved = f.feed.moves, noted = f.feed.noted, arrived = f.feed.arrivals
+        let moved = f.feed.moves, noted = f.feed.noted, arrived = f.feed.arrivals, crossed = f.feed.crossed, homed = f.feed.homed
         var deepest = 0, mounted = 0, views = 0, outside = 0
+        // The item each row's view showed: one seen with another was rebound (LLP 1078).
+        var shown: [ObjectIdentifier: Int] = [:], rebound = 0
         // A hard fling's travel, a frame at a time at 60 a second.
         let seconds = Self.duration(velocity: 12_000)
         for frame in 1...Int(seconds * 60) {
@@ -36,21 +38,27 @@ final class TableFeedPerfMacTests: XCTestCase {
             mounted = max(mounted, f.mounted.count)
             views = max(views, f.feed.rowViews)
             outside = max(outside, f.mounted.values.filter { !($0.superview is TableRowCell) }.count)
+            for (item, row) in f.mounted where shown.updateValue(item, forKey: ObjectIdentifier(row)).map({ $0 != item }) == true { rebound += 1 }
         }
         XCTAssertGreaterThan(deepest, 150, "the fling passed some hundreds of rows")
         XCTAssertLessThan(mounted, 120, "a window of rows was mounted at any time")
         // What stage 3b cut. A row goes into its cell in the batch that
-        // made it and leaves it when the runner destroys it: one move a row
-        // the runner made (it makes some twice, ahead of a fling and again),
-        // where stage 3a's feed moved each in and out as it crossed the port.
-        let made = f.feed.arrivals - arrived
-        XCTAssertGreaterThan(made, deepest - 60, "the runner made the rows the fling passed")
-        XCTAssertEqual(f.feed.moves - moved, made, "each row the runner made went into a cell, once, and none came out to the document")
+        // made it and leaves it when the runner destroys it; one the runner
+        // rebinds to another item goes from its cell straight to that item's.
+        // So every move is a row made (some twice, ahead of a fling and
+        // again) or a row rebound, where stage 3a's feed moved each in and
+        // out as it crossed the port, and none goes out to the document.
+        let made = f.feed.arrivals - arrived, across = f.feed.crossed - crossed
+        XCTAssertGreaterThan(rebound, 50, "rows the fling passed were rebound, not made")
+        XCTAssertGreaterThanOrEqual(across, rebound, "each rebound row went to its new item's cell")
+        XCTAssertGreaterThan(made + rebound, deepest - 60, "the runner made or rebound the rows the fling passed")
+        XCTAssertEqual(f.feed.homed - homed, 0, "no row came out to the document")
+        XCTAssertEqual(f.feed.moves - moved, made + across, "each row the runner made went into a cell once, and each it rebound went from one cell to another")
         XCTAssertEqual(outside, 0, "every mounted row was in a cell at every frame: the table keeps a view for each")
         XCTAssertLessThan(views, 2 * mounted, "and it keeps no more views than the rows about the port")
         // AppKit hears a height only where the table's differs from layout's:
         // here the rows with a second paragraph or controls, three in ten.
-        XCTAssertLessThan(f.feed.noted - noted, made / 2, "a row of the estimated height told AppKit nothing")
+        XCTAssertLessThan(f.feed.noted - noted, (made + across) / 2, "a row of the estimated height told AppKit nothing")
     }
 
     private struct Times {
