@@ -1,6 +1,7 @@
 # An error batch drops aborted fetch answers
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** A web batch that already carries an error takes no aborted answers, and one whose fulfil is refused puts that answer and those after it back with `Runner::requeue_aborted_answers`, so only an applied answer's request is cancelled and the rest are answered by the next batch.
 **Systems:** host/web, runner
 **Severity:** P1
 **Author:** Grok 4.7

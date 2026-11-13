@@ -37,16 +37,24 @@ impl<D: DataSource> Host<D> {
             self.parked.retain(|_, r| runner.holds(r.ticket));
             // A fetch the app aborted, in these turns or before: its answer
             // resumes now, and the page cancels the request after the batch,
-            // whatever its method.
+            // whatever its method. A batch that ends in an error answers
+            // none: they stay queued, uncancelled, for the next batch.
             self.runner.collect_aborts();
-            while let Some(aborted) = self.runner.take_aborted_answer() {
-                immediate.push(aborted);
+            if error.is_none() {
+                while let Some(aborted) = self.runner.take_aborted_answer() {
+                    immediate.push(aborted);
+                }
             }
             if immediate.is_empty() || error.is_some() {
                 break;
             }
             let mut receipts = Vec::new();
+            let mut unapplied = Vec::new();
             for (ticket, outcome) in immediate {
+                if error.is_some() {
+                    unapplied.push(ticket);
+                    continue;
+                }
                 match self.runner.fulfill(ticket, outcome) {
                     Ok(Some(receipt)) => receipts.push(Timed {
                         at_ms: self.now_ms,
@@ -55,10 +63,13 @@ impl<D: DataSource> Host<D> {
                     Ok(None) => {}
                     Err(e) => {
                         error = Some(format!("{e:?}"));
-                        break;
+                        unapplied.push(ticket);
                     }
                 }
             }
+            // A refused commit rolls its answer back, and those after it
+            // were never given: only an applied answer's request is cancelled.
+            self.runner.requeue_aborted_answers(&unapplied);
             self.emit_receipts(&receipts, &mut batch);
         }
         for ticket in self.runner.take_explicit_aborts() {
