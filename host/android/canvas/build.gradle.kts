@@ -27,6 +27,7 @@ android {
             "../../../packages/local-auth/android", "../../../packages/local-auth/test",
             "../../../packages/passkeys/android", "../../../packages/passkeys/test",
             "../../../packages/payments/android", "../../../packages/payments/test",
+            "../../../packages/photos/android", "../../../packages/photos/test",
             "../../../packages/recording/android", "../../../packages/recording/test",
             "../../../packages/speech-recognition/android", "../../../packages/speech-recognition/test",
         ))
