@@ -1,6 +1,7 @@
 # A finite but oversized terminal timeout panics before boot
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** --timeout accepts only seconds whose deadline plus the shutdown grace is a representable Instant, and refuses the rest with the usage error; the watchdog computes that deadline with checked arithmetic.
 **Systems:** host/terminal
 **Author:** Codex
 **Date:** 2026-11-12
