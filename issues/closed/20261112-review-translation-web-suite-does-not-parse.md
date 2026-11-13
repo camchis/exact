@@ -1,6 +1,7 @@
 # The translation web conformance suite does not parse
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The note naming `availability()` inside a template literal no longer opens it with backticks, so the suite parses and passes in Chromium, Firefox and WebKit.
 **Systems:** packages/translation/test/web.mjs
 **Author:** Codex
 **Date:** 2026-11-12
