@@ -1,6 +1,7 @@
 # Apple tool polling can return a replacement runner's unrelated result
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The door polls a call through `ExactTools.runner`, which answers only while the runner that accepted the call runs (a `GenerationStamp`), and a poll after a fresh or carrying replacement ends the call once, `interrupted` and `uncertain`, instead of reading the new runner's call by the same id.
 **Systems:** host/apple/Sources/ExactKit/ExactTools.swift, runner/src/runner/modules/calls.rs
 **Author:** Codex
 **Date:** 2026-11-12

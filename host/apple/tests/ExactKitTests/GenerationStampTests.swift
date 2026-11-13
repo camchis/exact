@@ -136,4 +136,45 @@ final class GenerationStampTests: XCTestCase {
         session.picker.finish(new, files: [])
         XCTAssertEqual(try slots(session)["cancels"] as? Int, 1, "the current generation's cancel")
     }
+
+    // MARK: tool calls
+
+    /// Wait on the main run loop until `done`, two seconds at most.
+    private func until(_ done: () -> Bool) {
+        let end = Date().addingTimeInterval(2)
+        while !done() && Date() < end { RunLoop.main.run(until: Date().addingTimeInterval(0.01)) }
+    }
+
+    /// A tool call still running when the app reloads is polled after it.
+    /// The replacement's runner numbers its calls afresh, so its call 1 is
+    /// another invocation (here a stand-in's answer), whose outcome must
+    /// not answer this one. A fresh boot over the session and a reload
+    /// that carries its state both end the runner.
+    func testAToolCallPolledAfterTheRunnerIsReplacedEndsInterrupted() throws {
+        for fresh in [false, true] {
+            let session = try session()
+            let runner = ExactTools.runner(session)
+            var replaced = false
+            let agent = { (text: String) -> String? in
+                guard runner(text) != nil else { return nil }
+                return replaced ? #"{"outcome":"ok","certainty":"applied","reason":"","value":"another call's"}"# : #"{"call":1,"state":"running"}"#
+            }
+            var answer: [String: Any]?
+            ExactTools.follow(1, agent: agent, cancellation: ExactTools.Cancellation()) { answer = $0 }
+            XCTAssertNil(answer, "still running")
+            if fresh { XCTAssertNil(session.boot(plan: try compile(Self.plain), size: CGSize(width: 300, height: 400)).error) }
+            else { XCTAssertTrue(session.apply(try compile(Self.plain))) }
+            replaced = true
+            until { answer != nil }
+            XCTAssertEqual(answer?["outcome"] as? String, "interrupted", "fresh \(fresh): \(answer ?? [:])")
+            XCTAssertEqual(answer?["certainty"] as? String, "uncertain")
+            XCTAssertNil(answer?["value"])
+        }
+    }
+
+    func testAToolCallPolledInItsGenerationReadsItsRunner() throws {
+        let session = try session()
+        let reply = try XCTUnwrap(ExactTools.runner(session)(#"{"op":"called","id":1}"#))
+        XCTAssertTrue(reply.contains("error"), "this runner has no call 1: \(reply)")
+    }
 }
