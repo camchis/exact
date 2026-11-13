@@ -1,6 +1,7 @@
 # One link atom stays mixed on the web toolbar facts
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** Editor::facts reports a selection of one link atom as not mixed, as wire::selection_with does.
 **Systems:** markdown
 **Severity:** P3
 **Author:** Grok 4.7
