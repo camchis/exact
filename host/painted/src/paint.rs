@@ -432,6 +432,8 @@ pub use frame::Frame;
 
 /// The painter: the walk over one backend.
 pub struct Painter {
+    /// Module replies from a replaced kernel must not name its new allocations.
+    pub(crate) native_session: u64,
     pub(crate) split: Option<crate::presenter::split::Split>,
     pub(crate) window_canvas: Option<ViewId>,
     pub(crate) direct_canvases: std::collections::BTreeSet<ViewId>,
@@ -563,6 +565,7 @@ impl Painter {
     }
 
     pub(crate) fn replaced(&mut self) {
+        self.native_session = native::new_session();
         // A fresh kernel can reuse both epochs and node keys.
         self.paint_epoch = None;
         self.svg_warned.clear();
@@ -573,6 +576,7 @@ impl Painter {
     /// A painter over a backend.
     pub fn new(text: Shared, scale: f32, backend: Box<dyn Backend>) -> Painter {
         Painter {
+            native_session: native::new_session(),
             split: None,
             window_canvas: None,
             direct_canvases: Default::default(),

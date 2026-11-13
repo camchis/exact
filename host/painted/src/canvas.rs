@@ -221,7 +221,7 @@ mod refine;
 #[cfg(target_os = "android")]
 #[path = "canvas/requests.rs"]
 mod requests;
-#[cfg(target_os = "android")]
+#[cfg(any(target_os = "android", test))]
 #[path = "canvas/scroll.rs"]
 mod scroll;
 #[path = "canvas/shadow.rs"]
