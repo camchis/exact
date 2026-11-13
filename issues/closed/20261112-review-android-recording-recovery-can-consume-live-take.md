@@ -1,6 +1,7 @@
 # Android startup recovery can consume a recording that is still active
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** Each ledger entry names the process writing it and recovery skips this process's own, under a lock shared with a writer's claim; a failed finalization now answers the stop with an error and releases the codec, the track and the thread.
 **Systems:** packages/recording/android
 **Author:** Codex
 **Date:** 2026-11-12
