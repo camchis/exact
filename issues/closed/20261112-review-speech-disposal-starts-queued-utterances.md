@@ -1,6 +1,7 @@
 # Disposing a speech batch starts queued utterances before canceling them
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** `dispose` on the web, Apple and Android ends the dropped queued utterances before the speaking one, so the queue advances only to an utterance not dropped with it.
 **Systems:** packages/speech-synthesis
 **Author:** Codex
 **Date:** 2026-11-12
