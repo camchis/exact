@@ -1,6 +1,7 @@
 # Foreground resume restarts only the first arrival extension
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** On return to the foreground each arrival extension takes only its own scans from the suspended set, so every extension resumes and reads its field.
 **Systems:** host/web-js, runner
 **Severity:** P2
 **Author:** Grok 4.7
