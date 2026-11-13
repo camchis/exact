@@ -1,6 +1,7 @@
 # An auth callback ends another tab's pending sign-in
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The page's arm reply carries the session's `state`, and a tab takes a BroadcastChannel callback only when its one `state` is its own session's, leaving every other tab's popup, listener and deadline as they were.
 **Systems:** web authentication, host/web/auth-glue.js, host/web-js/auth.js
 **Author:** Codex
 **Date:** 2026-11-12
