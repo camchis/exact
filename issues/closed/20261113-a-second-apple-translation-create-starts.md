@@ -1,6 +1,7 @@
 # A second Apple translation create starts another download sheet
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** A create for a pair whose download sheet is up joins that download's waiters and is answered with it, so a pair shows one sheet.
 **Systems:** packages/translation
 **Severity:** P2
 **Author:** Grok 4.7
