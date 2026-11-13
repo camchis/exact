@@ -1,6 +1,6 @@
 import { test, expect } from 'bun:test';
 import { spawnSync } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, relative, resolve } from 'node:path';
 import { webChanges, webInputDigests } from '../../scripts/agent-launch.mjs';
@@ -261,6 +261,10 @@ test('the sources a receipt lists leave out the build output, dependencies and C
     for (const file of ['build/web-js-dev-stage/0123/app.js', 'target/debug/x', 'node_modules/p/index.js', 'dist/index.html', 'dist.gen/x/app.js', 'app.contract.d.ts', '.exact/x'])
       write(dir, file, 'x');
     expect(appSources(dir, out).digest).toBe(before.digest);
+    // The app named through a link, and the output by its real path (as `web-build --out` names it): the same files.
+    const link = `${dir}-link`;
+    symlinkSync(dir, link);
+    try { expect(appSources(link, resolve(realpathSync(dir), 'dist')).digest).toBe(before.digest); } finally { rmSync(link, { force: true }); }
     write(dir, 'assets/b.txt', 'b');
     const added = appSources(dir, out).digest;
     rmSync(resolve(dir, 'assets/a.txt'));

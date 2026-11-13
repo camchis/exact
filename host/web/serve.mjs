@@ -21,6 +21,7 @@ import { settingChanges } from '../../js/bake/src/__exact_env.mjs';
 import { acceptsHTML, appDocumentPath, prefersMarkdown, webRequestURL, parseWebRoot, sha256, webReleasePath, webRootPath } from '../../scripts/origin.mjs';
 import { canonical, filePathOf, matchPattern } from '../web-js/route-pattern.js';
 import { guardFlags } from '../../scripts/help.mjs';
+import { slashRelative, within } from '../../scripts/paths.mjs';
 
 import { INSTALL_FILES, INSTALL_PUBLIC, INSTALL_ROOT, installRoute, installNetworkPage } from '../../scripts/install-page.mjs';
 import { COMPRESSIBLE, acceptedEncodings, bodyDigest, compressionCache, matchesETag } from './compression.mjs';
@@ -1335,20 +1336,19 @@ function settleBuild(dist) {
  * tools write (`out` and what is kept beside it, dependencies, Cargo's target directory, `target` or `CARGO_TARGET_DIR`
  * as resolveApp takes it, dot directories but `.env`s, generated types, test reports). `newest`: the latest modification
  * time among them. `digest`: of their paths, which a build's receipt records as `sources`, so that a file come or gone
- * since the build is a change whatever its time; it names no file. */
+ * since the build is a change whatever its time; it names no file. As real paths: the app may be named through a link. */
 export function appSources(app, out) {
-  const SKIP = new Set(['node_modules', 'target', 'test-results', 'playwright-report']), cargo = process.env.CARGO_TARGET_DIR ? resolve(process.env.CARGO_TARGET_DIR) : null;
-  let paths = [], newest = 0;
+  const real = (p) => { try { return realpathSync(p); } catch { try { return resolve(realpathSync(dirname(p)), basename(p)); } catch { return resolve(p); } } };
+  const SKIP = new Set(['node_modules', 'target', 'test-results', 'playwright-report']), cargo = process.env.CARGO_TARGET_DIR ? real(process.env.CARGO_TARGET_DIR) : null;
+  let paths = [], newest = 0, root = real(app), output = real(out);
   const walk = (dir) => {
     for (const e of readdirSync(dir, { withFileTypes: true })) {
       const path = resolve(dir, e.name);
-      if (SKIP.has(e.name) || path === cargo || (e.name.startsWith('.') && !e.name.startsWith('.env')) || e.name.endsWith('.d.ts') || path === out || path.startsWith(`${out}.`)) continue;
-      if (e.isDirectory()) walk(path);
-      else if (e.isFile()) { paths.push(relative(app, path).split(sep).join('/')); newest = Math.max(newest, statSync(path).mtimeMs); }
+      if (SKIP.has(e.name) || (cargo && within(cargo, path)) || (e.name.startsWith('.') && !e.name.startsWith('.env')) || e.name.endsWith('.d.ts') || within(output, path) || path.startsWith(`${output}.`)) continue;
+      if (e.isDirectory()) walk(path); else if (e.isFile()) { paths.push(slashRelative(root, path)); newest = Math.max(newest, statSync(path).mtimeMs); }
     }
   };
-  walk(resolve(app));
-  return { newest, digest: sha256(Buffer.from(paths.sort().join('\n'))) };
+  walk(root); return { newest, digest: sha256(Buffer.from(paths.sort().join('\n'))) };
 }
 
 /** For a build whose app's sources are beside it, as `settleBuild` builds a changed setting again: a function a
