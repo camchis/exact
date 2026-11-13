@@ -1,6 +1,7 @@
 # A truncated diagnostic makes the benchmark log summary loop forever
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** diagnostics.mjs stops at an id the log cuts off instead of restarting its search at the start, keeping every diagnostic before it.
 **Systems:** bench/agent-framework/tools/diagnostics.mjs
 **Author:** Codex
 **Date:** 2026-11-12
