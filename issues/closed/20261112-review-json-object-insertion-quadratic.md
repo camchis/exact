@@ -1,6 +1,7 @@
 # Parsing JSON objects in reverse key order takes quadratic time
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** A parsed or collected object gathers its members and sorts them once, keeping the last of a repeated key, so key order no longer makes parsing quadratic.
 **Systems:** js/value/src/json.rs, js/value/src/parse.rs, js/src
 **Author:** Codex
 **Date:** 2026-11-12
