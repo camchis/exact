@@ -1,6 +1,7 @@
 # A web camera move can leave the browser track capturing
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** A camera move takes a new lease number, so an activation's open already in flight is dropped, and `adopt` stops any browser track it replaces.
 **Systems:** packages/media-capture
 **Severity:** P2
 **Author:** Grok 4.7
