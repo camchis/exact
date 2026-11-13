@@ -1,6 +1,7 @@
 # Web stream and Rust fetch adapters drop the request's authority origin
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The JS target's runtime stamps each Rust request with the asking commit's origin (a reply's follow-up keeps it), a TypeScript stream captures its answer's origin in the answer's turn, and `streamed` and `createRequestExecutor` pass it to admission and the redirect gate, checking a request that carries none as a non-app one.
 **Systems:** web network admission, host/web/http-body.js, host/web-js/admission.js, host/web-js/ts-stream.js, host/web-js/rust-data.js
 **Author:** Codex
 **Date:** 2026-11-12
