@@ -1,6 +1,7 @@
 # A failed recording start leaves the microphone leased and shows Record
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** Already fixed by cf5f420d2: a change task on `failed(started)` stops the take's track and clears `trackId` and `takeName`, which `recorder_start::a_recorder_that_does_not_start_stops_its_track` drives.
 **Systems:** apps/recorder, media capture
 **Severity:** P1
 **Author:** Grok 4.7
