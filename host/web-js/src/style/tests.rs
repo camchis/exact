@@ -15,7 +15,7 @@ fn a_native_buttons_cleared_display_matches_the_wasm_face() {
     let js = crate::emit::emit(&plan, false, false).unwrap().js;
     let start = js.find("v=>v===\"none\"?\"none\":\"grid\"").unwrap();
     let arguments = js[start..].split("));").next().unwrap();
-    let mapped = include_str!("../../rt.js")
+    let mapped = include_str!("../../tree.js")
         .lines()
         .find_map(|line| line.strip_prefix("export const mapped = "))
         .unwrap()

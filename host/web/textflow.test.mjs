@@ -638,7 +638,7 @@ browserTest('flowed links keep press ownership and native Enter activation', asy
 // for a Contract action; both hosts' actual listener functions run unchanged.
 browserTest('same-target capture precedes a key registered first in both web runtimes', async () => {
   expect(await inChrome(targetKeyFixture, ['/glue.js'], {
-    '/rt.js': fileURLToPath(new URL('../web-js/rt.js', import.meta.url)),
+    '/events.js': fileURLToPath(new URL('../web-js/events.js', import.meta.url)),
   })).toEqual([
     [['capture', 'key'], ['capture']],
     [['capture', 'key'], ['capture']],
@@ -646,7 +646,7 @@ browserTest('same-target capture precedes a key registered first in both web run
 }, 60000);
 
 async function targetKeyFixture() {
-  const [glue, rt] = await Promise.all(['/glue.js', '/rt.js'].map(url => fetch(url).then(r => r.text())));
+  const [glue, rt] = await Promise.all(['/glue.js', '/events.js'].map(url => fetch(url).then(r => r.text())));
   const attach = await fetch('/wasm-input.js').then(r => r.text());
   const on = rt.slice(rt.indexOf('export function on('), rt.indexOf('// Each event family')).replace('export ', '');
   // onKey hears a key with nothing focused through atBody, the line before it (0c3cf4405f).
