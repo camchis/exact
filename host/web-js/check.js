@@ -309,9 +309,20 @@ export function observe(views, inactive = () => false) {
       }
       if (el.matches(':disabled') || el.getAttribute('aria-disabled') === 'true') item.disabled = true;
     }
+    // What lets taps through (`pointer-events: none`) is no target, and a hit test cannot say what lies over it. In an
+    // announcement laid over the page (a toast: a live region out of flow), it lies over what is beneath by design.
+    const through = cs.pointerEvents === 'none';
+    if (through) {
+      let live = false, out = false;
+      for (let e = el; e && e.id !== 'exact-root' && !live; e = e.parentElement) {
+        live = /^(polite|assertive)$/.test(e.getAttribute('aria-live') ?? '') || /^(status|alert)$/.test(e.getAttribute('role') ?? '');
+        out ||= /^(absolute|fixed)$/.test(getComputedStyle(e).position);
+      }
+      if (live && out) item.overlay = true;
+    }
     // What a finger at its middle reaches; covered only where no scroller could move it clear. Past the screen's top
     // or bottom where nothing scrolls it in (a column taller than the screen) is out of reach: a control's finding.
-    if (item.control || text) {
+    if ((item.control || text) && !through) {
       // A wrapped run's middle may be another run's: a finger aims at its longest line.
       const at = lines.length > 1 ? lines.reduce((p, q) => (q.width * q.height > p.width * p.height ? q : p)) : b;
       const my = at.top + at.height / 2;
@@ -326,8 +337,9 @@ export function observe(views, inactive = () => false) {
           if (!reach(el, hit, false, my) && !slides(el, at.left + at.width / 2)) item.cover = { by: viewOf(hit), name: hit.localName, kind: modal && !modal.contains(hit) ? 'sheet' : 'node' };
         }
       }
-      if (text && !item.cut && b.bottom - H >= 2 && b.top < H && !reach(el, null, false)) item.cut = { edge: 'bottom', dx: 0, dy: r2(b.bottom - H) };
     }
+    // Past the screen's bottom where nothing scrolls to it: geometry, whether or not it takes taps.
+    if (text && !item.cut && b.bottom - H >= 2 && b.top < H && !reach(el, null, false)) item.cut = { edge: 'bottom', dx: 0, dy: r2(b.bottom - H) };
     // A card: a filled box, not itself text or a control, that holds a text or a control, its fill what sets that group
     // apart from the page. None is a box with square corners that reaches a side of the viewport (the page itself, or a
     // band across it); a list, whose ground is the page under its rows (a grouped list's grey, its sections the cards);

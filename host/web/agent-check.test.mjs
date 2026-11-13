@@ -242,6 +242,25 @@ const VERSES = `component VerseFixture
         text "4" press=tap(6) testId="alone"
 `;
 
+// A toast (#394): an announcement laid over the page while it shows. `toast` lets taps through and lies over the row
+// beneath by design; `stuck` takes them, so it covers the button under it and overlaps its label. `low` lets taps
+// through and runs past the screen's bottom, which cuts it all the same.
+const TOAST = `component ToastFixture
+  state n = 0
+  action bump
+    n = n + 1
+  view
+    column testId="root" height="100%" position="relative"
+      text testId="under" padding=16 "A sentence the toast lies over while it shows"
+      button testId="beneath" press=bump margin-top=40
+        text "Beneath the stuck one"
+      text "Saved" position="absolute" top=16 left=16 right=16 padding=12 border-radius=12 background-color="-exact-secondary-background"
+        pointer-events="none" aria-live="polite" testId="toast"
+      text "Stuck" position="absolute" top=72 left=16 right=16 padding=12 border-radius=12 background-color="-exact-secondary-background"
+        aria-live="polite" testId="stuck"
+      text "Past the screen's bottom" position="absolute" left=16 bottom=-24 height=48 pointer-events="none" testId="low"
+`;
+
 const built = (() => {
   const ready = new Map();
   return (name, source) => {
@@ -647,6 +666,26 @@ test('pressable runs of a paragraph are targets in a sentence, judged by their l
     const boxes = judge({ ...obs, items: obs.items.map(({ lines, ...it }) => it) }, null).filter((f) => f.kind === 'overlap').map((f) => f.id);
     expect(boxes).toContain(ids.get('verse-1'));
     expect(item('verse-1').cover).toBeUndefined();
+  } finally { await session.close(); }
+}, 900000);
+
+test('a toast that lets taps through lies over the page by design; one that takes them covers what is under it', async () => {
+  const session = await open({ host: 'web', url: await built('toast', TOAST), size: [390, 844] });
+  try {
+    // Contract has no `fixed`; the page pins `low` to the viewport, where nothing scrolls to what runs past its bottom.
+    await session.carrier.evaluate(`[...document.querySelectorAll('#exact-root [data-exact-text]')].find((e) => e.textContent.startsWith('Past the screen')).style.position = 'fixed'`);
+    const obs = await session.op({ op: 'check' }), ids = new Map(((await session.op({ op: 'tree' })).nodes ?? []).map((n) => [n.props?.testId, n.id]));
+    const item = (testId) => obs.items.find((it) => it.id === ids.get(testId));
+    expect([item('toast').overlay, item('stuck').overlay]).toEqual([true, undefined]);
+    expect(item('toast').cover).toBeUndefined(); // a hit test passes through it, so cannot say what lies over it
+    expect(item('low').cut).toMatchObject({ edge: 'bottom' }); // what lets taps through is still cut by the screen's edge
+    const name = (id) => [...ids].find(([, n]) => n === id)?.[0];
+    const found = judge(obs, null).map((f) => `${name(f.id) ?? name(f.of)} ${f.kind}${f.detail?.with != null ? ` ${name(f.detail.with)}` : ''}`);
+    expect(found.filter((f) => /toast/.test(f))).toEqual([]);
+    expect(found).toContain('beneath covered');
+    // Without the mark, the toast and the sentence it lies over run together.
+    const unmarked = judge({ ...obs, items: obs.items.map(({ overlay, ...it }) => it) }, null).map((f) => `${name(f.id)} ${f.kind} ${name(f.detail?.with)}`);
+    expect(unmarked.some((f) => /overlap/.test(f) && /toast/.test(f) && /under/.test(f)), unmarked.join('\n')).toBe(true);
   } finally { await session.close(); }
 }, 900000);
 

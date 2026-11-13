@@ -175,11 +175,12 @@ export function judge(obs, png, { host = 'web', nodes = new Map() } = {}) {
   // it): neither holds the other and they share more than a sliver of what is presented of each (`vis`: a row its list
   // or scroller cuts overlaps nothing past that edge, LLP 1116.006 D5). A pressable run of a paragraph that wraps meets
   // others only where its lines are.
-  const controls = items.filter((it) => it.control);
+  const controls = items.filter((it) => it.control && !it.overlay);
   const where = (it) => (it.control && !it.lines ? [shown(it, obs.keyboard)] : drawn(it));
-  // A list's section header (`pinned`) lies over the rows passing under it, as UIKit pins it: no overlap.
+  // A list's section header (`pinned`) lies over the rows passing under it, as UIKit pins it, and an announcement laid
+  // over the page that lets taps through (`overlay`, a toast) over what it passes: no overlap.
   for (const a of controls) for (const b of items) {
-    if (a === b || !(b.control || b.text) || b.pinned || (b.control && b.id < a.id)) continue;
+    if (a === b || !(b.control || b.text) || b.pinned || b.overlay || (b.control && b.id < a.id)) continue;
     if (!b.control && (b.of === a.id || controls.some((c) => c !== a && holds(c, b)))) continue; // its own label, or another control's
     const i = meeting(where(a), where(b));
     if (i.w >= 2 && i.h >= 2 && !holds(a, b) && !holds(b, a)) add('overlap', a, { with: b.id, by: [r0(i.w), r0(i.h)] }, 'give them room (a gap, or let the row wrap)');
@@ -193,7 +194,7 @@ export function judge(obs, png, { host = 'web', nodes = new Map() } = {}) {
   // `beneath`, `on` and `solid`; a label running past its bar's edge still meets the row outside it).
   const hides = (top, below, i) => below.beneath != null && top.on === below.beneath.by && top.solid && holds(below.beneath, i);
   for (const [k, a] of texts.entries()) for (const b of texts.slice(k + 1)) {
-    if (holds(a, b) || holds(b, a) || a.pinned || b.pinned) continue;
+    if (holds(a, b) || holds(b, a) || a.pinned || b.pinned || a.overlay || b.overlay) continue;
     const i = meeting(drawn(a), drawn(b));
     if (hides(a, b, i) || hides(b, a, i)) continue;
     if (i.w > 0.5 && i.h >= 2) add('overlap', a, { with: b.id, by: [Math.round(i.w * 10) / 10, r0(i.h)] }, 'give them room (a gap, or let the row wrap)');

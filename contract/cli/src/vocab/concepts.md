@@ -1363,9 +1363,20 @@ component App
       button press=save testId="save"
         text "Save"
       if toast != ""
-        text toast position="absolute" bottom=32 left=16 right=16 padding=12 border-radius=12 backgroundMaterial="thin" aria-live="polite" testId="toast"
+        text toast position="absolute" bottom=32 left=16 right=16 padding=12 border-radius=12 text-align="center"
+          backgroundMaterial="thin" box-shadow="0 4px 16px rgba(0, 0, 0, 0.2)" pointer-events="none"
+          aria-live="polite" testId="toast"
 ```
 
+- A material takes the colour of what is behind it, so over a page of its own colour (a thin
+  material on a white page) only its shadow sets it apart; the shadow reads in both schemes.
+
+- In a tab app it stands above the tab bar: `bottom="calc(6rem + env(safe-area-inset-bottom))"`
+  clears the bar on every host at every text size (the web's bar is 3.5rem tall and grows
+  with the text; iOS 26's floating bar ends about 84 points above the screen's bottom).
+- `pointer-events="none"` lets taps through to what it lies over while it shows. verify
+  takes such an announcement (out of flow, `aria-live`, letting taps through) as lying over
+  the page by design, so a test may end while it shows.
 - The action the task runs clears the message whatever it reads: a gated task is armed at
   commits, not by the clock (docs/agent-pitfalls.md, "A gate reads state at commits").
 
