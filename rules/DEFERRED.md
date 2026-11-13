@@ -618,6 +618,17 @@ change can break.
   a bug in the presenter. A terminal entry (LLP 1101) is a separate application root on
   a separate medium, not a platform override; GUI surfaces still have one source.
 
+**Expanded (expo/exact#359, 2026-11-12; LLP 1162.001):** a `source` declared in
+`app.contract` answers a resource or a send with one HTTP request, its JSON read
+into the shape, so a source that is one request needs no data module, and an
+app whose sources are all declared links no JavaScript engine on native hosts.
+The declaration names its origin, which is its grant. Consumer: Weather Now
+(`apps/weather-now`), Open-Meteo's forecast and city search with no `app.ts`.
+Take: none offered; waived by Charlie's ask (2026-11-12: work the open issues
+through to the ideal end state). Still out, and the data module's: token
+refresh, pagination across requests, offline queues and retries, an overlay,
+streams, uploads, form bodies, and an origin from `app.json`'s `env`.
+
 ## Features carried over as "no"
 
 **Admitted (Charlie, 2026-10-12, textrows ruling):** bounded
