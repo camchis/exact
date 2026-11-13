@@ -993,8 +993,9 @@ each probe hook is one `Option` check, and a record is built only by a closure a
 armed probe calls. A look frame whose encode fails disarms every instrument, and a
 live frame clears any that are left. Hooks see the last live frame held, with no time passing, and
 the hook clock keeps that frame's time, so the next live frame's delta is the one
-it would have had. A look frame draws every sun caster itself and leaves the static
-shadow cache as the live frames left it, and it chooses levels of detail from its
+it would have had. A look frame reads the static shadow cache when its sun matrices
+and caster signature match, otherwise drawing every sun caster itself. It leaves
+the cache as the live frames left it, and chooses levels of detail from its
 own camera and then puts back the live frames' choice (`end_look`), so the
 selection's hysteresis never carries an inspection's level into a live frame. A canvas that draws (web, Apple, a Linux
 host under `EXACT_GPU_RENDER=1`) draws its look frame with its own renderer; a
@@ -1062,7 +1063,8 @@ until it has, and the driver asks again.
   build) into a counter it zeroes first, and the tell reads those. The listing's caster instances come from the
   shadow passes' draw records and the cull's counts for each cascade; a direct
   frame (no GPU cull, the iOS simulator) draws casters unculled and lists them
-  as unknown.
+  as unknown. Reused static depth is listed as `cached sun casters`; its texels
+  count, but its caster instances are unknown because those draws ran earlier.
 - **The cull's account** (cull.wgsl `probe`): after the passes, the cull's own
   functions run once more over every item into a buffer of the look frame's own:
   its world sphere (swept between ticks, attached, skinned; a kept-whole group's
