@@ -130,6 +130,25 @@ const MENU: &str = r#"component App
           text "Save"
 "#;
 
+/// A grouped list's toggle rows: one named by its text, one by its switch's
+/// label and disabled, under a section's header.
+const TOGGLES: &str = r#"component App
+  state dark = false
+  action flip(checked: bool)
+    dark = checked
+  view
+    list appearance="auto" listStyle="inset-grouped" width=320 height=400
+      section
+        header
+          text "Display"
+        row
+          text "Dark mode"
+          input type="checkbox" switch checked=dark change=flip testId="dark"
+        row
+          text "Sound"
+          input type="checkbox" switch checked=true disabled=true aria-label="Play sounds" testId="sound"
+"#;
+
 /// The shell's painter for a bar or a window: it draws nothing.
 struct Blank;
 impl SurfacePainter for Blank {
@@ -477,6 +496,45 @@ fn a_control_is_its_kind_with_its_state_and_what_is_hidden_is_no_node() {
     );
     assert_eq!(field.view, id(&p, "name"));
     assert_eq!(nodes.last().unwrap().id, field.id, "last, as it is written");
+}
+
+/// A grouped list's toggle row is one stop, as Material's list item with a
+/// trailing switch is to TalkBack ("Dark mode, switch, off"), and a press
+/// on it flips the switch.
+#[test]
+fn a_grouped_toggle_row_is_one_switch_named_by_its_row() {
+    let mut p = boot(TOGGLES, (320., 400.), 0);
+    let nodes = statement(&mut p).nodes;
+    let said: Vec<_> = (nodes.iter())
+        .filter(|n| n.role != role::SCROLLER)
+        .map(|n| (n.role, n.name.as_str(), n.flags))
+        .collect();
+    let check = flag::CLICK | flag::CHECKABLE;
+    assert_eq!(
+        said,
+        [
+            (role::TEXT, "Display", 0),
+            (role::SWITCH, "Dark mode", check),
+            (
+                role::SWITCH,
+                "Play sounds",
+                flag::CHECKABLE | flag::CHECKED | flag::DISABLED
+            ),
+        ]
+    );
+    let dark = named(&nodes, "Dark mode");
+    assert_eq!(dark.view, id(&p, "dark"), "it stands for the switch");
+    assert!(p.access_act(dark.id, act::CLICK, 0.0, 0.0));
+    settle(&mut p);
+    assert_eq!(
+        named(&read(&mut p), "Dark mode").flags,
+        check | flag::CHECKED
+    );
+    let sound = named(&nodes, "Play sounds").id;
+    assert!(
+        !p.access_act(sound, act::CLICK, 0.0, 0.0),
+        "a disabled switch takes no press"
+    );
 }
 
 #[test]

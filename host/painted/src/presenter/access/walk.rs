@@ -54,6 +54,33 @@ impl<D: DataSource> Presenter<D> {
         let id = node.id;
         let aria = node.props.str(PropId::AccessibilityRole);
         let control = ControlKind::of(node.node_type, node.props);
+        // A grouped list's toggle row is one node, as Material's list item
+        // with a trailing switch is to TalkBack: the switch's kind and
+        // state, named by the row, else the switch, else the row's words.
+        // A press on it is a press on the switch.
+        let kernel = self.host.kernel();
+        let toggle = kernel.grouped_toggle(id).and_then(|t| kernel.node(t));
+        if let Some((target, kind)) =
+            toggle.and_then(|t| Some((t, ControlKind::of(t.node_type, t.props)?)))
+        {
+            let (role, mut flags, range, value) = self.access_control(&target, kind);
+            if target.props.bool(PropId::Disabled) == Some(true) {
+                flags = (flags | flag::DISABLED) & !(flag::CLICK | flag::LONG_CLICK);
+            }
+            let name = (self.access_label(&node))
+                .or_else(|| self.access_label(&target))
+                .unwrap_or_else(|| self.access_words(&node, false));
+            let words = || Some((name, value));
+            if self
+                .access_emit(b, &scope, &node, role, flags, range, words)
+                .is_some()
+            {
+                if let Some(own) = b.out.last_mut() {
+                    own.view = target.id;
+                }
+            }
+            return;
+        }
         // What is one node, with nothing under it.
         let leaf = match (node.node_type, control) {
             (NodeType::TextInput, _) => {
