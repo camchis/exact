@@ -1,6 +1,7 @@
 # Apple age-range requests trap on a large finite gate
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** An age gate above 150 now refuses TypeError on Apple and Android, so no gate reaches Apple's Int conversion out of range.
 **Systems:** Age-range package, Apple argument validation
 **Author:** Codex
 **Date:** 2026-11-12
