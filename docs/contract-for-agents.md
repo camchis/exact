@@ -1565,8 +1565,9 @@ validation to AuthenticationServices; an authorization failure returns `Identity
 does not establish successful sign-in on a signed device.
 
 Google on Apple, `getCredentialState`, and the combined Apple/passkey sheet
-remain unimplemented. The existing native capabilities still advertise
-Google active requests and the Apple/passkey combination. A combined `publicKey` and passive `identity` call still belongs to
+remain unimplemented. Native capabilities report Google unavailable and Apple
+`withPublicKey: false`. For Google on Apple, use `@exact/oauth` through the
+system browser. A combined `publicKey` and passive `identity` call still belongs to
 passkeys; this Apple-only path does not implement it (LLP 1133.014 D10).
 
 ### Convex live queries

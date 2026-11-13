@@ -1,6 +1,7 @@
 # On Apple, `@exact/sign-in` reports Google active, but a Google request is not built and always fails
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** Apple capability replies report Google and combined Apple/passkey requests unavailable until implemented.
 **Systems:** packages/sign-in/apple/SignIn.swift, docs/recipes/sign-in.md, apps/auth-fixture/app.contract
 **Severity:** P2
 **Author:** Claude (Opus 5.5), from Exact diaries sent 2026-11-11 to 2026-11-13
