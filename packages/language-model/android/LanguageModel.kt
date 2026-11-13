@@ -187,6 +187,8 @@ class LanguageModelModule(context: ExtensionContext) : ExactExtension(context) {
         if (!r.live) return
         r.state = state
         if (error != null) { r.error = error; r.reason = reason; r.message = message }
+        // Only a live response has a generation for its call's cancel to abort.
+        r.request?.let { if (byRequest[it] === r) byRequest.remove(it) }
         val s = r.session
         val begun = s.responding === r
         // One still waiting its turn never reached the session: nothing of it is committed.
@@ -330,7 +332,6 @@ class LanguageModelModule(context: ExtensionContext) : ExactExtension(context) {
                     val r = respond(s, args, name == "promptStreaming")
                     if (name == "promptStreaming") return reply(JSONObject().put("id", r.id).put("session", s.id))
                     val settle = { done: ModelResponse ->
-                        done.request?.let { byRequest.remove(it) }
                         when {
                             done.error != null -> reply(error(done.error!!))
                             !done.typed -> reply(JSONObject().put("text", done.text).put("contextUsage", done.contextUsage ?: 0).put("overflowed", done.overflowed))

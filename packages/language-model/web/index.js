@@ -193,6 +193,8 @@ export function implementation({ changed, agent, now, foreground, log, invoke })
     if (r.state !== 'generating' && r.state !== 'calling-tool') return;
     r.state = state;
     if (failure) Object.assign(r, failure);
+    // Only a live response has a generation for its call's cancel to abort.
+    if (r.request != null && byRequest.get(r.request) === r) byRequest.delete(r.request);
     const s = r.session, begun = s.responding === r;
     // One still waiting its turn never reached the session: nothing of it is committed.
     if (begun) r.turn.reply = r.text;
@@ -474,7 +476,6 @@ export function implementation({ changed, agent, now, foreground, log, invoke })
       const r = respond(s, args, how, false);
       if (isError(r)) return r;
       await r.done;
-      if (r.request != null) byRequest.delete(r.request);
       if (r.error) return { error: r.error };
       if (!r.typed) return { text: r.text, contextUsage: r.contextUsage, overflowed: r.overflowed };
       try { return JSON.parse(r.text); } catch { return { error: 'SyntaxError' }; }

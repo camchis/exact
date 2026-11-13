@@ -1,6 +1,7 @@
 # Language-model streaming request maps retain completed responses indefinitely
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** A response's request association is removed when it ends, on the web, Apple and Android, so completed streams and a destroyed session's responses are no longer held by it.
 **Systems:** packages/language-model/web/index.js, packages/language-model/apple/LanguageModel.swift, packages/language-model/android/LanguageModel.kt
 **Author:** Codex
 **Date:** 2026-11-12

@@ -12,10 +12,10 @@ private struct SessionTests {
     final class Clock { var now = 0.0 }
 
     /// A module on the agent model whose replies are `replies` (§9), its session clock `clock`.
-    static func module(_ clock: Clock, replies: [[String: Any]]) -> LanguageModelModule {
+    static func module(_ clock: Clock, replies: [[String: Any]], rate: Double = 25) -> LanguageModelModule {
         let context = ExactPackageContext(agent: true, session: "sessions", changed: { _ in }, log: { _ in }, now: { clock.now })
         let m = LanguageModelModule(context: context)
-        m.preferred(["responses": replies, "rate": 25.0])
+        m.preferred(["responses": replies, "rate": rate])
         return m
     }
 
@@ -79,9 +79,40 @@ private struct SessionTests {
         }
     }
 
+    /// A response is kept by its call's request only while it is live, for that call's cancel: a
+    /// hundred completed streams leave none, and nor does the end of their session.
+    static func requestsReleased() {
+        let m = module(Clock(), replies: [], rate: 0)
+        let s = session(m)
+        for request in 1...100 {
+            m.context.request = request
+            let id = ask(m, "promptStreaming", ["session": s.id, "input": "question \(request)"])?["id"] as? String ?? ""
+            _ = ask(m, "languageModelResponse", ["response": id])
+        }
+        check("completed streams keep no request", m.byRequest.isEmpty, m.byRequest.count)
+        check("eight ended responses are kept", m.responses.count == LanguageModelModule.kept, m.responses.count)
+
+        // A live one is kept until its call is let go, which still aborts it.
+        let held = module(Clock(), replies: [["text": "held", "hold": true]])
+        let t = session(held)
+        held.context.request = 7
+        let id = ask(held, "promptStreaming", ["session": t.id, "input": "held"])?["id"] as? String ?? ""
+        check("a live stream is kept by its request", held.byRequest[7] != nil, held.byRequest.count)
+        held.cancel(7)
+        check("letting its call go aborts it", held.responses[id]?.state == "aborted", held.responses[id]?.state as Any)
+        check("and releases its request", held.byRequest.isEmpty, held.byRequest.count)
+
+        held.context.request = 8
+        _ = ask(held, "promptStreaming", ["session": t.id, "input": "held again"])
+        _ = ask(held, "destroyLanguageModel", ["session": t.id])
+        check("a destroyed session's streams keep no request", held.byRequest.isEmpty && held.responses.isEmpty,
+              "\(held.byRequest.count) \(held.responses.count)")
+    }
+
     static func main() {
         abortedPlatform()
         endedQueue()
+        requestsReleased()
         for failure in failures { print("FAIL: \(failure)") }
         print("language-model sessions: \(failures.count) failures")
         exit(failures.isEmpty ? 0 : 1)

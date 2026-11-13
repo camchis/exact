@@ -397,3 +397,36 @@ for (const after of ['available', 'unavailable']) {
     else expect(await created).toEqual({ error: 'NotSupportedError' });
   });
 }
+
+test('a stream is kept by its call only while it is live, and a destroyed session keeps none', async () => {
+  // The implementation's maps, recorded as it makes them: sessions, responses and requests.
+  const maps = [], Original = globalThis.Map;
+  globalThis.Map = class extends Original { constructor(...args) { super(...args); maps.push(this); } };
+  let impl;
+  try {
+    impl = implementation({ agent: true, now: () => 0, foreground: () => true, changed() {} });
+  } finally {
+    globalThis.Map = Original;
+  }
+  implementations.push(impl);
+  impl.preferred({ rate: 0 });
+  const sizes = () => maps.map(m => m.size);
+  const { id: session } = await impl.createLanguageModel({}, { origin: 'app' });
+  for (let request = 1; request <= 100; request++) {
+    const { id } = await impl.promptStreaming({ session, input: `question ${request}` }, { request });
+    expect(await impl.languageModelResponse({ response: id })).toMatchObject({ state: 'complete' });
+  }
+  expect(sizes()).toEqual([1, 8, 0]);
+
+  // A live one stays until its call is let go, which still aborts it.
+  impl.preferred({ rate: 0, responses: [{ text: 'held', hold: true }, { text: 'held', hold: true }] });
+  const { id: held } = await impl.promptStreaming({ session, input: 'held' }, { request: 101 });
+  expect(sizes()[2]).toBe(1);
+  impl.cancel(101);
+  expect(await impl.languageModelResponse({ response: held })).toMatchObject({ state: 'aborted' });
+  expect(sizes()[2]).toBe(0);
+
+  await impl.promptStreaming({ session, input: 'held again' }, { request: 102 });
+  await impl.destroyLanguageModel({ session });
+  expect(sizes()).toEqual([0, 0, 0]);
+});

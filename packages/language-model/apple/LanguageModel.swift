@@ -105,7 +105,8 @@ public final class LanguageModelModule: ExactPackage {
     var agent: Bool { context.agent }
     var sessions: [String: ModelSession] = [:]
     var responses: [String: ModelResponse] = [:]
-    private var byRequest: [Int: ModelResponse] = [:]
+    /// Each live response by the call that made it, for that call's `cancel`.
+    var byRequest: [Int: ModelResponse] = [:]
     private var serial = 0
     // The agent's words (§9) and its preferred availability, laid over the agent model's.
     private var overlay: [String: Any] = [:]
@@ -279,6 +280,8 @@ public final class LanguageModelModule: ExactPackage {
         r.cancelAdvance?(); r.cancelAdvance = nil
         r.state = state
         if let error { r.error = error; r.reason = reason; r.message = message }
+        // Only a live response has a generation for its call's cancel to abort.
+        if let request = r.request, byRequest[request] === r { byRequest[request] = nil }
         let s = r.session, begun = s.responding === r
         // One still waiting its turn never reached the session: nothing of it is committed.
         if begun { r.turn.reply = r.text } else { s.queue.removeAll { $0.response === r } }
@@ -473,8 +476,7 @@ public final class LanguageModelModule: ExactPackage {
             do {
                 let r = try respond(s, args, streaming: name == "promptStreaming")
                 if name == "promptStreaming" { return reply(["id": r.id, "session": s.id]) }
-                let settle = { [weak self] (r: ModelResponse) in
-                    if let request = r.request { self?.byRequest[request] = nil }
+                let settle = { (r: ModelResponse) in
                     if let e = r.error { return reply(["error": e]) }
                     guard r.typed else { return reply(["text": r.text, "contextUsage": r.contextUsage ?? 0, "overflowed": r.overflowed]) }
                     reply((LanguageModelSchema.parse(r.text) as? [String: Any]) ?? ["error": "SyntaxError"])
