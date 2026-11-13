@@ -3076,6 +3076,11 @@ Exact's web servers use declared routes for file-like deep links: `/profile/:han
 admits a navigation to `/profile/photos.zip`. Existing public files win; unmatched
 file paths stay 404, even with `notfound`.
 
+A route literal may hold Unicode and spaces as they are (`"/item/café"`) or escaped, but spells
+an escape as a browser sends it: the router matches a path only as written, while a host serves
+every spelling from one file. An escape of a character a URL carries as itself (`%41` for `A`)
+or one in lower case (`%c3`) is refused (`route-pattern`), naming the spelling to write.
+
 **A built site, hosted.** `bun exact.mjs web-build --out dist` writes the site to `dist/`, a
 release build as deploy makes one (no agent mode): a page for each `render=build` route
 (rendered under Bun unless the app has a render entry of its own), `404.html` for a `notfound`
