@@ -1,6 +1,7 @@
 # transformImage refuses integral resize dimensions serialized from Rust floats
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** `transformImage` reads `resizeWidth` and `resizeHeight` as numbers and accepts any whole value from 1 to 16384, however its JSON is written, still refusing fractional and out-of-range sizes.
 **Systems:** data/src/image/edit.rs, data/host/src/native.rs
 **Author:** Codex
 **Date:** 2026-11-12
