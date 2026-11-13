@@ -1,6 +1,7 @@
 # A failed queued deadline keeps a process one-shot's place
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** A process one-shot never waits in its lane's queue, so admission no longer arms it a queued deadline, and the arm's failure can no longer leave its ticket in `one_shots`.
 **Systems:** host
 **Severity:** P2
 **Author:** Grok 4.7
