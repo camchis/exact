@@ -1,6 +1,7 @@
 # Stream throughput gate passes without receiving any streams
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The gate's verdict (`apps/stream-fixture/judge.mjs`) first requires every streamed run's resources live, one stream received and decoded per resource, and the server sending each at half its pace or more, and fails every criterion without them.
 **Systems:** Stream fixture, performance validation
 **Author:** Codex
 **Date:** 2026-11-12
