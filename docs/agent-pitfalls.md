@@ -451,6 +451,13 @@ This list holds what the [agent guide](contract-for-agents.md)'s rules don't mak
   by the root's `navigationBack`, and a route that declares one that is disabled
   refuses it (the log says "back gesture refused" and why). A route with no such
   control always goes back (LLP 1115 D5). Fix: enable the control, or leave it out.
+- **Browser Back restores a screen, but its Back returns to the screen just left.**
+  Cause: an in-app transition used `open`, which replaced the current visit with
+  the destination's declared chain. Browser Back then pushed the discarded URL
+  above that destination. Fix: use `push` to keep the caller. `open` also keeps
+  every current visit when the selected stack is a prefix of the declared chain;
+  use it then to include an intermediate parent, or for a deliberate return such
+  as Home (LLP 1038 §3, D7).
 - **A `link` to a route does nothing on iOS or the Mac.** On the web the browser's
   Back and Forward and a `link` to a declared route work with no `navigate` handler:
   the runner pops or goes there itself (LLP 1115 D5, LLP 1115.000 D4.3). A native host
