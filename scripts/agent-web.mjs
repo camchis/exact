@@ -929,11 +929,13 @@ async function openWebUnlocked({
         return { at: [x, y], ...(avoided ? { avoided } : {}) };
       },
       async screenshot(path, window = false, film = false) {
-        // a transition under way is shown where it ends, unless filmed (LLP 1116.003 D8; the wasm target has no
-        // `picture`)
-        const tags = await ask({ op: film ? 'tags' : 'picture' }).then(r =>
-          r.error && !film ? ask({ op: 'tags' }) : r,
-        );
+        // A picture holds transitions at their end; a film follows the clock (LLP 1116.003 D8).
+        // The wasm target has no `picture`.
+        const readPicture = () =>
+          ask({ op: film ? 'tags' : 'picture' }).then(r =>
+            r.error === 'unknown op: picture' && !film ? ask({ op: 'tags' }) : r,
+          );
+        const tags = await readPicture();
         if (tags.error) throw new Error(tags.error);
         delete tags.moving;
         await frame();
@@ -951,6 +953,9 @@ async function openWebUnlocked({
           3500,
         );
         await frame();
+        // Frame and image callbacks can start GPU work after the first read.
+        const settled = await readPicture();
+        if (settled.error) throw new Error(settled.error);
         const { data } = await call('Page.captureScreenshot', { format: 'png' });
         writeFileSync(path, Buffer.from(data, 'base64'));
         return { ...tags, screenshot: path, w: size[0], h: size[1], ...(pending ? { imagesPending: pending } : {}) };

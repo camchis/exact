@@ -509,10 +509,18 @@ export async function openPlaywrightWeb({ browser: name, plan, world, size, url:
         return { at: [x, y], ...(hovered ? { hovered } : {}), ...(avoided ? { avoided } : {}) };
       },
       async screenshot(path, window = false, film = false) {
-        if (!film) await ask({ op: 'picture' }); // a transition under way is shown where it ends, unless filmed (LLP 1116.003 D8)
+        // A picture holds transitions at their end; a film follows the clock (LLP 1116.003 D8).
+        // The wasm target has no `picture`.
+        const readPicture = () => ask({ op: film ? 'tags' : 'picture' })
+          .then(r => r.error === 'unknown op: picture' && !film ? ask({ op: 'tags' }) : r);
+        const tags = await readPicture();
+        if (tags.error) throw new Error(tags.error);
         await frame();
         const pending = await page.evaluate(async () => { const on = i => { const b = i.getBoundingClientRect(); return b.bottom > 0 && b.right > 0 && b.top < innerHeight && b.left < innerWidth; }; const left = () => [...document.images].filter(i => !i.complete && on(i)); const end = performance.now() + 3000; while (left().length && performance.now() < end) await new Promise(r => setTimeout(r, 25)); await globalThis.exact.imageFrames?.(); return left().length; });
-        await frame(); await page.screenshot({ path, type: 'png' });
+        await frame();
+        const settled = await readPicture();
+        if (settled.error) throw new Error(settled.error);
+        await page.screenshot({ path, type: 'png' });
         const viewport = page.viewportSize();
         return { screenshot: path, w: viewport.width, h: viewport.height, ...(pending ? { imagesPending: pending } : {}) };
       },

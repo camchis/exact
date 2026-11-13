@@ -2,7 +2,7 @@
 import { test } from 'bun:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { PassThrough } from 'node:stream';
@@ -309,6 +309,183 @@ need('chrome', chromium().unavailable)('the web agent keeps desktop input facts 
     try { await session?.close(); } finally { server.stop(true); }
   }
 }, 30_000);
+
+async function playwrightScreenshot(ask, frame, page) {
+  const {glueNode} = await import('../host/web/tests/glue-fixture.mjs');
+  const method = glueNode(readFileSync(new URL('./agent-playwright.mjs', import.meta.url), 'utf8'),
+    node => node.type === 'Property' && node.key?.name === 'screenshot' && node.value?.type === 'FunctionExpression' && node);
+  return new Function('ask', 'frame', 'page', `return ({${method}}).screenshot;`)(ask, frame, page);
+}
+
+for (const browser of ['chrome', 'firefox', 'webkit']) {
+  const run = need(browser, await browserMissing(browser === 'chrome' ? 'chromium' : browser));
+  run(`web screenshots settle GPU work started during frame and image waits (${browser})`, async () => {
+    const html = `<!doctype html><main id="exact-root" data-boot-ms="0"></main><script>
+      let stage, wait, pending = false, first = true, release, observed;
+      globalThis.arm = (at, held) => {
+        stage = at; wait = held; pending = false; first = true;
+        globalThis.gate = new Promise(resolve => release = resolve);
+        globalThis.settling = new Promise(resolve => observed = resolve);
+        globalThis.release = () => { pending = false; release(); };
+      };
+      globalThis.exact = {ready:Promise.resolve(),
+        imageFrames:async () => {
+          if (stage === 'image') pending = true;
+          if (stage === 'last frame') requestAnimationFrame(() => { pending = true; });
+        },
+        agentSettled:async () => {
+          if (first) {
+            first = false;
+            if (stage === 'first frame') requestAnimationFrame(() => { pending = true; });
+          }
+          if (pending) {
+            observed();
+            if (wait) await gate;
+            else return {error:'GPU is not settled: controlled work'};
+          }
+          return {clock:0, epoch:1, incarnation:1};
+        }};
+    </script>`;
+    const server = Bun.serve({hostname:'127.0.0.1', port:0,
+      fetch:() => new Response(html, {headers:{'content-type':'text/html'}})});
+    const dir = mkdtempSync(resolve(tmpdir(), 'exact-screenshot-settle-'));
+    let session;
+    try {
+      session = await open({host:'web', browser, url:server.url.href});
+      const {evaluate, screenshot} = session.carrier;
+      for (const film of [false, true]) for (const stage of ['first frame', 'image', 'last frame']) {
+        await evaluate(`arm(${JSON.stringify(stage)}, false)`);
+        const path = resolve(dir, `${stage}-${film}.png`);
+        await assert.rejects(screenshot(path, false, film), /GPU is not settled: controlled work/);
+        assert.equal(existsSync(path), false);
+      }
+      await evaluate("arm('image', true)");
+      const path = resolve(dir, 'waited.png');
+      const capture = screenshot(path);
+      try {
+        assert.equal(await Promise.race([
+          capture.then(() => 'captured'), evaluate('settling').then(() => 'settling'),
+        ]), 'settling');
+        assert.equal(existsSync(path), false);
+      } finally { await evaluate('release()'); await capture; }
+      assert.equal(existsSync(path), true);
+    } finally {
+      try { await session?.close(); }
+      finally { server.stop(true); rmSync(dir, {recursive:true, force:true}); }
+    }
+  }, 30000);
+  run(`web screenshots preserve the JS animation adapter's picture hold (${browser})`, async () => {
+    const html = `<!doctype html><main id="exact-root"><div id="moving" style="opacity:0;transition:opacity 1000ms linear">Moving</div></main><script>
+      globalThis.exact = {clock:{now:0, epoch:0}, After:[], views:new Map()};
+      exact.ready = import('/host/web-js/agent.js').then(({install}) => {
+        install(exact);
+        globalThis.arm = () => {
+          delete exact.gpu; delete exact.imageFrames;
+          moving.style.transition = 'none'; moving.style.opacity = '0'; getComputedStyle(moving).opacity;
+          moving.style.transition = 'opacity 1000ms linear'; getComputedStyle(moving).opacity;
+          moving.style.opacity = '1';
+          return exact.agentSettled({op:'tags'});
+        };
+        document.getElementById('exact-root').dataset.bootMs = '0';
+      });
+    </script>`;
+    const server = Bun.serve({hostname:'127.0.0.1', port:0, fetch(request) {
+      const path = new URL(request.url).pathname;
+      if (path === '/') return new Response(html, {headers:{'content-type':'text/html'}});
+      if (path === '/favicon.ico') return new Response(null, {status:204});
+      if (path.endsWith('/names.js')) return new Response('export default [[],[],[]]; export const types=[[],[],[]], sourceTypes={};', {headers:{'content-type':'text/javascript'}});
+      const local = new URL('..' + path, import.meta.url);
+      const file = existsSync(local) ? local : new URL('..' + path.replace('/host/web-js/', '/host/web/'), import.meta.url);
+      return new Response(readFileSync(file), {headers:{'content-type':'text/javascript'}});
+    }});
+    const dir = mkdtempSync(resolve(tmpdir(), 'exact-screenshot-hold-'));
+    let session;
+    try {
+      session = await open({host:'web', browser, url:server.url.href});
+      const {evaluate, screenshot} = session.carrier;
+      const captures = [screenshot];
+      // Chromium also exercises Playwright's capture method against the real animation adapter.
+      if (browser === 'chrome') captures.push(await playwrightScreenshot(session.carrier.ask, () => webFrame(evaluate), {
+        evaluate,
+        screenshot: async ({path}) => {
+          const {data} = await session.carrier.call('Page.captureScreenshot', {format:'png'});
+          writeFileSync(path, Buffer.from(data, 'base64'));
+        },
+        viewportSize: () => ({width:100, height:100}),
+      }));
+      for (const capture of captures) {
+        for (const film of [false, true]) {
+          await evaluate('arm()');
+          assert.equal(await evaluate('moving.getAnimations()[0].currentTime'), 0);
+          await capture(resolve(dir, `${film}.png`), false, film);
+          assert.equal(await evaluate('moving.getAnimations()[0].currentTime'), film ? 0 : 999.5);
+          assert.equal(await evaluate('exact.clock.now'), 0);
+        }
+        await evaluate(`arm().then(() => {
+          let pending = false;
+          exact.imageFrames = async () => { pending = true; };
+          exact.gpu = {settled:async () => {
+            if (!pending) return [];
+            pending = false;
+            return [{name:'controlled transient work'}];
+          }};
+        })`);
+        const refused = resolve(dir, 'transient.png');
+        await assert.rejects(capture(refused), /GPU is not settled: controlled transient work/);
+        assert.equal(existsSync(refused), false);
+        assert.equal(await evaluate('moving.getAnimations()[0].currentTime'), 999.5);
+        assert.equal(await evaluate('exact.clock.now'), 0);
+      }
+    } finally {
+      try { await session?.close(); }
+      finally { server.stop(true); rmSync(dir, {recursive:true, force:true}); }
+    }
+  }, 30000);
+}
+
+test('Playwright screenshots settle work from each wait before capture', async () => {
+  for (const film of [false, true]) for (const stage of ['first frame', 'image', 'last frame']) for (const mode of ['refuse', 'transient', 'wait']) {
+    const wait = mode === 'wait';
+    let pending = false, frames = 0, captured = false, lastOp;
+    const gate = Promise.withResolvers(), observed = Promise.withResolvers();
+    const screenshot = await playwrightScreenshot(async ({op}) => {
+      lastOp = op;
+      if (pending) {
+        observed.resolve();
+        if (mode === 'transient') pending = false;
+        if (!wait) return {error:'GPU is not settled: controlled work'};
+        await gate.promise;
+      }
+      return {};
+    }, async () => {
+      if (++frames === (stage === 'first frame' ? 1 : stage === 'last frame' ? 2 : 0)) pending = true;
+    }, {
+      evaluate: async () => { if (stage === 'image') pending = true; return 0; },
+      screenshot: async () => { captured = true; },
+      viewportSize: () => ({width:100, height:100}),
+    });
+    const capture = screenshot('unused.png', false, film);
+    if (wait) {
+      try { await observed.promise; assert.equal(captured, false); }
+      finally { pending = false; gate.resolve(); await capture; }
+      assert.equal(captured, true);
+    } else {
+      await assert.rejects(capture, /GPU is not settled: controlled work/);
+      assert.equal(captured, false);
+    }
+    assert.equal(lastOp, film ? 'tags' : 'picture');
+  }
+  const ops = [];
+  const screenshot = await playwrightScreenshot(async ({op}) => {
+    ops.push(op);
+    return op === 'picture' ? {error:'unknown op: picture'} : {};
+  }, async () => {}, {
+    evaluate: async () => 0, screenshot: async () => {},
+    viewportSize: () => ({width:100, height:100}),
+  });
+  await screenshot('unused.png');
+  assert.deepEqual(ops, ['picture', 'tags', 'picture', 'tags']);
+});
 
 test('malformed input is labelled before delivery; a state refusal is not', async () => {
   const carrier = { host: 'web', browser: 'chrome', launchFacts: launchFacts({}), reset() {},
