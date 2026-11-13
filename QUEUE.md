@@ -1630,7 +1630,6 @@ and the Linux headless CPU renderer without claiming display frame timing.
 - **The iOS frame-health card's header rests under the status bar** (2026-11-13, found driving the minimized card; a decision). A new full card rests 8 points from the window's top edge, past the safe area (LLP 1079.000 §7.2, #303), so on an iPhone simulator its Close, Pause, Details and Share sit under the status bar and take no taps until the card is dragged down. The minimized card already rests below the status bar. Decide whether the full card rests below it too.
 
 - **macOS live trackpad replay (LLP 1079.000, 2026-10-28).** Add a reliable completion acknowledgement for synthetic phased wheels before admitting them under platform timing. Immediate layout reads exposed zero or partial motion; posting the later phases first did not resolve it. The carrier currently refuses with `platform-trackpad-replay-unqualified`; ordinary wheels and frozen-clock functional replay remain available.
-- **Late work that lands unchanged leaves no hitch (LLP 1079.000 §1).** A frame whose owner batch changes nothing is never applied, so when it finishes late it counts as a late frame but the detail ring records no apply-deadline event. Record the late frame's start, deadline and landing as an event of its own.
 
 - **NucBox: qualify an AMD overlay diagnostic if the paint crash recurs**
   (LLP 1149.001 Stage 1w). The retained wgpu paint crash is an execution
