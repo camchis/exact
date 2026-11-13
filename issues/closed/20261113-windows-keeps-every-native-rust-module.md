@@ -1,6 +1,7 @@
 # Windows keeps every native Rust module image in temp
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** A refused native image's file and directory are removed on every platform, and each process's first load sweeps other processes' image directories over a minute old, which removes a Windows image once no process maps it.
 **Systems:** logic
 **Severity:** P3
 **Author:** Grok 4.7
