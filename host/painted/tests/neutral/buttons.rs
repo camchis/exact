@@ -49,7 +49,7 @@ pub(super) fn popover_sources_and_sheet_word_clips_match_the_browser() {
     assert!(error.is_none(), "{error:?}");
     let mut failures = Vec::new();
     use exact_kernel::{AxisOffer, ButtonMeasureRequest, TextMeasurer};
-    let mut measurer = exact_linux::text::Measurer(exact_linux::text::TextEngine::shared());
+    let mut measurer = exact_painted::text::Measurer(exact_painted::text::TextEngine::shared());
     for (opener, chooser) in [
         ("plain", false),
         ("sourced", true),
@@ -362,7 +362,7 @@ pub(super) fn symbols_use_the_neutral_metrics_in_layout_and_paint() {
             check(name, (f.width, f.height), (em * scale, em * scale));
         }
         check("authored image", size(&mut p, "fixed"), (48., 40.));
-        let mut images = exact_linux::image::Images::new(std::path::PathBuf::new());
+        let mut images = exact_painted::image::Images::new(std::path::PathBuf::new());
         let image = id(&p, "sf");
         let reports = images.sync(p.host().kernel(), &[image]);
         check("image sync", reports[0].1.unwrap(), (em * 1.2, em * 1.2));
@@ -573,7 +573,7 @@ pub(super) fn symbol_face_exceptions_match_the_browser() {
         .unwrap();
     assert!(choice.neutral_role_floor && choice.neutral_menu_row);
     use exact_kernel::{AxisOffer, ButtonMeasureRequest, TextMeasurer};
-    let mut measurer = exact_linux::text::Measurer(exact_linux::text::TextEngine::shared());
+    let mut measurer = exact_painted::text::Measurer(exact_painted::text::TextEngine::shared());
     let mut request = ButtonMeasureRequest {
         face: p.host().kernel().press_face(id(&p, "choice")).unwrap(),
         style: choice,
