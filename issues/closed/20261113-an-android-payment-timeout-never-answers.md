@@ -1,6 +1,7 @@
 # An Android payment timeout never answers the request
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** An authorization past its budget answers the send with the stored `fail` and `authorize-timeout` at once, then abandons the request, so the sheet that stays up calls no handler again and its close answers nothing more.
 **Systems:** packages/payments
 **Severity:** P1
 **Author:** Grok 4.7
