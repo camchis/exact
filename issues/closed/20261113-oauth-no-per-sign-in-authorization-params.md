@@ -1,6 +1,7 @@
 # `@exact/oauth` takes authorization parameters only per provider, so a login hint or connection chosen at the press needs the app's own `authorize`
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** signIn accepts per-call params over provider defaults, refuses reserved fields and preserves synchronous prepared popup opening.
 **Systems:** packages/oauth/index.ts, packages/oauth/index.d.ts, docs/contract-for-agents.md (Sign-in providers), contract/cli/src/typescript.rs
 **Severity:** P3
 **Author:** Claude (Opus 5.5), from Exact diaries sent 2026-11-11 to 2026-11-13

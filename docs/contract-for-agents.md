@@ -1465,6 +1465,27 @@ next `open` asks for the token again and sends it as the first message.
 The token never enters the URL, subprotocols or a Contract answer. Adapt the
 message and refusal handling to the service; do not retry indefinitely.
 
+**Parameters chosen at the press.** Keep provider defaults in
+`authorizationParams`; pass a login hint, connection or account-choice prompt
+with the sign-in itself:
+
+```ts
+provider.signIn(store, { params: { login_hint: email, prompt: 'select_account' } });
+```
+
+`params` overrides those defaults for this request alone, including when
+`authorize` sends it. The package still opens a prepared browser request
+before awaiting anything. Both parameter maps refuse `response_type`,
+`client_id`, `redirect_uri`, `scope`, `state`, `code_challenge`,
+`code_challenge_method`, `nonce` and `max_age` with `TypeError`; the package
+sets those fields or cannot validate what they ask for.
+
+For flows the package does not cover, data code may use `openAuthSession`
+and `authCallback` directly; their public declarations and rejection statuses
+are in the generated `app.d.ts`. A callback must carry exactly one `state`,
+equal to the nonempty value supplied to `openAuthSession`. Keep callback URLs
+in data code: they can contain credentials.
+
 **An app's own sign-in screens.** A provider that lets an app sign the person
 in with its own screens (ForgeRock's authentication trees) still issues an
 authorization code. The app sends the authorization request as the provider

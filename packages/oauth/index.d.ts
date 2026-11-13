@@ -101,13 +101,15 @@ export interface OAuthAuthorization {
   url: string;
   /** The authorization endpoint. */
   endpoint: string;
-  /** `response_type`, `client_id`, `redirect_uri`, `scope`, `state`, the PKCE challenge, `nonce` with `openid`, and `authorizationParams`. */
+  /** `response_type`, `client_id`, `redirect_uri`, `scope`, `state`, the PKCE challenge, `nonce` with `openid`, and `authorizationParams` with the sign-in’s `params` overrides. */
   params: Record<string, string>;
   /** The package's transport (`OAuthConfig.fetch`, else `fetch`), to send it with. */
   fetch: (url: string, init: RequestInit) => Promise<Response>;
 }
 
 export interface OAuthSignIn {
+  /** Extra authorization parameters for this press, overriding authorizationParams. The package's own fields (response_type, client_id, redirect_uri, scope, state, code_challenge, code_challenge_method, nonce and max_age) are refused with TypeError. */
+  params?: Record<string, string>;
   /** For an app that signs the person in with its own screens (LLP 1146 D8): sends the authorization request as the provider documents, and answers the URL it redirected to. Throw an `OAuthError` to say why it could not. */
   authorize?: (request: OAuthAuthorization) => Promise<string>;
 }
