@@ -1,6 +1,7 @@
 # RealWorld's old requests can change the next reader's session
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** A `currentUser` 401 forgets the token only while it is still the one the request carried, and every change of reader forgets pending favourite and follow presses, so a previous reader's late reply changes nothing.
 **Systems:** apps/realworld/app.ts
 **Author:** Codex
 **Date:** 2026-11-12
