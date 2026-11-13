@@ -1017,10 +1017,12 @@ const SCRIPT_TREE = /^(logic|data|gpu|render|art|assets|deck|modules)(\/|$)/;
  * app's Rust crates (which can `include_bytes!` any file beside them), and
  * what `app.json` names (an icon). Shots, tools, repros and test files never
  * count (LLP 1012: a drive refuses a stale build, not an agent's notes), nor
- * TypeScript or JSON app.ts never imports (`moduleGraph`). Of the rest, a
+ * TypeScript or JSON app.ts never imports (`moduleGraph`), nor, given the
+ * `.contract` files a build compiled (`contracts`, its receipt's), another
+ * one: the compiler compiles what app.contract reaches. Of the rest, a
  * helper script outside a script tree, a gitignored file, or a picture, log,
  * note, export or saved world is not an input. */
-export function notBuildInput(dir, keep = []) {
+export function notBuildInput(dir, keep = [], contracts = null) {
   const ignored = gitIgnored(dir, keep);
   const under = (path, roots) => roots.some(p => within(p, path));
   let manifest = ''; try { manifest = readFileSync(resolve(dir, 'app.json'), 'utf8'); } catch {}
@@ -1035,6 +1037,7 @@ export function notBuildInput(dir, keep = []) {
     if ((AGENT_TREE.test(rel) && !under(path, keep)) || TEST_FILE.test(rel) || rel === DECLARATIONS) return true;
     const native = INPUT_TREE.test(rel) || under(path, keep) || inCrate(path) || manifest.includes(rel);
     if (graph && MODULE_FILE.test(rel) && !CONFIG_JSON.test(rel) && !native && !graph.has(path)) return true;
+    if (contracts && rel.endsWith('.contract') && rel !== 'app.contract' && !native && !contracts.has(path)) return true;
     if (BUILD_SOURCE.test(rel) || native) return false;
     if (HELPER.test(rel) && !SCRIPT_TREE.test(rel)) return true;
     return OUTPUT.test(rel) || ignored(path);
@@ -1093,7 +1096,9 @@ export function receiptChanges(receipt, app, { hashed = false } = {}) { // `hash
   // A file edited while the build ran is newer than what it read, though older than the receipt written at its end
   // (LLP 1116.008 D2): the build's own start bounds it, else (an older receipt) the receipt's time.
   const since = Math.min(statSync(receipt).mtimeMs, Date.parse(started) || Infinity);
-  const ignored = notBuildInput(app.dir, shaderWatchRoots(app));
+  // A Contract file the build did not compile (one no `use` reaches) is no input of it; a receipt without the list keeps all.
+  const compiled = build?.graph?.contractSources;
+  const ignored = notBuildInput(app.dir, shaderWatchRoots(app), compiled?.length ? new Set(compiled.map(path => resolve(path))) : null);
   // A game's proof, pins and helper scripts are not native inputs either
   // (game/proof.mjs shares gameNonInput). A non-game keeps every real source.
   const game = path => Boolean(app.manifest?.game) && gameNonInput(relative(app.dir, path));

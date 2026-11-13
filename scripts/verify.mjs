@@ -424,19 +424,22 @@ export function buildWarnings(output) {
   return kept.split('\n').filter(line => /^warning: /.test(line));
 }
 
+/** A line a drive's build says that `verify` shows as it comes: the build or the wait starting (minutes, and the report
+ * comes after them), and `logged`'s ticker while it runs. */
+export const buildProgress = line => /^(?:(?:building|waiting) for|\s*still building)/.test(line);
+
 /** The iOS build a drive needs, or its plan alone (agent-build.mjs): null when fresh, else what it said. */
 async function iosBuild(app) {
   const { buildFirst } = await import('./agent-build.mjs');
   const said = [], started = Date.now();
-  // A native build (or the wait for one) is said as it starts too: it is minutes, and the report comes after it.
-  const code = await buildFirst('ios', app, { say: (line) => { said.push(line); if (/^(building|waiting) for/.test(line)) console.error(line); } });
+  const code = await buildFirst('ios', app, { say: (line) => { said.push(line); if (buildProgress(line)) console.error(line); } });
   return said.length || code ? { ms: Date.now() - started, code, said, warnings: [] } : null;
 }
 
 /** The Windows build a drive needs (agent-build.mjs `windowsBuildFirst`): null when fresh, else what it said. */
 async function windowsBuild(app) {
   const { windowsBuildFirst } = await import('./agent-build.mjs'), said = [], started = Date.now();
-  const code = await windowsBuildFirst(app, { say: (line) => { said.push(line); if (/^building for/.test(line)) console.error(line); } });
+  const code = await windowsBuildFirst(app, { say: (line) => { said.push(line); if (buildProgress(line)) console.error(line); } });
   return said.length || code ? { ms: Date.now() - started, code, said, warnings: [] } : null;
 }
 /** A drive's own options on a host: iOS shows UIKit's bars; Windows opens at app.json's window size, as a person sees it. */

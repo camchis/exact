@@ -1,6 +1,7 @@
 # A native drive refuses the build it just made when any source-like file changed during the build, read by it or not
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** An Apple build's freshness counts only the `.contract` files its receipt says the compiler compiled (with app.contract, input trees and manifest-named entries), and `verify` shows the build's "still building" lines; no `--stale-ok` flag was added.
 **Systems:** scripts/agent-launch.mjs (`receiptChanges`, `notBuildInput`, `refuseStale`), scripts/agent-build.mjs, scripts/verify.mjs (`iosBuild`)
 **Severity:** P2
 **Author:** Claude (Opus 5.5), from Exact diaries sent 2026-11-11 to 2026-11-13
