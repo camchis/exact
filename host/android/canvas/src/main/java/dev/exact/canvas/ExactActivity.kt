@@ -537,9 +537,10 @@ open class ExactActivity : Activity() {
 
     override fun onStop() {
         stopped = true
-        Exact.owner?.windowFrames?.detach()
+        Exact.owner?.windowFrames?.detach(window)
         requests.foreground(false)
-        Exact.hidden(true)
+        // A replaced activity's stop can come after its successor's start: the page is the successor's to hide.
+        if (reads()) Exact.hidden(true)
         if (reads()) pads.background()
         if (reads()) Extensions.stopped(isChangingConfigurations)
         view.running(false, reads())

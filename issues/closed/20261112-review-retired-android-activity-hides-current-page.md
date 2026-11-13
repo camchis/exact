@@ -1,6 +1,7 @@
 # A retired Android activity can mark its successor's page hidden
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** A stop tells the host the page is hidden only while its activity still reads the host, and detaches only its own window from frame measurement, so a replaced activity's late stop leaves its successor's page and window alone.
 **Systems:** host/android/canvas/src/main/java/dev/exact/canvas/ExactActivity.kt, host/android/canvas/src/main/java/dev/exact/canvas/Owner.kt
 **Author:** Codex
 **Date:** 2026-11-12
