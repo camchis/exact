@@ -1,6 +1,7 @@
 # A test's `expect state` takes only `==`, so a value a drag or the clock sets cannot be asserted as a range
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** Scripted state assertions accept inclusive numeric bounds and typed literal membership, with observed values on failure.
 **Systems:** contract/syntax/src/parser/steps.rs (`expect state`), docs/contract-grammar.md, docs/start-here.md
 **Severity:** P3
 **Author:** Claude (Opus 5.5), from Exact diaries sent 2026-11-11 to 2026-11-13

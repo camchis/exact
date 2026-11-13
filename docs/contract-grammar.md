@@ -775,7 +775,8 @@ step          = "tap" "midi" STRING ( HEX { HEX } | "clock" NUMBER NUMBER ) NL
               | "expect" ( "disabled" | "enabled" ) STRING NL  (* a control's `disabled` (LLP 1116.010 D3) *)
               | "expect" "refusal" STRING NL          (* one observed refusal of the named mutation slot *)
               | "expect" "text" STRING "==" STRING NL
-              | "expect" "state" IDENT { "." ( IDENT | NUMBER ) } "==" test-value NL
+              | "expect" "state" IDENT { "." ( IDENT | NUMBER ) }
+                  ( "==" test-value | ( ">=" | "<=" ) [ "-" ] NUMBER | "in" test-value { test-value } ) NL
               | "expect" "sound" ( "has" | "missing" ) STRING
                   [ "at" NUMBER ] [ "gain" NUMBER ] [ "ends" NUMBER ]
                   [ "playbackRate" NUMBER ] [ "pan" [ "-" ] NUMBER ] [ "by" IDENT ] NL
