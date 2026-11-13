@@ -1,6 +1,7 @@
 # execFile refuses UTF-8 output within maxBuffer because its JSON reply exceeds a base64-sized allowance
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** `execFile` output crosses as base64 in either encoding, decoded as UTF-8 by the binding when asked, and a process reply's capacity is its length, so any output within `maxBuffer` fits the reserved ceiling.
 **Systems:** data/src/process.rs, js/src/process.js, host/apple/src/executor_process_supervise.rs
 **Author:** Codex
 **Date:** 2026-11-12
