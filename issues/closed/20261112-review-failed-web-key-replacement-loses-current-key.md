@@ -1,6 +1,7 @@
 # A failed web `keepKey` replacement loses access to the current key
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** `keepKey` on the web writes the new handle to the name only after the key service has stored the pair, and a later `keepKey`, `set` or `forget` of the name supersedes a write still in flight, on the JS target and in the wasm prelude.
 **Systems:** web key persistence, host/web-js/admission.js, host/web/storage-environment.js
 **Author:** Codex
 **Date:** 2026-11-12
