@@ -1,6 +1,7 @@
 # Any parent edit snaps the camera, the lights, and every socket
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The scene and attachment feeds ask ParentChanges whether an entity's own chain changed (snap_in), so a parent edit elsewhere no longer snaps the camera, the lights, the pointer's children or the sockets.
 **Systems:** game
 **Severity:** P2
 **Author:** Grok 4.7
