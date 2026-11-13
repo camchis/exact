@@ -3,7 +3,7 @@ import { spawnSync } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
 import { chmodSync, cpSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { basename, dirname, relative, resolve } from 'node:path';
-import { capturedLockDrift, gameDefaults, gameShells, prepareGame } from './app/shells.mjs';
+import { capturedLockDrift, gameDefaults, gameShells, prepareGame, sdkFetch } from './app/shells.mjs';
 import { cargoEnvironment, lockedMetadata, pathFrom, patchLines } from '../scripts/app.mjs';
 import { PLATFORMS, SDK_CRATES, appCrateName, authoredCrate, copiedBuildScripts, namePlatform, withoutPlatformKeys } from '../scripts/app-shells.mjs';
 import { updateManifests } from './update-manifests.mjs';
@@ -50,6 +50,18 @@ function withModel(destination, directory) {
       '/// The world every test here starts from, with art/ baked in memory (tests/model.rs).\nfn start(options: Options) -> Sim<SmallGame> {\n    exact_game::sim_with_art!(options).unwrap()\n}'],
   ]);
 }
+/** Cargo's words for a crate an offline cache lacks: an index never fetched has no match for the package, a cached
+ * index without the .crate stopped the download. */
+const MISSING_CRATE = /no matching package named|attempting to make an HTTP request|in the offline mode|--offline was specified|failed to download/;
+/** Whether a new game's Cargo graph error (`message`) is only a cache without the SDK's crates, so exact new can
+ * make the game and leave the fetch to a build. Both must say so: the error itself, and fetching the SDK lock
+ * offline (`fetch`, sdkFetch, as exact setup --check asks), since that wording is also a stale SDK lock's. No Cargo,
+ * a broken Cargo config (the game's own, which the SDK's fetch does not read) or anything else is not. */
+export function uncachedCrates(message, fetch) {
+  if (!/^game Cargo graph: /.test(message ?? '') || !MISSING_CRATE.test(message)) return false;
+  const cache = fetch();
+  return !cache.ok && MISSING_CRATE.test(cache.message ?? '');
+}
 export function createGame(destination, directory = import.meta.dir, options = {}) {
   const local = destination === '.' || /[\\/]/.test(destination ?? '');
   const name = local ? basename(resolve(destination)) : destination;
@@ -76,20 +88,16 @@ export function createGame(destination, directory = import.meta.dir, options = {
   try {
     return writeGame(destination, directory, options, {name, local});
   } catch (error) {
-    let removed = false;
     try {
       const now = lstatSync(destination);
       if (now.isDirectory() && now.dev === started.dev && now.ino === started.ino) {
         if (existed) for (const entry of readdirSync(destination)) rmSync(resolve(destination, entry), {recursive:true, force:true});
         else rmSync(destination, {recursive:true, force:true});
-        removed = true;
       }
     } catch {}
-    // The Cargo error names a manifest in the game, which is gone now. exact
-    // setup fetches the game SDK lock a new game resolves from (sdkFetch).
-    if (removed && /^game Cargo graph: /.test(error?.message ?? '')) {
-      error.message += `\nexact new removed ${destination}. Fetch the game SDK's crates with bun ${JSON.stringify(resolve(directory, '../scripts/exact.mjs'))} setup, then run exact new again.`;
-    }
+    // A Cargo cache without the SDK's crates is not a failure (writeGame), so
+    // a Cargo graph error here is a resolution one: its hints still apply once
+    // exact new has run again.
     throw error;
   }
 }
@@ -141,7 +149,16 @@ function writeGame(destination, directory, options, {name, local}) {
 
   // Resolve against this SDK now, before the first locked test or proof.
   // No captured lock is needed unless the author adds dependencies.
-  prepareGame(destination, gameDefaults(destination).game, directory);
+  // A new game's crates are the SDK lock's, so a Cargo cache that lacks them
+  // (a fresh machine, an agent's sandbox) does not stop it: the shells are
+  // written, a build service fetches its own, and a local build or test
+  // refuses with the fetch to run, as here.
+  let uncached = null;
+  try { prepareGame(destination, gameDefaults(destination).game, directory); }
+  catch (error) {
+    if (!uncachedCrates(error?.message, () => sdkFetch({offline:true, source:directory}))) throw error;
+    uncached = `Cargo's cache lacks the game SDK's crates. A build service fetches its own; to build or test here first, run:\n  cargo fetch --manifest-path ${quote(resolve(destination, '.shells/Cargo.toml'))}`;
+  }
 
   const argument = local ? quote(destination === process.cwd() ? '.' : destination) : name;
   const proof = quote(relative(process.cwd(), resolve(destination, 'proof.mjs')));
@@ -162,10 +179,10 @@ function writeGame(destination, directory, options, {name, local}) {
   bun exact.mjs windows --run build and launch on Windows
   bun exact.mjs prove         take the first development baseline; prove --repin --release before you ship it
   First publication runs seven legs. A warm continuous web leg is reused; Save and FreshGame
-  still compile their own wasm (the mode is compile-time). Hot-swap wasm is not reused.`;
+  still compile their own wasm (the mode is compile-time). Hot-swap wasm is not reused.${uncached ? `\n${uncached}` : ''}`;
   }
   return `Created ${local ? destination : `game/games/${name}`}\n  bun ${script('dev.mjs')} ${argument}\n  bun ${script('prove.mjs')} ${argument}
-  bun ${proof} web --screenshot-only`;
+  bun ${proof} web --screenshot-only${uncached ? `\n${uncached}` : ''}`;
 }
 
 const ROOT = resolve(import.meta.dir, '..');
