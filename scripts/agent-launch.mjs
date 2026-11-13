@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url';
 import { types as utilTypes } from 'node:util';
 import { filesystemLock } from './filesystem.mjs';
 import { boundSettings, settingChanges, settingInputs, settingLines } from '../js/bake/src/__exact_env.mjs';
-import { backendOriginSelection, literalBackendOrigin } from '../js/bake/src/typescript.mjs';
+import { backendOriginSelection, literalBackendOrigin, selectBackendOrigin } from '../js/bake/src/typescript.mjs';
 import { besidePattern } from '../host/web/beside.mjs';
 import { chooseSimulator, phone } from '../host/apple/devices.mjs';
 import { androidDevice } from './agent-android.mjs';
@@ -561,7 +561,7 @@ export function parseFlags(argv) {
     if (argv[i] === '--json') flags.json = true;
     else if (argv[i] === '--world') flags.world = resolve(value());
     else if (argv[i] === '--plan') flags.plan = resolve(value());
-    else if (argv[i] === '--backend') { const value = argv[++i]; if (!value || value.startsWith('--')) throw new Error('--backend <url>: name the backend origin'); process.env.EXACT_BACKEND_ORIGIN = value; }
+    else if (argv[i] === '--backend') selectBackendOrigin(argv[++i]);
     else if (argv[i] === '--app') flags.app = value();
     else if (argv[i] === '--browser') flags.browser = value();
     else if (argv[i] === '--size') {

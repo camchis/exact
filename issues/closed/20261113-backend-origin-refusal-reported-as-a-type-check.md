@@ -1,6 +1,7 @@
 # A backend selection's refusal of an app.ts without `const origin` is reported as a failed type check
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** Backend-selection refusals have their own diagnostic id, name the selector, and explain literal or setting-based const origin.
 **Systems:** js/bake/src/typescript.mjs (`injectBackendOrigin`), host/web-js/build.mjs, scripts/exact.mjs (`typeDiagnostics`), scripts/help.mjs (`--backend`)
 **Severity:** P3
 **Author:** Claude (Opus 5.5), from Exact diaries sent 2026-11-11 to 2026-11-13

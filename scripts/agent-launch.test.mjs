@@ -676,7 +676,7 @@ const other = 'http://127.0.0.1:4400';`;
   expect(next).toContain('net.fetch https://other.example');
   expect(next).toContain("const other = 'http://127.0.0.1:4400'");
   expect(next).toContain("// const origin = 'http://comment'");
-  expect(() => injectBackendOrigin('const origin = compute();', 'http://new', parseSync)).toThrow(/top-level literal/);
+  expect(() => injectBackendOrigin('const origin = compute();', 'http://new', parseSync)).toThrow(/top-level const origin/);
   for (const init of ["'http://127.0.0.1:4400' as const", "('http://127.0.0.1:4400' satisfies string)", '`http://127.0.0.1:4400` as const']) {
     const wrapped = `export const origin = ${init}; export const grants = \`net.fetch \${origin}\`;`;
     expect(literalBackendOrigin(wrapped, parseSync)).toBe('http://127.0.0.1:4400');
@@ -1413,4 +1413,14 @@ test('a widget address carries a configuration of parameter names to values', as
   expect(parsed.argv).toEqual(['ios', 'state']);
   for (const bad of ['three', '[]', '{"categories":3}'])
     expect(() => widgetArguments(['ios', 'widget', 'plan', '--configuration', bad, 'state'])).toThrow('widget --configuration: expected a JSON object');
+});
+
+
+test('a backend flag keeps its source through child builds and an environment override replaces it', async () => {
+  const { backendOriginSelection, selectBackendOrigin } = await import('../js/bake/src/typescript.mjs');
+  const env = {};
+  selectBackendOrigin('https://chosen.example/', env);
+  expect(backendOriginSelection('.', env)).toEqual({ origin: 'https://chosen.example', source: '--backend' });
+  env.EXACT_BACKEND_ORIGIN = 'https://other.example';
+  expect(backendOriginSelection('.', env)).toEqual({ origin: 'https://other.example', source: 'EXACT_BACKEND_ORIGIN' });
 });

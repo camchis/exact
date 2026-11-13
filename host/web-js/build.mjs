@@ -307,7 +307,8 @@ if (ts && existsSync(webScript) && !/^\s*fn main\(\)\s*\{\s*exact_js_bake::build
 // The check's errors, then its warnings: what `contract build` and a drive's summary read, warnings after refusals.
 const sayWarnings = (warnings) => { for (const warning of warnings ?? []) console.warn(warning); };
 const captured = ts ? await typecheck(!opt('--data')).catch((error) => {
-  console.error(`${error.message ?? error}\nerror: ${app}: app.ts failed the type check every host's build runs`);
+  console.error(error.code === 'backend-selection' ? `error [backend-selection]: ${error.message}`
+    : `${error.message ?? error}\nerror: ${app}: app.ts failed the type check every host's build runs`);
   sayWarnings(error.warnings);
   process.exit(1);
 }) : null;

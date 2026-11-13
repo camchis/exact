@@ -3471,6 +3471,13 @@ string, a template or `+` of constants, an array of them `.join('\n')`, or a
 top-level `const` holding one). Numbers keep their type: `1 + 2` is `3`, while
 `'a' + 1 + 2` is `'a12'`. Conditional expressions are refused.
 
+A backend override (`--backend`, `EXACT_BACKEND_ORIGIN` or `.exact/backend-origin`)
+needs one top-level `const origin`, set to a literal http(s) string or a setting
+such as `import.meta.env.API_BASE_URL ?? 'https://api.example'`, and used in
+`net.fetch ${origin}`. Settings are inlined before the override. A refused
+selection names its selector and reports `backend-selection`, including in
+`contract build --json`.
+
 For grants that differ by backend, write an object literal such as
 `export const grants = { 'http://127.0.0.1:4790': ['net.fetch http://127.0.0.1:4790', 'secret.keep fixture-token'], 'https://discord.com': ['net.fetch https://discord.com', 'net.websocket wss://gateway.discord.gg', 'secret.keep discord-token'] };`.
 Keys must be unique string literals naming http(s) origins without credentials,
