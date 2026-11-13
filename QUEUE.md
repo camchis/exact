@@ -1346,12 +1346,6 @@ sits on that list carries the trade it would take.
   view without the `UITabBarController`'s bar, or the bar's visibility following the route stack,
   which still has the photo on top until UIKit finishes.
   2026-10-22 (lane q1022/c2): the retained tabbed fullscreen-zoom fixture enters a real interactive dismissal (vertical 250-pt drag) and its capture shows the presented card covering the bar's place, the bar visible after completion; this does not separate a missing bar from ordinary occlusion.
-- **The web JS target's build-time answer at a store holding secrets** (LLP 1027 D4,
-  approved 2026-10-10): the Rust runner shows a store reader's declared `else` placeholder
-  instead of the bake's empty-store answer when the store holds a granted secret and the
-  source is not ready; `rt.js` still shows the build-time answer until its Rust module
-  loads. It learns a store reader only from an answer (`ans.store`), so it needs the
-  plan's reader marker emitted first.
 - **The sky's capture on the phone** landed at the display's rate 2026-08-30 (LLP 1008
   §9): a shadow layer tree rendered by `CARenderer`, a nested canvas's readback cached,
   the texture handed to the module as it is (`gpu_texture_metal`, `gpu_sync`) — 119 fps

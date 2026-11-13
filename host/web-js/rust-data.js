@@ -7,7 +7,7 @@ import { rt } from './rt-link.js'; // (rt.js's own, as a lazy chunk takes them)
 // declarations (`app.bind.plan`, the plan without the bake's answers),
 // fetched after first pixel; once bound and activated, every answer is a
 // synchronous call, as the runner's `DataSource::answer` is. Until then the
-// runtime keeps each resource's compiled value and asks again at `ready`.
+// runtime shows its compiled value or placeholder and asks again at `ready`.
 const ABI = 9, utf8 = new TextEncoder(), text = new TextDecoder();
 
 function writer() {
