@@ -49,7 +49,7 @@ import { basename, delimiter, dirname, isAbsolute, parse, relative, resolve, sep
 import { fileURLToPath } from 'node:url';
 import { buildRust, publishedSignature, rustBundle, rustPackage, tieredNative } from './rust.mjs';
 import { appleProduction } from '../host/apple/link.mjs';
-import { assertOwnTarget, bakedEntryAssets, cargoReproducibilityFlags, readManifest, buildBake, bakeTarget, readBuilds, cohortReceipt, classifyArtifacts, resolveApp, shaderWatchRoots } from './app.mjs';
+import { assertOwnTarget, bakedEntryAssets, bakeOutput, cargoReproducibilityFlags, readManifest, buildBake, bakeTarget, readBake, readBuilds, cohortReceipt, classifyArtifacts, resolveApp, shaderWatchRoots } from './app.mjs';
 import { gameShells } from "../game/app/shells.mjs";
 import { streamBundle, unbundledTextures } from './texture-families.mjs';
 import { blobPath, channelOrigin, openOrigin, OriginUnavailable, sha256, streamPath, parseWebRoot, webRootPath, webRootStream, webReleasePath, validateChannel } from './origin.mjs';
@@ -617,6 +617,40 @@ export function deployRun(target, release) {
 
 // ------------------------------------------------------------------ the bake
 
+// The output path is watched by the bake. Keep it with the owning Cargo cache;
+// only completed, validated receipts enter a publication's private directory.
+function deployBakeEnv(app, sourceRoot) {
+  return sealedSourceEnv(sourceRoot, { CARGO_TARGET_DIR: app.target, EXACT_UPDATE_TRUST: 'production',
+    EXACT_BAKE_OUTPUT: bakeOutput(app, { EXACT_UPDATE_TRUST: 'production' }) });
+}
+
+export function copyBake(app, run, build, directory) {
+  cohortReceipt(build);
+  const { platform } = build.compat.inputs, target = build.compat.target;
+  const stem = `${platform}-${target}`, receipt = readBake(app, platform, target, directory);
+  if (build.trust !== 'production' || canonicalJson(receipt) !== canonicalJson(build.compat)) refuse('the completed deploy bake does not match its production receipt');
+  const plan = readFileSync(resolve(directory, `${stem}.plan`));
+  const graph = readFileSync(resolve(directory, `${stem}.artifacts.json`));
+  if (sha256(plan) !== receipt.embedded.plan.sha256 || plan.length !== receipt.embedded.plan.bytes
+    || canonicalJson(JSON.parse(graph)) !== canonicalJson(build.graph)) refuse('the completed deploy bake does not match its plan or graph');
+  for (const product of build.products) {
+    const bytes = readFileSync(product.path);
+    if (bytes.length !== product.bytes || sha256(bytes) !== product.sha256) refuse(`${product.path}: the completed deploy product changed; build again`);
+  }
+  const entries = bakedEntryAssets(directory, build, name => /^(plans|typescript|activities)\//.test(name));
+  const destination = resolve(run, 'bake');
+  mkdirSync(destination, { recursive: true });
+  for (const [suffix, bytes] of [['.json', JSON.stringify(receipt)], ['.plan', plan], ['.artifacts.json', graph]]) writeFileSync(resolve(destination, stem + suffix), bytes);
+  const entryRoot = resolve(destination, `${stem}.entries`);
+  rmSync(entryRoot, { recursive: true, force: true });
+  for (const { name, bytes } of entries) {
+    const path = resolve(entryRoot, name);
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, bytes);
+  }
+  writeFileSync(resolve(destination, `${stem}.build.json`), JSON.stringify(build) + '\n');
+}
+
 /** The web root on the JS target (LLP 1071 §7): the wasm bake's plan compiled into `<run>/web-js` (`host/web-js/build.mjs
  * --production`) with the bake's origin files, so the root and every stream share one plan; with no bake (`web` null,
  * LLP 1153 D3.6), the app's own Contract, with no envelope. The directory; a JS build that fails refuses the deploy. */
@@ -635,7 +669,7 @@ function bakeJs(app, run, web, exactRoot, sourceRoot) {
 export function bake(app, run, exactRoot, sourceRoot) {
   mkdirSync(run, { recursive: true });
   const web = resolve(run, 'web');
-  const env = sealedSourceEnv(sourceRoot, { EXACT_WEB_DIST: web, CARGO_TARGET_DIR: app.target, EXACT_UPDATE_TRUST: 'production', EXACT_BAKE_OUTPUT:resolve(run,'bake') });
+  const env = { ...deployBakeEnv(app, sourceRoot), EXACT_WEB_DIST: web };
   if (app.workspace === exactRoot) delete env.EXACT_APP_DIR;
   else env.EXACT_APP_DIR = app.dir;
   // An app's bake needs no wasm (`--bake`: the build script's outputs and the
@@ -647,6 +681,11 @@ export function bake(app, run, exactRoot, sourceRoot) {
   if (r.stdout) process.stderr.write(r.stdout);
   if (r.status !== 0) refuse(`the bake failed: host/web/build.mjs ${app.crate('web')} exited ${r.status ?? r.signal}`);
   if (!existsSync(resolve(web, 'exact.json'))) refuse(`the bake wrote no exact.json under ${web}`);
+  const receipt = resolve(env.EXACT_BAKE_OUTPUT, 'web-wasm32-unknown-unknown.build.json');
+  if (!existsSync(receipt)) refuse('the web build emitted no completed graph receipt');
+  const build = JSON.parse(readFileSync(receipt, 'utf8'));
+  if (build?.compat?.inputs?.platform !== 'web' || build.compat.target !== 'wasm32-unknown-unknown') refuse('the completed web receipt names another platform or target');
+  copyBake(app, run, build, env.EXACT_BAKE_OUTPUT);
   return web;
 }
 
@@ -687,9 +726,9 @@ export function holdBundles(bundle, builds, directory) {
 /** Compile the actual target/grants producer. Analysis artifacts have no
  * launchable production sequence; publication returns the receipt for a
  * subsequent strict release bake. */
-function buildFor(app, platform, sourceRoot, run) {
+export function buildFor(app, platform, sourceRoot, run) {
   const target = bakeTarget(platform);
-  const env = sealedSourceEnv(sourceRoot, { CARGO_TARGET_DIR: app.target, EXACT_UPDATE_TRUST: 'production', EXACT_BAKE_OUTPUT:resolve(run,'bake') });
+  const env = deployBakeEnv(app, sourceRoot);
   // By target, not platform: on a Mac the Linux host builds for this Mac's
   // own triple, and with another deployment target it and the macOS bake
   // rebuilt each other's crates (objc2 records MACOSX_DEPLOYMENT_TARGET).
@@ -700,7 +739,9 @@ function buildFor(app, platform, sourceRoot, run) {
     env[apple === 'ios' ? 'IPHONEOS_DEPLOYMENT_TARGET' : 'MACOSX_DEPLOYMENT_TARGET'] = apple === 'ios' ? '17.0' : '14.0';
     env.EXACT_APPLE_LINK = 'plan'; // a compatibility input: link as the production archive does (host/apple/link.mjs)
   }
-  return buildBake(app, platform, target, {env, analysis:true, profile: ['ios', 'macos'].includes(platform) ? appleProduction(app, platform).profile : 'release'});
+  const build = buildBake(app, platform, target, {env, analysis:true, profile: ['ios', 'macos'].includes(platform) ? appleProduction(app, platform).profile : 'release'});
+  copyBake(app, run, build, env.EXACT_BAKE_OUTPUT);
+  return build;
 }
 
 export { classifyArtifacts, cohortReceipt } from './app.mjs';

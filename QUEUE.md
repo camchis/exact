@@ -1520,14 +1520,6 @@ and the Linux headless CPU renderer without claiming display frame timing.
 
 - Shop Exact delivery sheet: content-to-sheet handoff needs continuous input/geometry measurement. Three iOS experiments (2026-09-20) matched short expansion/collapse but did not prove transfer, reversal or inertia; repeated source endpoint drags varied. They were preserved outside the repo and reverted to the staged baseline. Do not restart the same endpoint-fitting loop. Evidence: sibling shopify-exact/.evidence/content-handoff-experiments.json. Header coalesced-input admission remains repaired; Google Maps integration is separate.
 
-- Every deploy recompiles its app crates (2026-09-23, deploy lane): their build
-  scripts write the run's receipts into a per-run `EXACT_BAKE_OUTPUT` they watch, so
-  an unchanged deploy still reruns them and recompiles `caltrain-web`, both
-  `caltrain-apple`s and `caltrain-linux` with LTO; nothing else rebuilds, and a warm
-  Caltrain deploy took 265–450 s at load ~25. A receipt directory per Cargo cache,
-  copied into the run after the build, would let an unchanged deploy reuse them. The
-  `exact-filesystem` helper also rebuilds inside each deploy's capture, where its tool
-  target sits.
 
 - LLP 1024 §9 guardrails (Charlie, 2026-09-27): enforce the prop update size budget (a named refusal status) and flag per-frame prop churn in the journal. Neither is enforced yet.
   2026-10-23 (lane q1022/u): Parked. Commit cd3142c3b6 was withdrawn by git revert 266a861210 at the orchestrator's instruction. LLP 1024 §9 supplies no byte limit, and the web did not share the Apple refusal. The only aggregate sizes measured before the withdrawal were synthetic regression inputs: JSON.stringify({value: "é".repeat(32761) + "aa"}) is 65,536 UTF8 bytes; replacing that value with "é".repeat(32762) + "a" is 65,537 bytes. Bun TextEn
