@@ -1,6 +1,7 @@
 # Barcode browser test changes its expected pick ID on every poll
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The suite counts each pick once before it waits, matches the path the web host gives a pick (`<launch>-<pick>.<ext>`), and fails a still whose pick never appears.
 **Systems:** Barcode detection browser conformance tests
 **Author:** Codex
 **Date:** 2026-11-12
