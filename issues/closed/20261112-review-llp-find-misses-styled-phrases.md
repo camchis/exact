@@ -1,6 +1,7 @@
 # The LLP reader cannot find text that crosses a formatting boundary
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** Find searches a paragraph's, metadata field's or table cell's runs as one text and gives each run's part of a match its own span, with that run's style and link and the match's one ordinal.
 **Systems:** LLP terminal reader, page search
 **Author:** Codex
 **Date:** 2026-11-12
