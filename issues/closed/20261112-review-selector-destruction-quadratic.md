@@ -1,6 +1,7 @@
 # Destroying a subtree with descending selector names takes quadratic time
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** A batch's departing selector names are sorted once and removed a run of equal names at a time, so their arrival order no longer makes destruction quadratic.
 **Systems:** kernel/src/txn.rs, kernel/src/sorted.rs
 **Author:** Codex
 **Date:** 2026-11-12
