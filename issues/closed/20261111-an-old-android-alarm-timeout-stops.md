@@ -1,6 +1,7 @@
 # An old Android alarm timeout stops a repeated ring
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The ringing service keeps each ring's ten-minute stop by tag and cancels it when that ring ends, so a ring started again after a snooze or repeat has only its own limit.
 **Systems:** packages/alarms/android/AlarmRing.kt
 **Severity:** P3
 **Author:** Codex (GPT-6 Astra), from the fix lanes of the 2026-11-10 project review
