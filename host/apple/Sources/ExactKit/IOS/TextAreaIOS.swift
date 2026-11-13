@@ -441,13 +441,14 @@ package final class TextArea: UITextView {
         if text.isEmpty, !placeholder.isEmpty {
             // Where the first line of text sits, however short the content
             // box: what overflows the view is clipped, as the web clips a
-            // textarea's placeholder at its padding box. `draw(in:)` drops a
-            // line its rect cannot hold whole, so a short box drew nothing.
-            // The container starts in content coordinates; bounds.origin is
-            // the scroll offset.
+            // textarea's placeholder at its padding box. The container starts
+            // in content coordinates; bounds.origin is the scroll offset.
+            // String drawing drops a line its rect cannot hold whole, so the
+            // rect is one line taller than what the view shows.
             let box = CGRect(origin: .zero, size: bounds.size).inset(by: textContainerInset)
+            let font = font ?? UIFont.systemFont(ofSize: 16)
             var attributes: [NSAttributedString.Key: Any] = [
-                .font: font ?? UIFont.systemFont(ofSize: 16),
+                .font: font,
                 .foregroundColor: placeholderColor ?? ThemeRoles.color("placeholder", in: self, or: UIColor.placeholderText),
             ]
             attributes[.paragraphStyle] = typingAttributes[.paragraphStyle]
@@ -461,7 +462,10 @@ package final class TextArea: UITextView {
                 style.alignment = direction == .rightToLeft ? .right : .left
                 attributes[.paragraphStyle] = style
             }
-            (placeholder as NSString).draw(with: CGRect(x: box.minX, y: box.minY, width: max(0, box.width), height: .greatestFiniteMagnitude),
+            let paragraph = attributes[.paragraphStyle] as? NSParagraphStyle
+            let lineHeight = max(font.lineHeight, paragraph?.minimumLineHeight ?? 0) + (paragraph?.lineSpacing ?? 0)
+            let height = max(0, bounds.height - textContainerInset.top) + lineHeight
+            (placeholder as NSString).draw(with: CGRect(x: box.minX, y: box.minY, width: max(0, box.width), height: height),
                                            options: .usesLineFragmentOrigin, attributes: attributes, context: nil)
         }
     }
