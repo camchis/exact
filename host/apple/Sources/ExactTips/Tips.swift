@@ -4,19 +4,32 @@
 // time in document order (D3). TipKit remembers what the person closed and
 // what `tipDone` retired, by the element's id. An app's composition links
 // this module, and TipKit and SwiftUI with it, only when its plan binds `tip`.
-#if os(iOS) || os(macOS)
+// tvOS has no UIKit tip popover: there it installs nothing and links neither
+// framework, and no tip shows (D4).
 import ExactKit
+#if os(iOS) || os(macOS)
 import SwiftUI
 import TipKit
+#endif
 #if os(iOS)
 import UIKit
-#else
+#elseif os(macOS)
 import AppKit
 #endif
 
 public enum ExactTips {
-    public static func install() { TipLink.installed = TipHost() }
+    public static func install() {
+        #if os(iOS) || os(macOS)
+        TipLink.installed = TipHost()
+        #endif
+    }
 }
+
+#if os(iOS)
+extension TipUIPopoverViewController: TipPresentation {}
+#endif
+
+#if os(iOS) || os(macOS)
 
 /// A tip as an element writes it. Its title and message are already in the
 /// reader's language (`t()`), so they are shown verbatim.
@@ -90,6 +103,16 @@ final class TipHost: TipCapability {
         }
         order[ownerID] = tips.isEmpty ? nil : tips.map(\.content.id)
         place(ownerID)
+    }
+
+    func withdraw(owner: AnyObject) {
+        let ownerID = ObjectIdentifier(owner)
+        for (key, entry) in shown where key.owner == ownerID {
+            entry.watch?.cancel()
+            close(entry)
+            shown[key] = nil
+        }
+        order[ownerID] = nil
     }
 
     func state(owner: AnyObject) -> [[String: Any]] {

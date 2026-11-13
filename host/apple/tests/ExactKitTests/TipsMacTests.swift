@@ -71,6 +71,18 @@ final class TipsMacTests: XCTestCase {
         NSApp.windows.filter { $0.isVisible && String(describing: type(of: $0)).contains("Popover") }
     }
 
+    /// A session destroyed with its tip showing closes the popover and leaves
+    /// nothing of itself in the process's Tips host.
+    func testADestroyedSessionClosesItsTipAndKeepsNothing() throws {
+        let session = try boot("tips-mac-destroyed")
+        let presenter = session.presenter
+        waitFor("the Filter tip shows") { self.shows(session, "filter-tip", over: "bar item") }
+        session.destroy()
+        sessions.removeAll { $0 === session }
+        XCTAssertTrue(TipLink.installed?.state(owner: presenter).isEmpty == true, "no tip kept for the destroyed session")
+        waitFor("its popover closed") { self.popoverWindows().isEmpty }
+    }
+
     func testATipShowsOverItsToolbarItemThenItsElementAndRetiresWhenDone() throws {
         let session = try boot("tips-mac")
         let filter = try node(session, "filter"), add = try node(session, "add")
@@ -83,7 +95,8 @@ final class TipsMacTests: XCTestCase {
         // Pressing Filter is what its tip teaches: it is retired, and Add's shows.
         _ = Agent(session: session).tap(["id": Int(filter.id)])
         waitFor("the Add tip over its button") { self.shows(session, "add-tip", over: "element") }
-        XCTAssertEqual(tips(session)["filter-tip"]?["status"] as? String, "invalidated")
+        // TipKit records the invalidation in its own time; the next tip shows at once.
+        waitFor("TipKit retires the Filter tip") { self.tips(session)["filter-tip"]?["status"] as? String == "invalidated" }
         XCTAssertEqual(tips(session)["filter-tip"]?["reason"] as? String, "actionPerformed")
 
         _ = Agent(session: session).tap(["id": Int(add.id)])
