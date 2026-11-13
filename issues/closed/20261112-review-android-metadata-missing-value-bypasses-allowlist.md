@@ -1,6 +1,7 @@
 # Omitting a metadata value bypasses the Android manifest allowlist
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** A meta-data entry must be an object with a string name on the list and a string value equal to that name's, and both attributes are escaped when written.
 **Systems:** scripts/android-manifest.mjs, js/bake/src/typescript.mjs
 **Author:** Codex
 **Date:** 2026-11-12
