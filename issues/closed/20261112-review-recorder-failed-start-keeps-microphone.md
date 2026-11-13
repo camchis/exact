@@ -1,6 +1,7 @@
 # Recorder keeps the microphone active after recording fails to start
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** A `change` task gated on `failed(started)` stops the take's track, clears its identifiers and shows the start's failure code; a retry records on a new track.
 **Systems:** Recorder app, media capture lifecycle
 **Author:** Codex
 **Date:** 2026-11-12
