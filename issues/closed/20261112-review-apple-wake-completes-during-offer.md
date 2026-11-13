@@ -1,6 +1,7 @@
 # A synchronous package completion ends a shared Apple wake too early
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** `WakeStore.offer` marks each package waiting before posting its offer, lets go of one that declines, and decides whether the wake has ended only once every package has been offered, so a package that finishes during its offer neither ends the wake early nor stays waiting.
 **Systems:** host/apple
 **Author:** Codex
 **Date:** 2026-11-12
