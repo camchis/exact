@@ -1,6 +1,7 @@
 # Source compatibility signatures discard enum membership
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** A source signature records an enum as a string with its sorted members, nested or not, so a changed vocabulary, or a receipt that recorded the enum as a bare string, is a different shape and the update is refused.
 **Systems:** bake/src/receipt.rs, scripts/app.mjs
 **Author:** Codex
 **Date:** 2026-11-12

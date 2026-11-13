@@ -272,6 +272,45 @@ fn a_plan_graph_names_the_plans_own_format() {
     assert_eq!(requires["kernelSchema"], json!("0000000000000007"));
 }
 
+/// A source's signature names an enum's members, in parameters and nested
+/// results alike, so an installed source that answers the old vocabulary is
+/// not admitted under a plan that refuses it. Their order and an unrelated
+/// declaration do not change it.
+#[test]
+fn a_source_signature_names_its_enum_members() {
+    let sources = |members: &[&str], unrelated: bool| {
+        let mut builder = exact_plan::builder::PlanBuilder::new(0, 0);
+        if unrelated {
+            let number = builder.primitive(exact_plan::TypeKind::Number);
+            builder.record("Other", &[("n", number)]);
+        }
+        let members: Vec<String> = members.iter().map(|m| m.to_string()).collect();
+        let state = builder.string_enum(&members);
+        let list = builder.list(state);
+        let result = builder.record("Result", &[("state", state), ("seen", list)]);
+        builder.source("read", &[state], result);
+        let plan = builder.finish().unwrap().encode();
+        plan_graph(&plan, &json!({}), "aarch64-apple-darwin").unwrap()["sources"]["read"].clone()
+    };
+    let old = sources(&["old", "common"], false);
+    assert_eq!(
+        old["params"][0],
+        json!({"kind":"String","members":["common","old"]})
+    );
+    assert_eq!(
+        old["result"]["fields"][1]["type"]["item"],
+        json!({"kind":"String","members":["common","old"]})
+    );
+    assert_ne!(old, sources(&["new", "common"], false));
+    assert_eq!(old, sources(&["common", "old"], true));
+    let mut plain = exact_plan::builder::PlanBuilder::new(0, 0);
+    let string = plain.primitive(exact_plan::TypeKind::String);
+    plain.source("read", &[string], string);
+    let plain = plain.finish().unwrap().encode();
+    let plain = plan_graph(&plain, &json!({}), "aarch64-apple-darwin").unwrap();
+    assert_eq!(plain["sources"]["read"]["params"][0], json!("String"));
+}
+
 #[test]
 fn rust_plan_receipts_require_the_baked_wasmi_executor() {
     let mut builder = exact_plan::builder::PlanBuilder::new(0, 0);

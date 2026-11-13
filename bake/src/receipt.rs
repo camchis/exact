@@ -514,6 +514,20 @@ fn shape(plan: &exact_plan::Plan, ty: exact_plan::TypesId, depth: usize) -> Resu
             }).collect::<Result<Vec<Value>, String>>()?;
             json!({"kind":"Record","fields":fields})
         }
+        // An enum is a string row whose field names are its members. An
+        // installed source may answer only those, so a changed vocabulary is
+        // a different shape; the members are sorted, as their order means
+        // nothing. A receipt from before this recorded a bare "String" for
+        // an enum, which differs from this, so it is refused, not trusted.
+        TypeKind::String if !row.fields.is_empty() => {
+            let mut members: Vec<&str> = row
+                .fields
+                .iter()
+                .map(|id| plan.str(plan.field(id).name))
+                .collect();
+            members.sort_unstable();
+            json!({"kind":"String","members":members})
+        }
         _ => json!(format!("{:?}", row.kind)),
     })
 }
