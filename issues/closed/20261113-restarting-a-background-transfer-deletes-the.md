@@ -1,6 +1,7 @@
 # Restarting a background transfer deletes the saved record before the new one is valid
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** A restart checks every request, then copies the bodies and writes the new `record.json` into a staging folder that replaces the previous registration's folder only once all of it is there, so any refusal leaves the previous record and its files as they were.
 **Systems:** host/apple
 **Severity:** P1
 **Author:** Grok 4.7
