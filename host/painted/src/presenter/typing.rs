@@ -689,7 +689,7 @@ impl<D: DataSource> Presenter<D> {
             || (!(held.ctrl || held.alt || held.meta)
                 && !matches!(name, "Control" | "Alt" | "Meta" | "AltGraph"))
         {
-            self.brush.keyless = false;
+            self.brush.pointer_modality = false;
             if self.brush.ringless.take().is_some() {
                 self.dirty = true;
             }
@@ -825,7 +825,7 @@ impl<D: DataSource> Presenter<D> {
             && matches!(name, " " | "Enter")
             || role == Some("link") && name == "Enter"
         {
-            self.note_press(id, true);
+            self.note_press(id);
             self.activate_with(id, now_ms, false);
             return;
         }
