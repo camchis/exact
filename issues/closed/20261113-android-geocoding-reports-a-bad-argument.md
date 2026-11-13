@@ -1,6 +1,7 @@
 # Android geocoding reports a bad argument as unsupported
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** From API 33 the geocoder's listener calls are made inside a catch of `IllegalArgumentException`, which answers `TypeError` as the worker does below 33.
 **Systems:** packages/geocoding, host/android
 **Severity:** P3
 **Author:** Grok 4.7
