@@ -1195,7 +1195,6 @@ sits on that list carries the trade it would take.
 ## Cheap, any time
 
 - **Drive iOS scroll drags with a real touch** (2026-11-10): `SwipeScrollDragTests` passes on a simulator, but no `--touch platform` drive has flicked a scroller with `scrolldragstart` and `scrolldragend`. Check that a flick fires one start and one end with UIKit's velocity and target.
-- **`affected.mjs --run` stops at the first failing command** (2026-11-10): `status ||= spawnSync(…)` does not call `spawnSync` once `status` is set, so a failing Cargo command skips the game workspace and every Bun file, silently. Run each command, then keep the first failure's status.
 
 - **Android's `linear()` evaluator still has the old edge rules** (2026-10-19, the `linear()` reviews). `piecewise` in `host/android/canvas/src/main/java/dev/exact/canvas/Layers.kt` holds the outer stops and takes the earlier stop at a shared input; the engine's (`motion/src/easing.rs`, `piecewise`) answers as Chrome 155 does: at a stop's exact input, the last stop there; before the first stop or past the last, the outer segment extrapolated; before a first pair that shares an input, the second's output. Two that differ today: `linear(0 25%, 1 25%, 1)` at 0.1 (Chrome 1, Android 0) and `linear(0 25%, 1 75%)` at 0 (Chrome −0.5, Android 0). Port the rule and check it on a phone or the JVM.
 
