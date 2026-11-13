@@ -2101,6 +2101,15 @@ async calls do on the web: writes that must stay together go in one
 `transaction` (SQLite) or one operation. `clock settle` and a test's `reload`
 wait for the module's storage; `clock +N` names what is left (`background`,
 beside `inflight`), and `state.background` counts what landed and failed.
+If a native storage wait times out, its answer fails: its unsent operations
+are rejected, and so is any it issues afterwards except a lock's `unlock()`,
+which runs once the operation in flight completes. That operation, which can
+still write, keeps its place in the queue until it completes, delivered as
+background work; other answers' operations, let go or not, stay queued behind
+it. A worker placement, which has no background delivery, keeps waiting for
+that completion. Image work whose right to write was revoked releases its place
+immediately. Retiring a worker stops its wait and drops its unsent work;
+storage already submitted to the host may still complete.
 Every failed storage operation, every unhandled rejection and every `console`
 line of the module reaches `logs` (`storage failed: …`, `data: unhandled
 rejection: …`, `console: …`). Storage is refused, with its line, during module
