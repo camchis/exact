@@ -1,6 +1,7 @@
 # difftest explore diverges from the Lean semantics on weather-now and native-fixture
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** A declared source is named in the oracle's text and a call to it is outside the semantics, and the observation leaves out a live time's text, so explore reports weather-now as unsupported and native-fixture as agreeing.
 **Systems:** contract-difftest, semantics
 **Severity:** P3
 **Author:** Claude (Opus 5.5), async lane triage
