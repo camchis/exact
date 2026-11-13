@@ -253,6 +253,16 @@ final class HeaderMacTests: XCTestCase {
         let status = try node(p, 16)
         XCTAssertEqual(readout.accessibilityRole(), .group)
         XCTAssertEqual(readout.accessibilitySubrole()?.rawValue, "AXApplicationStatus")
+        // `tree --ax sync-status` reads the readout AppKit exposes as the authored status.
+        let bar = try XCTUnwrap(p.toolbar.accessibilityRoot)
+        let scoped = p.axElements(roots: [p.viewport, bar], scope: [16])["elements"] as? [[String: Any]] ?? []
+        let named = scoped.filter { $0["testId"] as? String == "sync-status" }
+        XCTAssertEqual(named.count, 1, "AppKit's item viewer is not the status: \(scoped)")
+        let element = try XCTUnwrap(named.first)
+        XCTAssertEqual(element["id"] as? UInt32, 16)
+        XCTAssertEqual(element["via"] as? String, "owner")
+        XCTAssertEqual(element["role"] as? String, "status")
+        XCTAssertEqual(element["name"] as? String, "Syncing")
         XCTAssertTrue(status.liveAnnouncementView === readout)
         XCTAssertTrue(status.liveSpeaks("Saved", launching: false), "a projected status still announces changes")
         p.apply(wireBatch([["op": "props", "id": 16, "set": ["text": "Saved"]]]))
@@ -778,6 +788,8 @@ final class HeaderMacTests: XCTestCase {
             + tab(171, "All", selected: true) + tab(172, "Unread") + tab(173, "Flagged")
             + [children(17, [171, 172, 173]), children(10, [11, 12, 17, 13, 14])]
         let p = fixture(extra: tablist)
+        // Leave room for AppKit's expanded segments.
+        window.setContentSize(NSSize(width: 1200, height: 400))
         var pressed: [UInt32] = []
         p.onPress = { pressed.append($0) }
         // As authored the page makes its own segmented control of it.
@@ -797,6 +809,20 @@ final class HeaderMacTests: XCTestCase {
         XCTAssertNil(p.segments.control(of: 17), "the bar shows it: the page makes no control of it")
         XCTAssertTrue(p.toolbar.adopts(try node(p, 17)))
         XCTAssertFalse(try node(p, 172).isHidden, "its tabs are hidden by the header alone")
+        let bar = try XCTUnwrap(p.toolbar.accessibilityRoot)
+        let ax = p.axElements(roots: [p.viewport, bar])
+        let projected = ax["elements"] as? [[String: Any]] ?? []
+        for (id, title) in [(UInt32(171), "All"), (UInt32(172), "Unread"), (UInt32(173), "Flagged")] {
+            let element = try XCTUnwrap(projected.first { $0["testId"] as? String == "tab-\(title)" }, "\(ax)")
+            XCTAssertEqual(element["id"] as? UInt32, id)
+            XCTAssertEqual(element["name"] as? String, title)
+            XCTAssertEqual(element["via"] as? String, "owner")
+            let object = try XCTUnwrap(p.toolbar.accessibilityItems.first { $0.id == id }?.object)
+            XCTAssertEqual(Presenter.axFacts(object)?.label, title)
+        }
+        XCTAssertEqual(projected.filter { $0["testId"] as? String == "add" }.count, 1, "the hidden authored header adds no duplicate")
+        let scoped = p.axElements(roots: [p.viewport, bar], scope: [172])["elements"] as? [[String: Any]] ?? []
+        XCTAssertEqual(scoped.compactMap { $0["testId"] as? String }, ["tab-Unread"])
 
         // A person's choice presses the tab. The app has not answered, so the group shows the app's tab still.
         group.selectedIndex = 1
@@ -1064,6 +1090,16 @@ final class HeaderMacTests: XCTestCase {
         XCTAssertEqual(page.frame.height, view.bounds.height, "and has the route's whole height")
         let add = try XCTUnwrap(p.toolbar.items[try named("add").id])
         let agent = Agent(session: session), addNode = try named("add")
+        let ax = try XCTUnwrap(agent.accessibilityElementsTree([:])["ax"] as? [String: Any])
+        let addElement = try XCTUnwrap((ax["elements"] as? [[String: Any]])?.first { $0["testId"] as? String == "add" })
+        XCTAssertEqual(addElement["id"] as? UInt32, addNode.id)
+        XCTAssertEqual(addElement["name"] as? String, "Add Book")
+        XCTAssertEqual(addElement["via"] as? String, "owner")
+        XCTAssertEqual((ax["coverage"] as? [String: Any])?["complete"] as? Bool, true)
+        for element in (ax["elements"] as? [[String: Any]] ?? []) where ["Back", "Forward"].contains(element["name"] as? String ?? "") {
+            XCTAssertTrue(element["id"] is NSNull, "system history buttons have no authored control")
+            XCTAssertNil(element["testId"])
+        }
         let row = try XCTUnwrap((agent.layout()["nodes"] as? [[String: Any]])?.first { $0["id"] as? Int == Int(addNode.id) })
         XCTAssertNil(row["radii"], "a system-owned toolbar item has no observable corner geometry")
         let target = try XCTUnwrap(agent.layout(["id": Int(addNode.id)])["node"] as? [String: Any])

@@ -86,6 +86,7 @@ export async function open({
   lineHeight = null,
   scale,
   port,
+  ax = false,
 } = {}) {
   browser ??= 'chrome';
   if (!['chrome', 'firefox', 'webkit'].includes(browser))
@@ -189,13 +190,13 @@ export async function open({
       : host === 'host'
         ? await openStdio({ host: 'host', plan, env, app, session, onProcess })
         : host === 'host-ios'
-          ? await openIOS({ plan, app, env, session, hostFixture: true, touch, onProcess })
+          ? await openIOS({ plan, app, env, session, hostFixture: true, touch, ax, onProcess })
           : host === 'linux' || host === 'android'
             ? await openStdio({ host, plan, size: size ?? VIEWPORT, env, app, reader, onProcess })
             : host === 'windows'
               ? await openStdio({ host: 'windows', plan, size: size ?? VIEWPORT, env, app, onProcess })
               : host === 'ios'
-                ? await openIOS({ plan, env, app, size, touch, onProcess })
+                ? await openIOS({ plan, env, app, size, touch, ax, onProcess })
                 : await openWeb({
                     browser,
                     plan,

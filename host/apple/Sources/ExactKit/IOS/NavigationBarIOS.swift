@@ -781,6 +781,7 @@ extension NavigationHost {
         control.accessibilityIdentifier = list?.props["testId"]
         control.segmentLabels = tabs.map(SegmentHost.segmentLabel)
         control.segmentIDs = tabs.map { $0.props["testId"] }
+        control.segmentOwners = tabs.map(\.id)
         control.segmentUnavailable = tabs.map { $0.disabled || $0.ariaUnavailable }
         for (index, tab) in tabs.enumerated() { control.setEnabled(!tab.disabled, forSegmentAt: index) }
         segments.fit(titles)

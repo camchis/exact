@@ -4869,7 +4869,10 @@ text (`tap "Save draft"`); a name several views share refuses, naming them.
 `select`'s option by its `value`, and a date, time, range or checkbox takes
 its value the same way, in a drive or a test (a tap does not open a native
 `select`'s menu under the driver).
-`tree --ax` prints the platform's accessibility tree, as VoiceOver would read it.
+`tree --ax` prints the platform's accessibility properties without claiming
+VoiceOver's reading order. An iOS simulator drive containing `tree --ax` enables
+UIKit's accessibility runtime before launch and restores the simulator's setting
+after launch. Library drives request this with `open({host: 'ios', ax: true})`.
 Use `tree` to find targets, `state` for data and delivery, `layout` for
 geometry, `perf` for the work a drive cost (`perf <target> during "<op>" …`: per
 plan site, evaluations, unchanged results, instances created and retired), and

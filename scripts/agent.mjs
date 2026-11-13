@@ -342,6 +342,7 @@ export async function main(argv, injected = {}) {
       return await (injected.open ?? open)({
         host,
         browser,
+        ax: ops.some(line => /^\s*tree\s+--ax(?:\s|$)/.test(line)),
         env: {
           ...(fresh ? { EXACT_AGENT_STORAGE_FRESH: '1' } : {}),
           ...(flags.login ? { EXACT_LOGIN_LAUNCH: flags.login } : {}),
