@@ -42,7 +42,7 @@ import { installedFileDependencies } from './file-dependencies.mjs';
 import { startSweep } from './sweep.mjs';
 import { WEB_TOOLCHAIN, WEB_STD, WEB_SIZE, WEB_RUSTFLAGS, webToolchainEnv, cargoEnvironment,
   NO_WORKSPACE, androidCargo, appleCargo, authoredWorkspace, cargoDiagnosticsCommand,
-  cargoOnPath, knownWorkspace, rememberWorkspace, shellsDir, targetRustflags } from './cargo-check.mjs';
+  cargoOnPath, claimTargetCrates, knownWorkspace, rememberWorkspace, shellsDir, targetRustflags } from './cargo-check.mjs';
 export { WEB_TOOLCHAIN, WEB_STD, WEB_SIZE, webToolchainEnv, cargoEnvironment, cargoOnPath } from './cargo-check.mjs';
 import { ensureShells } from './app-shells.mjs';
 import { installProblems } from './install-page.mjs';
@@ -481,7 +481,11 @@ export function resolveApp(nameOrCrate) {
   // verb reads `dir` and `target` and runs no Cargo (D2.1).
   let rusted = false;
   const rust = () => {
-    if (!rusted) { rusted = true; if (generated) { ensureShells(dir, manifest, name); checkOutsideLock(workspace); } else checkLock?.(); }
+    if (rusted) return workspace;
+    rusted = true;
+    // A deploy builds its capture of the app where the app builds (scripts/deploy.mjs `materializeSnapshot`).
+    if (process.env.CARGO_TARGET_DIR && own !== ROOT && !process.env.EXACT_DEPLOY_CAPSULE) claimTargetCrates(target, name, dir);
+    if (generated) { ensureShells(dir, manifest, name); checkOutsideLock(workspace); } else checkLock?.();
     return workspace;
   };
   startSweep(target);

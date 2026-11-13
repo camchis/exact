@@ -1,6 +1,7 @@
 # Two apps whose crates share a name and a CARGO_TARGET_DIR make each other's Apple builds stale and busy
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** An app outside exact2's workspace records its crate names in a shared `CARGO_TARGET_DIR` at its first build, and another app whose crates have the same names is refused there, naming both directories, while the first still exists.
 **Systems:** scripts/app.mjs (`resolveApp`, `assertOwnTarget`, `appleCargoClaims`, `claimBuildOutput`), scripts/agent-launch.mjs (`receiptChanges`), host/apple/build.mjs
 **Severity:** P2
 **Author:** Claude (Opus 5.5), from Exact diaries sent 2026-11-11 to 2026-11-13

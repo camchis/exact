@@ -4,7 +4,7 @@ import { spawnSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
-import { targetRustflags } from './cargo-check.mjs';
+import { claimTargetCrates, targetRustflags } from './cargo-check.mjs';
 import { wasmRemapFlags } from './app.mjs';
 
 // Cargo refuses to merge an array given with --config into a configured string ("expected string, but found array"),
@@ -63,3 +63,18 @@ test('a wasm build takes its remap over the app\'s configured wasm rustflags, a 
     rmSync(dir, { recursive: true, force: true });
   }
 }, 300000);
+
+test('two apps whose crates share names cannot share a target directory while both exist', () => {
+  const dir = mkdtempSync(resolve(tmpdir(), 'exact-target-crates-'));
+  try {
+    const target = resolve(dir, 'shared'), one = resolve(dir, 'one/budget'), two = resolve(dir, 'two/budget');
+    for (const app of [one, two]) { mkdirSync(app, { recursive: true }); writeFileSync(resolve(app, 'app.contract'), ''); }
+    claimTargetCrates(target, 'budget', one);
+    claimTargetCrates(target, 'budget', one);
+    claimTargetCrates(target, 'other', two);
+    assert.throws(() => claimTargetCrates(target, 'budget', two), new RegExp(`holds the crates budget-\\* of the app in ${one}, and the app in ${two} names its crates the same`));
+    rmSync(one, { recursive: true });
+    claimTargetCrates(target, 'budget', two);
+    assert.equal(readFileSync(resolve(target, '.exact-crates/budget'), 'utf8'), `${two}\n`);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
