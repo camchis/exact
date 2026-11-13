@@ -1,6 +1,7 @@
 # The web build accepts `crypto.getRandomValues()` at a data module's top level, which every native bake refuses
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** 879be020f makes the web JS target refuse direct and synchronous helper crypto draws during module initialization, and module-body async continuations and queued Promise reactions outside an answer, before consuming entropy; draws after an await inside an answer work.
 **Systems:** host/web-js/ts-fetch.js, js/src/prelude.js (`answerOnly`), js/bake
 **Severity:** P3
 **Author:** Claude (Opus 5.5), from Exact diaries sent 2026-11-11 to 2026-11-13
