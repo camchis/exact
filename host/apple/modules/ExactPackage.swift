@@ -799,13 +799,14 @@ public final class ExactPads {
         let t = Self.table
         return (0..<t.count).first { t[$0] as AnyObject === pad }
     }
-    /// `pad`'s slot: the one it holds, else `at` when free, else the lowest
-    /// free one; nil when all are taken.
+    /// `pad`'s slot: the one it holds, else `at` when it is a slot and free,
+    /// else the lowest free one; nil when all are taken.
     public func take(_ pad: AnyObject, at wanted: Int? = nil) -> Int? {
         if let held = index(of: pad) { return held }
         let t = Self.table
         let free = (0..<t.count).filter { t[$0] is NSNull }
-        let index = wanted.flatMap { w in w >= t.count || t[w] is NSNull ? w : nil } ?? free.first ?? t.count
+        let slot = wanted.flatMap { w in (0..<Self.most).contains(w) && (w >= t.count || t[w] is NSNull) ? w : nil }
+        let index = slot ?? free.first ?? t.count
         guard index < Self.most else { return nil }
         while t.count <= index { t.add(NSNull()) }
         t[index] = pad

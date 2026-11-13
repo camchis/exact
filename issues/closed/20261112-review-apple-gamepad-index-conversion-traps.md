@@ -1,6 +1,7 @@
 # Apple gamepad requests can trap while converting an out-of-range index
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** A request's index converts with Int(exactly:), so one that is not a whole slot answers NotFoundError, and the slot table takes only a requested slot in its range.
 **Systems:** Gamepad package, Apple pad registry
 **Author:** Codex
 **Date:** 2026-11-12
