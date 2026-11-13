@@ -1,6 +1,7 @@
 # Caltrain's wasm runtime does not adopt its served document
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** A launch seeds its own tab at the root visit of its chain, so a query on a root location (the agent's `?agent=1`, or any other) spends no visit id, and the document rendered at `/?agent=1` is the tree the runtime launched at `/` makes and adopts.
 **Systems:** host/web (served document, adoption), host/web/tests/document.test.mjs
 **Severity:** P2
 **Author:** Claude (Opus 5.5), async lane triage
