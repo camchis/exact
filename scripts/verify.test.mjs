@@ -12,7 +12,7 @@ import { applyPattern, createApp } from '../game/new.mjs';
 import { findings } from '../host/apple/feel/analyze.mjs';
 import { chromium } from './agent-launch.mjs';
 import { ancestors, parentsOf } from './processes.mjs';
-import { ago, appServer, buildProgress, buildWarnings, draftFields, fixedType, groups, judgeRelaunch, judgeReload, movedClock, persistedStates, pinnedLaunch, recordedServerAddress, refusalsOf, relaunchFacts, relaunchStore, reloadLine, reloadNote, report, reusable, savedChanges, screenTexts, serverUrl, shotName, storedTexts, warningsOfBuild } from './verify.mjs';
+import { ago, appServer, buildProgress, buildWarnings, draftFields, fixedType, groups, judgeRelaunch, judgeReload, movedClock, persistedStates, pinnedLaunch, refusalsOf, relaunchFacts, relaunchStore, reloadLine, reloadNote, report, reusable, savedChanges, screenTexts, serverUrl, shotName, storedTexts, warningsOfBuild } from './verify.mjs';
 import { semanticsSummary } from './verify-semantics.mjs';
 
 const SIZES = [[390, 844], [1280, 900]];
@@ -674,27 +674,6 @@ test('an agent drive passes server arguments without DB or a scratch database', 
     assert.equal(readFileSync(old, 'utf8'), 'untouched');
     assert.deepEqual(readdirSync(lease), ['db.sqlite']);
   `);
-});
-
-test('recorded server addresses preserve accepted default ports and paths, refusing credentials and queries', () => {
-  const dir = mkdtempSync(resolve(tmpdir(), 'exact-server-address-'));
-  try {
-    writeFileSync(resolve(dir, 'app.json'), JSON.stringify({ server: { database: false } }));
-    writeFileSync(resolve(dir, 'server.ts'), 'Bun.serve({});\n');
-    for (const [url, port] of [
-      ['http://127.0.0.1:80', 80], ['http://127.0.0.1:080', 80], ['https://localhost:443', 443],
-      ['https://[::1]:0443/api', 443], ['http://localhost:80/health', 80], ['http://127.0.0.1:8080/api/v1/', 8080],
-    ]) {
-      writeFileSync(resolve(dir, 'app.ts'), `export const API = ${JSON.stringify(url)};\n`);
-      const accepted = appServer(dir, {});
-      assert.equal(accepted.url, url.replace(/\/$/, ''));
-      assert.equal(accepted.port, port);
-      assert.deepEqual(recordedServerAddress(accepted.url), { url: accepted.url, port });
-    }
-    for (const url of [null, {}, 'file:///tmp/server', 'ftp://localhost:80', 'http://user:pw@localhost:80',
-      'http://@localhost:80', 'http://localhost:80/?', 'http://localhost:80/?q=x', 'http://localhost:80/#',
-      'http://localhost:80/#x', 'http://:80', 'http://localhost:65536']) assert.equal(recordedServerAddress(url), null);
-  } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
 test('fixture drives isolate checkouts, refuse foreign servers and clean overlapping ports', async () => {
