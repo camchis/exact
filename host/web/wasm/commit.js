@@ -611,9 +611,15 @@ function apply(batch) {
           } else if (op.name === "requestPictureInPicture" || op.name === "exitPictureInPicture") {
             const why = "the wasm target does not float an image; the JS target does", el = op.name === "requestPictureInPicture" ? liveById(String(op.args?.[0] ?? "")) : null;
             log(`${op.name} refused: ${why}`);
-            /* the image hears the refusal after this batch, as its pictureinpictureerror (LLP 1042 §9) */
+            /* the image hears the refusal after this batch, as its pictureinpictureerror (LLP 1042 §9); a reload in
+               between reuses view ids, so only the same element in the same incarnation hears it */
             if (el?.dataset.view) {
-              setTimeout(() => send(host.wasm.exact_dispatch(Number(el.dataset.view), 19, writeIn("pictureinpictureerror\n" + why), now())));
+              const view = Number(el.dataset.view), asked = host.incarnation;
+              setTimeout(() => {
+                if (host.incarnation === asked && views.get(view) === el && !retiredViews.has(el)) {
+                  send(host.wasm.exact_dispatch(view, 19, writeIn("pictureinpictureerror\n" + why), now()));
+                }
+              });
             }
           } else if (op.name === "requestFullscreen") {
             const el = [...views.values()].find((el) => el.id === op.args?.[0] && el.exactMedia);

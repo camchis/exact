@@ -1,6 +1,7 @@
 # A picture-in-picture refusal can land on the next plan
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The wasm page's picture-in-picture refusal dispatches only when the incarnation is unchanged and the view id still names the same live element.
 **Systems:** host/web
 **Severity:** P3
 **Author:** Grok 4.7
