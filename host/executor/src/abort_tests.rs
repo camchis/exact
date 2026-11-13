@@ -103,7 +103,7 @@ fn an_app_aborted_queued_write_is_dropped_unsent() {
 
 /// An app's abort closes a held write's connection on a real transport: the
 /// server sees it end, never answered. `host` makes each owner's transport.
-pub(crate) fn an_aborted_held_write_closes_its_connection(host: impl Fn() -> ibex2::host::Host) {
+fn an_aborted_held_write_closes_its_connection(host: impl Fn() -> ibex2::host::Host) {
     use std::io::Read;
     let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
     let port = listener.local_addr().unwrap().port();
@@ -164,4 +164,19 @@ pub(crate) fn an_aborted_held_write_closes_its_connection(host: impl Fn() -> ibe
 #[test]
 fn an_app_aborted_held_write_closes_its_connection_on_the_platform_transport() {
     an_aborted_held_write_closes_its_connection(ibex2::host::Host::new);
+}
+
+/// The Linux host's own transport (rustls), which a Mac's tests reach
+/// through ibex2's `portable-http`.
+#[test]
+fn an_app_aborted_held_write_closes_its_connection_on_rustls() {
+    an_aborted_held_write_closes_its_connection(portable_host);
+}
+
+/// The Linux host's transports: rustls over ureq and the portable WebSocket.
+pub(crate) fn portable_host() -> ibex2::host::Host {
+    ibex2::host::Host::with_transport(Box::new(ibex2::transport::RustlsHttpTransport::new()))
+        .with_socket_transport(Box::new(
+            ibex2::transport::websocket::TcpSocketTransport::new(),
+        ))
 }

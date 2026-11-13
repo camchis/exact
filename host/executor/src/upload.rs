@@ -164,7 +164,7 @@ impl Core {
     /// The uploads let go (no longer `held`) that had begun to go out,
     /// each told once, for the host to hand the runner after it let their
     /// tickets go (`Runner::uploads_started`, LLP 1016.000 D10).
-    pub(crate) fn let_go_started(&self, held: impl Fn(u64) -> bool) -> Vec<u64> {
+    pub fn let_go_started(&self, held: impl Fn(u64) -> bool) -> Vec<u64> {
         let mut budget = self.shared.uploads.0.lock().unwrap();
         let gone: Vec<u64> = budget
             .started

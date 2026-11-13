@@ -9,7 +9,13 @@ fn socket_protocols_reach_the_peer_and_report_the_selection() {
     protocols(ibex2::host::Host::new);
 }
 
-pub(crate) fn protocols(host: fn() -> ibex2::host::Host) {
+#[test]
+#[ignore = "async lane: real WebSocket handshake"]
+fn socket_protocols_on_portable_transport() {
+    protocols(crate::tests::abort::portable_host);
+}
+
+fn protocols(host: fn() -> ibex2::host::Host) {
     for (offer, selected, accepted) in [
         (vec!["chat.v2", "Chat.v2", "chat.v1"], Some("chat.v1"), true),
         (vec![], None, true),

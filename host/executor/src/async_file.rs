@@ -348,7 +348,7 @@ impl Drop for ReaderEnded {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::executor::core::async_tests::{core, Script};
+    use crate::async_tests::{core, Script};
 
     #[test]
     fn one_sizing_decision_keeps_every_successor_in_the_park_refusal() {

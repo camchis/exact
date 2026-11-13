@@ -63,9 +63,11 @@ pub(crate) fn admit_one_shot(
 pub(crate) fn release_one_shot(_shared: &Shared, _ticket: u64) {}
 
 impl Core {
-    pub(crate) fn allow_processes(&self) {}
+    /// Nothing: this target starts no programs.
+    pub fn allow_processes(&self) {}
 
-    pub(crate) fn work_clock(&self) -> Option<Arc<dyn exact_runner::WorkClock>> {
+    /// None: there is no process work to keep a clock for.
+    pub fn work_clock(&self) -> Option<Arc<dyn exact_runner::WorkClock>> {
         None
     }
 }

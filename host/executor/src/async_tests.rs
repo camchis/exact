@@ -437,7 +437,7 @@ fn the_suite_passes_on_the_asynchronous_core() {
         return;
     }
     let status = std::process::Command::new(std::env::current_exe().unwrap())
-        .args(["executor", "--skip", "async_tests", "-q"])
+        .args(["--skip", "async_tests", "-q"])
         .env("EXACT_HTTP_ASYNC", "1")
         .status()
         .unwrap();

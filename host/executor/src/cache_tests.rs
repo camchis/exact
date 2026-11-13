@@ -102,8 +102,7 @@ impl Server {
         let owners = (0..WORKERS)
             .map(|_| {
                 Some(
-                    crate::executor::core::tests::lane_host()
-                        .endow(ibex2::grant::GrantSet::parse(grants).unwrap()),
+                    crate::tests::lane_host().endow(ibex2::grant::GrantSet::parse(grants).unwrap()),
                 )
             })
             .collect();
@@ -114,7 +113,7 @@ impl Server {
             Box::new(move || {
                 let _ = wake.send(());
             }),
-            Arc::new(crate::executor::core::tests::lane_host),
+            Arc::new(crate::tests::lane_host),
             asynchronous.then(asynch_lanes),
         );
         if cache {

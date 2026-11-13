@@ -263,7 +263,7 @@ impl Core {
     /// admit the requests held behind it, in order. One past a limit is
     /// refused, raising the barrier again over the rest: its ticket and
     /// reason are returned for the host to record (`refuse_request`).
-    pub(in super::super) fn resume_ordered(&self) -> Vec<(u64, &'static str)> {
+    pub fn resume_ordered(&self) -> Vec<(u64, &'static str)> {
         let (fenced, automatic) = {
             let mut state = self.shared.state.lock().unwrap();
             let automatic = !state.ordered_barrier;

@@ -67,10 +67,14 @@ pub(super) const IN_FLIGHT: usize = super::build_number(option_env!("EXACT_HTTP_
 /// reports `h2` or `h3` (D3): URLSession's own limit, so it never queues.
 const PER_ORIGIN: usize = 6;
 /// The base set: two starters, two finishers, the timer, the disposer (D4).
-pub(super) const THREADS: usize = 6 + if cfg!(any(not(target_vendor = "apple"), test)) {
-    1 + super::INDEPENDENT
+const BASE: usize = 6;
+/// The base set and the workers of [`portable_lanes`].
+pub(super) const PORTABLE_THREADS: usize = BASE + 1 + super::INDEPENDENT;
+/// The threads [`asynch_lanes`] take.
+pub(super) const THREADS: usize = if cfg!(any(not(target_vendor = "apple"), test)) {
+    PORTABLE_THREADS
 } else {
-    0
+    BASE
 };
 
 /// A job's run: its ticket and generation.
@@ -939,12 +943,18 @@ pub(super) fn asynch_lanes() -> Lanes {
     }
     #[cfg(any(not(target_vendor = "apple"), test))]
     {
-        Arc::new(|lane, bindings: &ibex2::host::Bindings, budget| {
-            let threads = if lane == 0 { 1 } else { super::INDEPENDENT };
-            let workers = Arc::new(workers::Workers::new(threads, budget));
-            (Arc::new(bindings.fetch.blocking_adapter(workers)), true)
-        })
+        portable_lanes()
     }
+}
+
+/// Each lane's transport the owner's blocking one, on bounded, reserved
+/// workers.
+pub(super) fn portable_lanes() -> Lanes {
+    Arc::new(|lane, bindings: &ibex2::host::Bindings, budget| {
+        let threads = if lane == 0 { 1 } else { super::INDEPENDENT };
+        let workers = Arc::new(workers::Workers::new(threads, budget));
+        (Arc::new(bindings.fetch.blocking_adapter(workers)), true)
+    })
 }
 
 /// What a job is to the starter.

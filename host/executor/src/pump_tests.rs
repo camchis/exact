@@ -1,5 +1,5 @@
 use super::*;
-use crate::executor::pump::Pump;
+use crate::pump::Pump;
 
 #[test]
 fn a_bounded_pump_keeps_the_ready_lanes_alternating() {

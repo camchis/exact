@@ -647,7 +647,7 @@ impl EventStream {
 #[path = "bytes.rs"]
 mod bytes;
 #[path = "listen.rs"]
-pub(crate) mod listen;
+pub mod listen;
 #[path = "longpoll.rs"]
 mod long_poll;
 #[path = "socket.rs"]
@@ -665,4 +665,4 @@ mod timeout_tests;
 
 #[cfg(test)]
 #[path = "protocol_tests.rs"]
-pub(crate) mod protocol_tests;
+mod protocol_tests;

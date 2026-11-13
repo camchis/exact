@@ -26,10 +26,8 @@ thread_local! {
 #[derive(Default)]
 pub(crate) struct Budget(pub(super) Mutex<Vec<super::super::WorkerSlot>>);
 
-#[cfg(any(not(target_vendor = "apple"), test))]
 pub(super) use portable::Workers;
 
-#[cfg(any(not(target_vendor = "apple"), test))]
 mod portable {
     use super::*;
     use ibex2::stdlib::fetch_async::{BoundedWorkerPool, ReservedWorker, WorkerService};
@@ -79,14 +77,14 @@ mod portable {
 
     #[cfg(test)]
     mod tests {
-        use super::super::super::super::{worker_budget, Core, WorkerSlot};
+        use super::super::super::super::{Core, WorkerBudget, WorkerSlot};
         use super::*;
         use std::sync::{atomic::Ordering, mpsc};
         use std::time::{Duration, Instant};
 
         #[test]
         fn portable_slots_live_until_worker_exit_and_failed_creation_never_retries() {
-            let live_workers = worker_budget();
+            let live_workers = WorkerBudget::Thread.live();
             assert_eq!(live_workers.load(Ordering::Acquire), 0);
             let wait_for_exit = || {
                 let deadline = Instant::now() + Duration::from_secs(10);

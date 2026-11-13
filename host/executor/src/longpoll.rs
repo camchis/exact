@@ -45,7 +45,7 @@ enum Asked {
 impl super::super::Core {
     /// Each long poll's backoff wait, by its stream ticket, read live: what
     /// `state.streams` shows as `retrying`.
-    pub(crate) fn retry_reader(&self) -> exact_runner::RetryReader {
+    pub fn retry_reader(&self) -> exact_runner::RetryReader {
         let shared = self.shared.clone();
         Arc::new(move |ticket| {
             let retrying = shared.retrying.lock().unwrap();

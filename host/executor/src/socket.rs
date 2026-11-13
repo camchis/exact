@@ -254,13 +254,13 @@ fn frame(shared: &Shared, ticket: u64, message: Message, limit: usize) -> Frame 
 impl Core {
     /// Each listener's address and open connections, by its stream ticket,
     /// read live (LLP 1133.005 D12).
-    pub(crate) fn listen_reader(&self) -> exact_runner::listen::ListenReader {
+    pub fn listen_reader(&self) -> exact_runner::listen::ListenReader {
         super::listen::reader(self.shared.clone())
     }
 
     /// Each open socket's buffered bytes, by its stream ticket, read live
     /// from its transport: the runner's snapshot at each turn's start.
-    pub(crate) fn socket_reader(&self) -> exact_runner::SocketReader {
+    pub fn socket_reader(&self) -> exact_runner::SocketReader {
         let shared = self.shared.clone();
         std::sync::Arc::new(move |ticket| {
             let sockets = shared.sockets.lock().unwrap();
@@ -276,7 +276,7 @@ impl Core {
     /// must take its share without its buffer passing 1 MiB or 256 frames,
     /// or nothing is sent. For each socket, the frames it accepted and the
     /// bytes it now buffers.
-    pub(crate) fn socket(&self, batch: &SocketSend) -> Result<Vec<(u64, u64, u64)>, String> {
+    pub fn socket(&self, batch: &SocketSend) -> Result<Vec<(u64, u64, u64)>, String> {
         // A listener's, by connection (LLP 1133.005 D6).
         if batch.ops.iter().any(|(_, _, op)| op.connection().is_some()) {
             return super::listen::send(&self.shared, batch);

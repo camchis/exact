@@ -2,7 +2,7 @@
 use super::super::{
     async_tests::{core, upload, Files, Script},
     tests::{job, one_at_a_time},
-    worker_budget, Core, RequestClass,
+    Core, RequestClass, WorkerBudget,
 };
 use super::*;
 use std::sync::mpsc::{channel, Receiver};
@@ -430,7 +430,7 @@ impl ibex2::stdlib::fetch::Transport for Held {
 
 #[test]
 fn retained_handles_keep_no_machine_thread_or_permit_after_retirement() {
-    let live_workers = worker_budget();
+    let live_workers = WorkerBudget::Thread.live();
     let (entered, started) = channel();
     let release = Arc::new((Mutex::new(false), std::sync::Condvar::new()));
     let owners = (0..2)
@@ -448,7 +448,7 @@ fn retained_handles_keep_no_machine_thread_or_permit_after_retirement() {
         owners,
         GRANTS,
         Box::new(|| {}),
-        Arc::new(crate::executor::core::tests::lane_host),
+        Arc::new(crate::tests::lane_host),
         Some(super::asynch_lanes()),
     );
     let waker = core.waker();

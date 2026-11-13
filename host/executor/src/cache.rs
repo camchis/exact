@@ -189,8 +189,9 @@ impl Cache {
 }
 
 impl Core {
-    #[allow(dead_code)] // The render host leaves its shared core uncached (LLP 1162 D4).
-    pub(in super::super) fn enable_http_cache(&self) {
+    /// Keep an HTTP cache for the app's reads; the render host leaves its
+    /// core uncached (LLP 1162 D4).
+    pub fn enable_http_cache(&self) {
         self.shared.state.lock().unwrap().cache = Some(Cache::new(self.grants.clone()));
     }
 }

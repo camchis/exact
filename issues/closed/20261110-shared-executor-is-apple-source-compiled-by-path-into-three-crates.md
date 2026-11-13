@@ -1,6 +1,7 @@
 # The executor three hosts share is source under `host/apple`, compiled by `#[path]` into each
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The executor is the crate `exact-executor` (`host/executor`), which the Apple, Linux and render hosts depend on through Cargo; a host passes its `WorkerBudget` to `Core`'s constructors, the process budget is one static per process, and the tests run once, in that crate.
 **Systems:** host/apple/src/executor_core.rs, host/linux/src/executor.rs, host/render/src/executor.rs, scripts/affected.mjs
 **Severity:** P3
 **Author:** Claude (Fable 5.2), from the 2026-11-10 project review

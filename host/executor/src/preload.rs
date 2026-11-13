@@ -176,25 +176,21 @@ pub enum Observation {
 /// A bounded, nonblocking launch measurement sink.
 pub type Observer = Arc<dyn Fn(&str, Observation) + Send + Sync>;
 
+/// `changed`, `threads` and `exited` serve tests, a host's among them, which
+/// reach them through [`Control`]: they are compiled into every build.
 struct Location {
     state: Mutex<Destination>,
-    #[cfg(test)]
     changed: Condvar,
-    #[cfg(test)]
     threads: Mutex<usize>,
-    #[cfg(test)]
     exited: Condvar,
 }
-#[cfg(test)]
 struct ThreadGuard(Arc<Location>);
-#[cfg(test)]
 impl ThreadGuard {
     fn new(location: &Arc<Location>) -> Self {
         *location.threads.lock().unwrap() += 1;
         Self(location.clone())
     }
 }
-#[cfg(test)]
 impl Drop for ThreadGuard {
     fn drop(&mut self) {
         *self.0.threads.lock().unwrap() -= 1;
@@ -254,11 +250,8 @@ impl Preloads {
         let count = cache.preloads.len();
         let destination = Arc::new(Location {
             state: Mutex::new(Destination::Staging(Box::new(cache))),
-            #[cfg(test)]
             changed: Condvar::new(),
-            #[cfg(test)]
             threads: Mutex::new(0),
-            #[cfg(test)]
             exited: Condvar::new(),
         });
         let (send, receive) = mpsc::channel();
@@ -310,12 +303,10 @@ impl Control {
         };
         let destination = self.destination.clone();
         let send = self.send.clone();
-        #[cfg(test)]
         let thread_guard = ThreadGuard::new(&destination);
         let spawned = std::thread::Builder::new()
             .name("exact-preload".into())
             .spawn(move || {
-                #[cfg(test)]
                 let _guard = thread_guard;
                 run(&destination, &send, receive, &host)
             });
@@ -333,20 +324,21 @@ impl Control {
         });
         let _ = self.send.send(Message::Tick);
     }
-    #[cfg(test)]
-    pub(crate) fn test_clock(&self, clock: Arc<dyn Fn() -> Instant + Send + Sync>) {
+    /// A test's clock in place of the monotonic one.
+    pub fn test_clock(&self, clock: Arc<dyn Fn() -> Instant + Send + Sync>) {
         update(&self.destination, |cache| cache.clock = clock);
     }
-    #[cfg(test)]
-    pub(crate) fn test_tick(&self) {
+    /// Expire what is due now, as the launch thread's tick does: a test's.
+    pub fn test_tick(&self) {
         update(&self.destination, expire);
     }
-    #[cfg(test)]
-    pub(crate) fn thread_count(&self) -> usize {
+    /// The launch threads alive: a test's.
+    pub fn thread_count(&self) -> usize {
         *self.destination.threads.lock().unwrap()
     }
-    #[cfg(test)]
-    pub(crate) fn wait_definitions(&self) {
+    /// Wait up to ten seconds for the launch definitions to be read, and
+    /// panic if they are not: a test's.
+    pub fn wait_definitions(&self) {
         let state = self.destination.state.lock().unwrap();
         let (state, timeout) = self
             .destination
@@ -360,8 +352,9 @@ impl Control {
         drop(state);
         assert!(!timeout.timed_out(), "launch definitions did not finish");
     }
-    #[cfg(test)]
-    pub(crate) fn wait_ready(&self, count: usize) {
+    /// Wait up to ten seconds for `count` complete launch replies, and
+    /// panic if they do not come: a test's.
+    pub fn wait_ready(&self, count: usize) {
         let state = self.destination.state.lock().unwrap();
         let (state, timeout) = self.destination.changed.wait_timeout_while(state, Duration::from_secs(10), |s| {
             matches!(s, Destination::Staging(cache) if cache.preloads.iter().filter(|p| matches!(p.reply, ReplyState::Ready(_))).count() < count)
@@ -435,7 +428,6 @@ fn update<T>(location: &Location, f: impl FnOnce(&mut cache::Cache) -> T) -> Opt
     match &mut *destination {
         Destination::Staging(cache) => {
             let result = f(cache);
-            #[cfg(test)]
             location.changed.notify_all();
             Some(result)
         }
@@ -457,7 +449,8 @@ fn update<T>(location: &Location, f: impl FnOnce(&mut cache::Cache) -> T) -> Opt
 }
 
 impl Core {
-    pub(in super::super) fn adopt_preloads(&self, set: Preloads) -> Result<(), Preloads> {
+    /// Adopt launch work before dispatching any request (LLP 1162.000 D4).
+    pub fn adopt_preloads(&self, set: Preloads) -> Result<(), Preloads> {
         let mut owned = self.preloads.lock().unwrap();
         let mut state = self.shared.state.lock().unwrap();
         if state.dispatched || state.retired || owned.is_some() {
@@ -488,7 +481,8 @@ impl Core {
         *owned = Some(set);
         Ok(())
     }
-    pub(in super::super) fn drop_preload_secret(&self, name: &str) {
+    /// Cancel and discard preloads that used a changed secret before returning.
+    pub fn drop_preload_secret(&self, name: &str) {
         let mut state = self.shared.state.lock().unwrap();
         if let Some(cache) = state.cache.as_mut() {
             drop_secret(cache, name);
@@ -496,7 +490,8 @@ impl Core {
         cache::serve_ready(&mut state);
         rouse(&self.shared, &state);
     }
-    pub(in super::super) fn take_preload_journal(&self) -> Vec<Fact> {
+    /// Facts are returned to the host for its journal (LLP 1162.000 D3).
+    pub fn take_preload_journal(&self) -> Vec<Fact> {
         self.shared
             .state
             .lock()
@@ -508,10 +503,7 @@ impl Core {
     }
     /// Boot may fulfil complete replies from its initial requests, in ticket
     /// order, until the first unresolved request (LLP 1162.000 D1, D4).
-    pub(in super::super) fn settle_preload(
-        &self,
-        r: &RequestOut,
-    ) -> Option<(Outcome, CompletionTiming)> {
+    pub fn settle_preload(&self, r: &RequestOut) -> Option<(Outcome, CompletionTiming)> {
         let mut state = self.shared.state.lock().unwrap();
         if state.retired || state.dispatched || state.counts != [0, 0] || state.ordered_barrier {
             return None;
@@ -971,12 +963,9 @@ fn run(
     host: &StreamHost,
 ) {
     // Adapt the binding itself so every host honours its supplied transport (D4).
-    #[cfg(test)]
     let guards: Vec<_> = (0..MAX_PRELOADS)
         .map(|_| ThreadGuard::new(destination))
         .collect();
-    #[cfg(not(test))]
-    let guards = vec![(); MAX_PRELOADS];
     let workers = match ibex2::stdlib::fetch_async::BoundedWorkerPool::with_worker_guards(
         guards,
         MAX_PRELOADS,

@@ -321,7 +321,7 @@ fn a_quit_ends_every_group() {
         let mut child = Command::new(std::env::current_exe().unwrap())
             .args([
                 "--exact",
-                "executor::core::process::real::tests::a_quit_ends_every_group",
+                "process::real::tests::a_quit_ends_every_group",
                 "--nocapture",
             ])
             .env(CHILD, "1")

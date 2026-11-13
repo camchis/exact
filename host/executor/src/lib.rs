@@ -1,6 +1,13 @@
-//! Native transport scheduling shared by Apple and Linux (LLP 1041 D1–D4).
-//! Reads and parallel sends overlap on shared workers, retaining their place
-//! in the ordered lane (LLP 1162 D1). Each worker owns its transport.
+//! The native request executor the Apple, Linux and render hosts share
+//! (LLP 1041 D1–D4): grant-checked transport, the ordered and independent
+//! lanes, streams, sockets, uploads and child processes. Reads and parallel
+//! sends overlap on shared workers, retaining their place in the ordered
+//! lane (LLP 1162 D1). Each worker owns its transport.
+//!
+//! A host wraps [`Core`] in an executor of its own, which gives it a wake
+//! and transports and decides which [`WorkerBudget`] its workers count against.
+#![deny(unsafe_code)]
+#![deny(missing_docs)]
 use exact_runner::{
     CompletionTiming, FailureKind, HttpScheduling, Outcome, Reply, Request, RequestClass,
     RequestOut, Response, Work as OwnedWork,
@@ -226,7 +233,7 @@ impl Shared {
     /// The app's directories for `request`: opened by the first request,
     /// worker's or stream's, whose body is or goes to an app file; `None` for any other
     /// request, which leaves them unopened, or when the host named none.
-    pub(super) fn roots_for(&self, request: &Request) -> body::Roots<'_> {
+    pub(crate) fn roots_for(&self, request: &Request) -> body::Roots<'_> {
         request.body_from.as_ref().or(request.body_to.as_ref())?;
         let paths = self.root_paths.get()?;
         Some(self.roots.get_or_init(|| body::open(paths)))
@@ -243,7 +250,7 @@ impl Shared {
 /// for bytes unless open streams leave no room for its ceiling
 /// (LLP 1041 §8.4, LLP 1054.000 R3). The ordered queue also bounds waiting
 /// request buffers, leaving room to start its head.
-pub(super) struct Core {
+pub struct Core {
     shared: Arc<Shared>,
     disabled: bool,
     /// The workers not started yet: each owner's bindings and its slot.
@@ -262,7 +269,7 @@ pub(super) struct Core {
 }
 /// Makes the host (and its transport) an owner or a stream fetches
 /// through: the platform's, unless the embedder names another.
-pub(super) type StreamHost = Arc<dyn Fn() -> ibex2::host::Host + Send + Sync>;
+pub type StreamHost = Arc<dyn Fn() -> ibex2::host::Host + Send + Sync>;
 
 /// The ordered owner (the boot's bindings) and the independent ones. The
 /// boot endowed its bindings with the data module's grants, before the plan
@@ -284,25 +291,50 @@ fn owners(
 }
 
 impl Core {
-    #[cfg(test)]
-    #[allow(dead_code)] // Shared hosts build without Apple's launch tests (LLP 1162.000 D4).
-    pub(super) fn test_start(
+    /// One ordered owner and six shared HTTP owners on the platform's
+    /// transport, or, switched on, the machine (LLP 1120): Apple's.
+    pub fn start_switched(
+        bindings: Option<ibex2::host::Bindings>,
+        grants: &str,
+        wake: Wake,
+        budget: WorkerBudget,
+    ) -> Self {
+        let host: StreamHost = Arc::new(ibex2::host::Host::new);
+        let lanes = asynchronous().then(|| (asynch_lanes(), asynch::THREADS));
+        Self::assemble(owners(bindings, grants), grants, wake, host, lanes, budget)
+    }
+
+    /// The workers, with every transport the other owners, scoped grants
+    /// and streams open made by `host` (the Linux host's, and the render
+    /// host's, LLP 1048.000 D10).
+    pub fn start_on(
+        bindings: Option<ibex2::host::Bindings>,
+        grants: &str,
+        wake: Wake,
+        host: StreamHost,
+        budget: WorkerBudget,
+    ) -> Self {
+        Self::assemble(owners(bindings, grants), grants, wake, host, None, budget)
+    }
+
+    /// For a host's tests (Apple's launch tests, LLP 1162.000 D4):
+    /// [`Core::start_switched`]'s owners, and, when `asynchronous`, the
+    /// machine (LLP 1120) with each lane on its owner's transport over
+    /// bounded workers on every target, as this crate's own tests run it.
+    pub fn test_start(
         asynchronous: bool,
         bindings: Option<ibex2::host::Bindings>,
         grants: &str,
         wake: Wake,
+        budget: WorkerBudget,
     ) -> Self {
-        Self::with_owners_lanes(
-            owners(bindings, grants),
-            grants,
-            wake,
-            Arc::new(ibex2::host::Host::new),
-            asynchronous.then(asynch::asynch_lanes),
-        )
+        let host: StreamHost = Arc::new(ibex2::host::Host::new);
+        let lanes = asynchronous.then(|| (asynch::portable_lanes(), asynch::PORTABLE_THREADS));
+        Self::assemble(owners(bindings, grants), grants, wake, host, lanes, budget)
     }
 
-    #[allow(dead_code)] // the tests'; the hosts' executors use `start_switched` or `start_on`
-    pub(super) fn start(bindings: Option<ibex2::host::Bindings>, grants: &str, wake: Wake) -> Self {
+    #[cfg(test)]
+    fn start(bindings: Option<ibex2::host::Bindings>, grants: &str, wake: Wake) -> Self {
         // Additional transports are constructed on their own threads, not
         // while the presenter is trying to publish its first frame.
         Self::with_owners_on(
@@ -313,31 +345,14 @@ impl Core {
         )
     }
 
-    /// [`Core::start`], or, switched on, the machine (LLP 1120): Apple's.
-    #[allow(dead_code)] // Apple's executor's; Linux's and the render host's are `start_on`
-    pub(super) fn start_switched(b: Option<ibex2::host::Bindings>, g: &str, w: Wake) -> Self {
-        Self::with_owners(owners(b, g), g, w)
-    }
-
-    /// [`Core::start`] with every transport the other owners, scoped grants
-    /// and streams open made by `host` (the Linux host's, and the render
-    /// host's, LLP 1048.000 D10).
-    #[allow(dead_code)] // the Linux and render hosts' executors call it
-    pub(super) fn start_on(
-        bindings: Option<ibex2::host::Bindings>,
-        grants: &str,
-        wake: Wake,
-        host: StreamHost,
-    ) -> Self {
-        Self::with_owners_on(owners(bindings, grants), grants, wake, host)
-    }
-
+    #[cfg(test)]
     fn with_owners(owners: Vec<Option<ibex2::host::Bindings>>, grants: &str, wake: Wake) -> Self {
         let host: StreamHost = Arc::new(ibex2::host::Host::new);
         let lanes = asynchronous().then(asynch_lanes);
         Self::with_owners_lanes(owners, grants, wake, host, lanes)
     }
 
+    #[cfg(test)]
     fn with_owners_on(
         owners: Vec<Option<ibex2::host::Bindings>>,
         grants: &str,
@@ -347,13 +362,28 @@ impl Core {
         Self::with_owners_lanes(owners, grants, wake, host, None)
     }
 
-    /// The core, on workers or, given `lanes`, the asynchronous machine.
+    /// A test's core: its workers count against the test thread's budget.
+    #[cfg(test)]
     fn with_owners_lanes(
         owners: Vec<Option<ibex2::host::Bindings>>,
         grants: &str,
         wake: Wake,
         host: StreamHost,
         lanes: Option<asynch::Lanes>,
+    ) -> Self {
+        let lanes = lanes.map(|lanes| (lanes, asynch::THREADS));
+        Self::assemble(owners, grants, wake, host, lanes, WorkerBudget::Thread)
+    }
+
+    /// The core, on workers or, given `lanes` and the threads they take,
+    /// the asynchronous machine.
+    fn assemble(
+        owners: Vec<Option<ibex2::host::Bindings>>,
+        grants: &str,
+        wake: Wake,
+        host: StreamHost,
+        lanes: Option<(asynch::Lanes, usize)>,
+        budget: WorkerBudget,
     ) -> Self {
         let shared = Arc::new_cyclic(|me| Shared {
             state: Mutex::new(State {
@@ -374,12 +404,11 @@ impl Core {
             me: me.clone(),
             processes: process::Processes::new(),
         });
-        let count = if lanes.is_some() {
-            asynch::THREADS
-        } else {
-            owners.len()
+        let (lanes, count) = match lanes {
+            Some((lanes, threads)) => (Some(lanes), threads),
+            None => (None, owners.len()),
         };
-        let budget = worker_budget();
+        let budget = budget.live();
         let reserved = budget
             .fetch_update(Ordering::AcqRel, Ordering::Acquire, |n| {
                 (n + count <= MAX_WORKERS).then_some(n + count)
@@ -484,28 +513,25 @@ impl Core {
     /// Where `app:/data`, `app:/cache` and `app:/tmp` are, for a request
     /// whose body is one of the app's files (LLP 1108 D6 R2). Set once,
     /// before the first request; without it such a request is refused.
-    pub(super) fn set_app_roots(&self, roots: [std::path::PathBuf; 3]) {
+    pub fn set_app_roots(&self, roots: [std::path::PathBuf; 3]) {
         let _ = self.shared.root_paths.set(roots);
         process::launched(&self.shared);
     }
 
     #[cfg(test)]
-    pub(super) fn run(&self, r: RequestOut, work: Option<Work>) -> Result<(), &'static str> {
+    fn run(&self, r: RequestOut, work: Option<Work>) -> Result<(), &'static str> {
         self.run_owned(r, work.map(OwnedWork::Now))
     }
 
-    pub(super) fn run_owned(
-        &self,
-        r: RequestOut,
-        work: Option<OwnedWork>,
-    ) -> Result<(), &'static str> {
+    /// Admit work, or return a refusal without an overflow queue.
+    pub fn run_owned(&self, r: RequestOut, work: Option<OwnedWork>) -> Result<(), &'static str> {
         self.admit(r, work, false, false)
             .map_err(|(reason, _work)| reason)
     }
 
     /// Take one outcome in lane order (LLP 1162 D3): a pump requests the
     /// next only after fulfilling this one, so a shaping error loses none.
-    pub(super) fn drain(&self) -> Vec<(u64, Outcome, Option<CompletionTiming>)> {
+    pub fn drain(&self) -> Vec<(u64, Outcome, Option<CompletionTiming>)> {
         self.drain_with_clock(std::time::Instant::now)
     }
 
@@ -575,7 +601,8 @@ impl Core {
         vec![(done.ticket, done.outcome, Some(timing))]
     }
 
-    pub(super) fn ordered_idle(&self) -> bool {
+    /// Earlier admitted ordered outcomes have all reached the host's pump.
+    pub fn ordered_idle(&self) -> bool {
         self.shared.state.lock().unwrap().counts[0] == 0
     }
 
@@ -589,7 +616,7 @@ impl Core {
     /// the host when something is ready). The answer stays pending: room
     /// never refuses a re-ask. Refused only when the executor is retired or
     /// never started, as all work is.
-    pub(super) fn again(&self, ticket: u64) -> Result<(), &'static str> {
+    pub fn again(&self, ticket: u64) -> Result<(), &'static str> {
         let mut state = self.shared.state.lock().unwrap();
         state.dispatched = true;
         if self.disabled {
@@ -610,18 +637,21 @@ impl Core {
         Ok(())
     }
 
-    pub(super) fn notify(&self) {
+    /// Wake the host: for a refusal stored on a runner ticket.
+    pub fn notify(&self) {
         wake(&mut self.shared.state.lock().unwrap());
     }
 
     /// `notify`, as a handle another thread keeps (a native module's
     /// announcements, LLP 1016.002).
-    pub(super) fn waker(&self) -> std::sync::Arc<dyn Fn() + Send + Sync> {
+    pub fn waker(&self) -> std::sync::Arc<dyn Fn() + Send + Sync> {
         let shared = self.shared.clone();
         std::sync::Arc::new(move || wake(&mut shared.state.lock().unwrap()))
     }
 
-    pub(super) fn begin_pump(&self) {
+    /// Acknowledge a coalesced wake, including turns used by refusal
+    /// settlement.
+    pub fn begin_pump(&self) {
         // A refusal made by waiting admission keeps its wake (LLP 1162 D1).
         self.shared.state.lock().unwrap().notified = false;
         self.resume_waiting();
@@ -690,18 +720,36 @@ impl Drop for WorkerSlot {
     }
 }
 
-fn worker_budget() -> Arc<AtomicUsize> {
-    if super::ISOLATE_WORKER_BUDGET {
-        // Cores created by one test share a bound. Slots retain that budget
-        // when their workers outlive the test thread or retire elsewhere.
-        thread_local! {
-            static BUDGET: Arc<AtomicUsize> = Arc::default();
+/// What a core's workers count against: `MAX_WORKERS` live at once,
+/// retired ones included until they exit.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum WorkerBudget {
+    /// The process's one bound, which every core of every host in the
+    /// process shares.
+    Process,
+    /// A bound of the thread that starts the core, for tests that run side
+    /// by side and must not refuse each other's cores.
+    Thread,
+}
+
+impl WorkerBudget {
+    /// The count of live workers this budget bounds.
+    fn live(self) -> Arc<AtomicUsize> {
+        match self {
+            // Cores created by one test share a bound. Slots retain that budget
+            // when their workers outlive the test thread or retire elsewhere.
+            WorkerBudget::Thread => {
+                thread_local! {
+                    static BUDGET: Arc<AtomicUsize> = Arc::default();
+                }
+                BUDGET.with(Arc::clone)
+            }
+            WorkerBudget::Process => {
+                static BUDGET: std::sync::LazyLock<Arc<AtomicUsize>> =
+                    std::sync::LazyLock::new(Arc::default);
+                Arc::clone(&BUDGET)
+            }
         }
-        BUDGET.with(Arc::clone)
-    } else {
-        static BUDGET: std::sync::LazyLock<Arc<AtomicUsize>> =
-            std::sync::LazyLock::new(Arc::default);
-        Arc::clone(&BUDGET)
     }
 }
 
@@ -1302,24 +1350,19 @@ fn execute(
 
 // The process transport exists where a host starts programs (LLP 1133.007
 // §8); elsewhere every request answers `Unsupported` and none of it links.
-#[cfg_attr(
-    any(target_os = "macos", target_os = "linux"),
-    path = "process.rs"
-)]
+#[cfg_attr(any(target_os = "macos", target_os = "linux"), path = "process.rs")]
 #[cfg_attr(
     not(any(target_os = "macos", target_os = "linux")),
     path = "process_off.rs"
 )]
 mod process;
-#[path = "stream.rs"]
 pub(crate) mod stream;
+pub use stream::listen;
 
 #[cfg(test)]
-#[path = "async_tests.rs"]
 mod async_tests;
 #[path = "async.rs"]
 mod asynch;
-#[path = "outcome.rs"]
 mod outcome;
 use asynch::{asynch_lanes, asynchronous, drained};
 use outcome::{
@@ -1327,36 +1370,24 @@ use outcome::{
     Quiet,
 };
 
-#[path = "forget.rs"]
 mod forget;
-#[path = "reach.rs"]
 mod reach;
 
-#[path = "body.rs"]
 mod body;
-#[path = "body_to.rs"]
 mod body_to;
 
-#[path = "admission.rs"]
 mod admission;
-#[path = "cache.rs"]
 mod cache;
-#[path = "preload.rs"]
-#[allow(dead_code)] // Launch entry points are host-owned (LLP 1162.000 D4).
-pub(super) mod preload;
-#[path = "reads.rs"]
+pub mod preload;
+pub mod pump;
 mod reads;
 
 #[cfg(test)]
-#[path = "read_tests.rs"]
 mod read_tests;
 
 #[cfg(test)]
-#[path = "idle_tests.rs"]
 mod idle_tests;
 #[cfg(test)]
-#[path = "scope_tests.rs"]
 mod scope_tests;
 #[cfg(test)]
-#[path = "tests.rs"]
-pub(super) mod tests;
+mod tests;

@@ -1045,7 +1045,7 @@ impl Core {
 impl Core {
     /// Start programs for data code: a desktop host's executor (§8). Its
     /// `home:` and `bundle:` directories are storage's too (D6).
-    pub(crate) fn allow_processes(&self) {
+    pub fn allow_processes(&self) {
         self.shared.processes.enabled.store(true, Ordering::Release);
         ibex2::stdlib::fs::set_roots(ibex2::stdlib::fs::Roots {
             home: home(&self.shared.processes),
@@ -1055,7 +1055,7 @@ impl Core {
 
     /// The clock the host's process work keeps, for the runner under the
     /// agent (LLP 1133.007 §7); `None` on the wall.
-    pub(crate) fn work_clock(&self) -> Option<Arc<dyn exact_runner::WorkClock>> {
+    pub fn work_clock(&self) -> Option<Arc<dyn exact_runner::WorkClock>> {
         let processes = &self.shared.processes;
         processes.clock.is_agent().then(|| {
             Arc::new(Work {

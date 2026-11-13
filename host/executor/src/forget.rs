@@ -168,7 +168,7 @@ impl Core {
     /// since a write that was sent, or a turn that has begun, is not undone.
     /// None of it holds a later ordered completion back, and each releases
     /// its count and bytes when it ends.
-    pub(crate) fn forget(&self, held: impl Fn(u64) -> bool) {
+    pub fn forget(&self, held: impl Fn(u64) -> bool) {
         self.forget_with(held, &[]);
     }
 
@@ -177,7 +177,7 @@ impl Core {
     /// unsent and a running exchange's transport aborted, which releases
     /// its lane's count, bytes and places when it ends. Work and streams are
     /// let go as `forget` lets them go.
-    pub(crate) fn cancel(&self, tickets: &[u64]) {
+    pub fn cancel(&self, tickets: &[u64]) {
         if !tickets.is_empty() {
             self.forget_with(|ticket| !tickets.contains(&ticket), tickets);
         }

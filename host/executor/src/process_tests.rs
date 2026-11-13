@@ -761,7 +761,7 @@ fn a_spawn_without_readiness_makes_no_network_host() {
         let _ = wake.send(());
     });
     let core = Core::under_agent(&[("path:t3", &format!("script:{file}"))], || {
-        Core::start_on(None, GRANTS, wake, host)
+        Core::start_on(None, GRANTS, wake, host, super::super::WorkerBudget::Thread)
     });
     let body = r#"{"kind":"spawn","program":"path:t3"}"#;
     core.run(request(1, body, true), None).unwrap();

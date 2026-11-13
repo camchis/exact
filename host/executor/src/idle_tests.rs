@@ -60,7 +60,7 @@ fn an_independent_test_can_admit_work_while_another_reserves_every_worker() {
 
 #[test]
 fn cores_in_one_test_share_the_worker_limit_and_return_slots_to_their_owner() {
-    let budget = worker_budget();
+    let budget = WorkerBudget::Thread.live();
     let full = Core::with_owners_on(
         (0..MAX_WORKERS).map(|_| None).collect(),
         "",
