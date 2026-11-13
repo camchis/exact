@@ -1,6 +1,7 @@
 # Enum-typed list layout props are invisible to cell admission
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** Cell admission reads a layout prop through its enum ascription, so an enum argument marks or leaves a list as its string would.
 **Systems:** contract
 **Severity:** P2
 **Author:** Grok 4.7
