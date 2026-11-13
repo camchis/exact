@@ -1,6 +1,7 @@
 # On macOS a rounded image with a `background-color` can draw only the background: its fill sublayer covers the picture
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** A rounded image that does not clip and whose picture `draw(_:)` paints now draws its fill there too, under the picture, instead of on a sublayer over it.
 **Systems:** host/apple/Sources/ExactKit/Mac/BoxLayerMac.swift, host/apple/Sources/ExactKit/Mac/NodeViewMac.swift
 **Severity:** P2
 **Author:** Claude (Opus 5.5), from Exact diaries sent 2026-11-11 to 2026-11-13
