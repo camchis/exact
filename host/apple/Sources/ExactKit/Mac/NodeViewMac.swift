@@ -1048,7 +1048,7 @@ package final class NodeView: NSView, NSTextViewDelegate, NSTextFieldDelegate {
         updateEmbedded()
         video?.update()
         updateMaterial()
-        needsDisplay = true
+        if Self.paints(set: set, clear: clear) { needsDisplay = true }
     }
 
     // Empty container layers carry geometry and children, with no bitmap.

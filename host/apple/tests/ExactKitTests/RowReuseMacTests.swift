@@ -171,6 +171,30 @@ final class RowReuseMacTests: XCTestCase {
         }
     }
 
+    /// A row rebound to another item writes its wrapper's key and place in
+    /// the set and its row's test id. None of them changes what those boxes
+    /// paint, so neither is invalidated for them; a prop that paints is, and
+    /// a prop that goes is taken for one that may have painted.
+    func testARowsKeyAndTestIdRedrawNothingAndAPaintingPropDoes() throws {
+        let f = try TableFixture(count: 200, table: true, source: Self.source(count: 200))
+        fixtures.append(f)
+        let wrapper = try XCTUnwrap(f.mounted[3]), row = try f.node("row-3")
+        func invalidated(_ v: NodeView) -> Bool { v.needsDisplay || v.layer?.needsDisplay() == true }
+        func settled() { f.window.displayIfNeeded(); CATransaction.flush() }
+        settled()
+        XCTAssertFalse(invalidated(wrapper) || invalidated(row), "nothing is waiting to draw")
+        wrapper.applyProps(set: ["listItemKey": "k900", "accessibilityPosInSet": "901", "accessibilitySetSize": "200"], clear: [])
+        row.applyProps(set: ["testId": "row-900"], clear: [])
+        XCTAssertFalse(invalidated(wrapper), "a new key and place in the set paint nothing")
+        XCTAssertFalse(invalidated(row), "a new test id paints nothing")
+        row.applyProps(set: ["testId": "row-901", "accessibilityLabel": "Item 901"], clear: [])
+        XCTAssertTrue(invalidated(row), "with a prop that may paint, the box is drawn again")
+        settled()
+        row.applyProps(set: [:], clear: ["accessibilityLabel"])
+        XCTAssertTrue(invalidated(row), "a prop that goes may have painted")
+        XCTAssertFalse(NodeView.paints(set: ["testId": "row-902"], clear: []))
+    }
+
     /// A batch that only says where lists stand (a report's answer that
     /// moved no view, half a fling's batches) skips the passes over the
     /// views; one that carries anything else of the page's does not.
