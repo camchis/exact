@@ -66,8 +66,8 @@ pub enum Capability {
     /// `@keyframes`' grammars, for a plan that declares keyframes or binds
     /// `animation` or `-exact-exit-animation`.
     Animations,
-    /// `background-image`'s gradients (LLP 1066): its grammar, for a plan
-    /// that binds the row.
+    /// Gradient grammars (LLP 1066, LLP 1077 D2), for a plan that binds
+    /// `background-image` or `mask-image`.
     Gradients,
     /// CSS grid's track, placement and keyword grammars, for a plan that
     /// binds any of the six grid rows.
@@ -130,11 +130,21 @@ pub enum Capability {
     /// popover, whose frameworks (TipKit, SwiftUI) an app links only for it.
     /// Hosts with no tip system show none and link nothing for it.
     Tips,
+    /// `box-shadow` and `text-shadow` grammars (LLP 1077 D3, D4).
+    Shadows,
+    /// `corner-shape`'s grammar (LLP 1077 D1).
+    Corners,
+    /// `rotate`'s angle and axis grammars (LLP 1077 D8).
+    Rotate,
+    /// `-webkit-text-stroke`'s shorthand grammar (LLP 1077 D7).
+    TextStroke,
+    /// `-exact-symbol-palette`'s grammar (LLP 1077 D10).
+    SymbolPalette,
 }
 
 impl Capability {
     /// Every capability, in bit order.
-    pub const ALL: [Capability; 31] = [
+    pub const ALL: [Capability; 36] = [
         Capability::Markdown,
         Capability::Motion,
         Capability::Collections,
@@ -166,6 +176,11 @@ impl Capability {
         Capability::Dates,
         Capability::Sqlite,
         Capability::Tips,
+        Capability::Shadows,
+        Capability::Corners,
+        Capability::Rotate,
+        Capability::TextStroke,
+        Capability::SymbolPalette,
     ];
 
     /// The name an entry, a refusal and a report use.
@@ -202,6 +217,11 @@ impl Capability {
             Capability::Dates => "dates",
             Capability::Sqlite => "sqlite",
             Capability::Tips => "tips",
+            Capability::Shadows => "shadows",
+            Capability::Corners => "corners",
+            Capability::Rotate => "rotate",
+            Capability::TextStroke => "text_stroke",
+            Capability::SymbolPalette => "symbol_palette",
         }
     }
 
@@ -211,14 +231,14 @@ impl Capability {
         Capability::ALL.into_iter().find(|c| c.name() == name)
     }
 
-    const fn bit(self) -> u32 {
+    const fn bit(self) -> u64 {
         1 << self as u32
     }
 }
 
 /// A set of capabilities.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub struct Uses(u32);
+pub struct Uses(u64);
 
 impl Uses {
     /// The core alone.
@@ -227,6 +247,12 @@ impl Uses {
     /// This set and `capability`.
     pub const fn with(self, capability: Capability) -> Uses {
         Uses(self.0 | capability.bit())
+    }
+
+    fn with_style(self, style: StyleId) -> Uses {
+        style.capability().map_or(self, |name| {
+            self.with(Capability::from_name(name).expect("schema style capability"))
+        })
     }
 
     /// Whether the set holds `capability`.
@@ -329,6 +355,29 @@ pub fn uses(plan: &Plan) -> Uses {
                     uses = uses.with(Capability::Collections);
                 }
                 Some(PropId::BackgroundMaterial) => uses = uses.with(Capability::Materials),
+                Some(PropId::DecorationStyles) => {
+                    // The compiler puts decoration rows in a literal JSON table
+                    // rather than style bindings (LLP 1114.007 D1).
+                    if let Some(serde_json::Value::Object(table)) =
+                        constant_str(plan, plan.code(binding.expr))
+                            .and_then(|json| serde_json::from_str(json).ok())
+                    {
+                        for row in table
+                            .values()
+                            .filter_map(serde_json::Value::as_array)
+                            .flatten()
+                        {
+                            if let Some(style) = row
+                                .get(0)
+                                .and_then(serde_json::Value::as_u64)
+                                .and_then(|id| u32::try_from(id).ok())
+                                .and_then(StyleId::from_bit)
+                            {
+                                uses = uses.with_style(style);
+                            }
+                        }
+                    }
+                }
                 Some(PropId::ListStyle) => uses = uses.with(Capability::GroupedLists),
                 Some(PropId::Dataset) => uses = uses.with(Capability::Dataset),
                 Some(PropId::AccessibilityControls) => uses = uses.with(Capability::Tabs),
@@ -348,6 +397,9 @@ pub fn uses(plan: &Plan) -> Uses {
                 _ => {}
             },
             BindingKind::Style => {
+                if let Some(style) = StyleId::from_bit(u32::from(binding.id)) {
+                    uses = uses.with_style(style);
+                }
                 if StyleId::from_bit(u32::from(binding.id)) == Some(StyleId::BackdropFilter) {
                     uses = uses.with(Capability::Backdrop);
                 }
@@ -384,12 +436,6 @@ pub fn uses(plan: &Plan) -> Uses {
                     Some(StyleId::Animation | StyleId::ExitAnimation)
                 ) {
                     uses = uses.with(Capability::Animations);
-                }
-                if matches!(
-                    StyleId::from_bit(u32::from(binding.id)),
-                    Some(StyleId::BackgroundImage | StyleId::MaskImage)
-                ) {
-                    uses = uses.with(Capability::Gradients);
                 }
                 if matches!(
                     StyleId::from_bit(u32::from(binding.id)),

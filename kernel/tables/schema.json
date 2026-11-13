@@ -3341,6 +3341,7 @@
     {
       "bit": 57,
       "field": "box_shadow",
+      "capability": "shadows",
       "codec": "box-shadow",
       "_comment": "@ref LLP 1077 D4: CSS `box-shadow`, `none` or a list (at most 8) of shadows, each `inset? <length>{2,4} <color>` in any order, painted as CSS paints outer and inset shadows; it replaced LLP 1064's four shadow rows. A missing colour is refused (LLP 1064 D1).",
       "cold": true
@@ -3382,6 +3383,7 @@
     {
       "bit": 62,
       "field": "rotate",
+      "capability": "rotate",
       "codec": "f32",
       "default": 0,
       "cold": true
@@ -4005,6 +4007,7 @@
     {
       "bit": 141,
       "field": "background_image",
+      "capability": "gradients",
       "snapshot": "admit",
       "watch": "admit",
       "codec": "background-image",
@@ -4082,6 +4085,7 @@
     {
       "bit": 151,
       "field": "text_shadow",
+      "capability": "shadows",
       "codec": "text-shadow",
       "inherited": true,
       "_comment": "@ref LLP 1077 D3: CSS `text-shadow`, `none` or one shadow (no list, no spread), under the glyphs and decorations; a missing colour is currentcolor. Inherited, as in CSS."
@@ -4089,6 +4093,7 @@
     {
       "bit": 152,
       "field": "mask_image",
+      "capability": "gradients",
       "rare": true,
       "codec": "mask-image",
       "_comment": "@ref LLP 1077 D2: CSS `mask-image`, `none` or one gradient in background-image's grammar (LLP 1066), its alpha over the border box. Not inherited."
@@ -4096,6 +4101,7 @@
     {
       "bit": 153,
       "field": "corner_shape",
+      "capability": "corners",
       "rare": true,
       "codec": "corner-shape",
       "_comment": "@ref LLP 1077 D1: CSS `corner-shape`, one to four of round | squircle | square | bevel | scoop | notch | superellipse(K), plus -exact-continuous (Apple's continuous curve on every host; declared in LLP 1001). Shapes the corners `border-radius` sizes."
@@ -4103,6 +4109,7 @@
     {
       "bit": 154,
       "field": "text_stroke_width",
+      "capability": "text_stroke",
       "codec": "f32",
       "default": 0,
       "inherited": true,
@@ -4111,6 +4118,7 @@
     {
       "bit": 155,
       "field": "text_stroke_color",
+      "capability": "text_stroke",
       "codec": "current-color",
       "default": "currentcolor",
       "inherited": true,
@@ -4126,6 +4134,7 @@
     {
       "bit": 157,
       "field": "rotate_axis",
+      "capability": "rotate",
       "codec": "rotate-axis",
       "_comment": "@ref LLP 1077 D8: the axis of CSS `rotate` (`x`, `y`, `z` or three numbers), set with `rotate`'s angle by the one `rotate` attribute; initial z. The angle is `rotate` (bit 62), which the engine animates.",
       "cold": true
@@ -4170,6 +4179,7 @@
     {
       "bit": 163,
       "field": "symbol_palette",
+      "capability": "symbol_palette",
       "codec": "symbol-palette",
       "inherited": true,
       "_comment": "@ref LLP 1077 D10: not CSS. A symbol's palette, one to three colours, under `-exact-symbol-rendering: palette`. Inherited."

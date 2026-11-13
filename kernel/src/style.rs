@@ -20,11 +20,16 @@ mod engine;
 pub use crate::gradient::link as link_gradients;
 pub use effects::link as link_effects;
 mod grid;
+pub use crate::corner::link as link_corners;
 pub use grid::link as link_grid;
 pub use grid::{
     GridFitContent, GridLine, GridPlacement, GridRepeat, GridRepeatCount, GridTrack,
     GridTrackComponent, GridTrackMax, GridTrackMin, GridTracks,
 };
+pub use shadow::link as link_shadows;
+pub use space::link as link_rotate;
+pub use stroke::link as link_text_stroke;
+pub use symbols::link as link_symbol_palette;
 pub mod calc;
 mod floor;
 mod handles;
