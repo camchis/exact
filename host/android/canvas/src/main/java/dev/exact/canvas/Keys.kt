@@ -2,6 +2,7 @@ package dev.exact.canvas
 
 import android.content.Context
 import android.text.InputType
+import android.view.KeyCharacterMap
 import android.view.KeyEvent
 import android.view.inputmethod.BaseInputConnection
 import android.view.inputmethod.EditorInfo
@@ -58,9 +59,8 @@ class Keys(private val view: ExactView) {
             KeyEvent.KEYCODE_DEL -> Exact.key(0, true)
             KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER -> Exact.key('\n'.code, false)
             else -> {
-                if (e.isCtrlPressed || e.isMetaPressed || e.isAltPressed) return false
-                val c = e.unicodeChar
-                if (c == 0 || c and android.view.KeyCharacterMap.COMBINING_ACCENT != 0) return false
+                val c = typed(e)
+                if (c == 0) return false
                 Exact.key(c, false)
             }
         }
@@ -83,6 +83,23 @@ class Keys(private val view: ExactView) {
         KeyEvent.KEYCODE_DPAD_RIGHT -> "ArrowRight" to "ArrowRight"
         KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_BUTTON_SELECT -> "Select" to "Enter"
         else -> null
+    }
+
+    companion object {
+        /** The character a key types at the focused field, or 0 when it types none here: a chord with Ctrl or Meta, a
+         * dead key, or a key that gives nothing with the Alt held. Alt itself is no refusal: the right Alt (AltGr) is
+         * how a layout types a key's third character, its key character map's `ralt` (German AltGr+Q is '@'). */
+        internal fun typed(e: KeyEvent): Int = typed(
+            e.unicodeChar, e.getUnicodeChar(e.metaState and KeyEvent.META_ALT_MASK.inv()),
+            e.isCtrlPressed || e.isMetaPressed, e.isAltPressed,
+        )
+
+        /** [typed] from the character with the event's meta state ([c]) and with its Alt taken away ([withoutAlt]). */
+        internal fun typed(c: Int, withoutAlt: Int, chord: Boolean, alt: Boolean): Int = when {
+            chord || (alt && c == withoutAlt) -> 0
+            c == 0 || c and KeyCharacterMap.COMBINING_ACCENT != 0 -> 0
+            else -> c
+        }
     }
 
     /** Text the IME committed as one event (dummy mode, more than one character). */

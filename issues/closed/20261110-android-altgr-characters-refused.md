@@ -1,6 +1,7 @@
 # On Android a hardware keyboard's AltGr characters are not typed into a field exact2 paints
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** `Keys.typed` refuses Alt only when the key types the same character, or none, without it, so a layout's AltGr characters (its `ralt`) are typed; Ctrl and Meta chords and dead keys are still refused.
 **Systems:** host/android/canvas/src/main/java/dev/exact/canvas/Keys.kt
 **Severity:** P3
 **Author:** Claude (Fable 5.2), from the 2026-11-10 project review
