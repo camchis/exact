@@ -44,7 +44,10 @@ class PromptResumeTest {
         Extensions.front = { Exact.reader?.get() }
     }
 
-    private fun authenticate() = module.later("authenticate", JSONObject().put("reason", "Unlock")) { answers += it }
+    private fun authenticate(reason: String = "Unlock", request: Int? = null) {
+        module.context.request = request
+        module.later("authenticate", JSONObject().put("reason", reason)) { answers += it }
+    }
     private val errors get() = answers.map { it.optString("error") }
 
     @Test fun aCallWhileTheActivityShowsPausedIsShownAtTheResume() {
@@ -79,6 +82,29 @@ class PromptResumeTest {
         authenticate()
         assertEquals(listOf("SYSTEM_CANCEL"), errors)
         assertEquals(emptyList<String>(), shown)
+    }
+
+    /** A prompt the platform refuses to build (an empty title) fails SYSTEM_CANCEL, though it is built from `onResume`,
+     * where no caller would catch the throw. */
+    @Test fun aPromptRefusedAtTheResumeFailsSystemCancel() {
+        Extensions.paused()
+        authenticate(reason = "")
+        Extensions.resumed()
+        assertEquals(listOf("SYSTEM_CANCEL"), errors)
+        assertTrue(answers.single().optString("message").startsWith("BiometricPrompt refused the prompt"))
+    }
+
+    /** A send let go while its prompt waits is answered SYSTEM_CANCEL and shows nothing at the resume; another send's
+     * prompt still shows. */
+    @Test fun aWaitingCallLetGoShowsNothing() {
+        Extensions.paused()
+        authenticate(request = 7)
+        authenticate(request = 8)
+        module.cancel(7)
+        assertEquals(listOf("SYSTEM_CANCEL"), errors)
+        Extensions.resumed()
+        assertEquals(listOf("prompt"), shown)
+        assertEquals(1, answers.size)
     }
 
     @Test fun aWaitingCallEndsWithTheSession() {
