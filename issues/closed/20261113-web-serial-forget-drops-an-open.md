@@ -1,6 +1,7 @@
 # Web serial forget drops an open connection without closing the port
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** `forget` closes each open connection on the port as `close` does (reader canceled, writes drained, port closed) before asking the browser to forget it.
 **Systems:** packages/serial
 **Severity:** P2
 **Author:** Grok 4.7
