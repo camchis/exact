@@ -1,6 +1,7 @@
 # A display link with a zero period traps the frame sampler
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The sampler counts an interval only against a finite, positive announced period, so a callback with no period is skipped instead of trapping.
 **Systems:** host/apple
 **Severity:** P2
 **Author:** Grok 4.7
