@@ -1,6 +1,7 @@
 # A macOS field maxlength follows the stale value prop
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** TextInputFormatter decides an edit from the editor's original string, as TextInputLimit.allows does: it accepts a proposal within maxlength or no longer than that string, whatever the value prop's length.
 **Systems:** host/apple
 **Severity:** P2
 **Author:** Grok 4.7
