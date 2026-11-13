@@ -2261,27 +2261,44 @@ if (source === "request") {
 What each turn of an answer sends goes out in the order it sent it once
 the commit that ran the turn stands, as its fetches do; a refused commit
 takes it back and says so, and nothing the answer does afterwards (a
-value, a failure) takes it back. Natively its turns are its source's call
-and each delivery of its own `fetch` or storage step. Code that resumes
-from an `await` runs in the next turn that drains microtasks (its own
-delivery, or the answer's that settled what it awaited) and sends as that
-turn's answer; a mapper's call drains none, so code a mapper resumes runs
-in the next answer asked, or in none (and its send refuses) when that is
-the waiting answer's own re-ask. Send before the first `await`, or settle
-waiters from an answer. An answer asked again sends again, so key a
-request that must not repeat. On the web build an `async` function's
-steps after an `await` and the answer's own timers are its later turns
-too, and each sends when it ends; a plain `.then` callback outside an
-`async` function runs under no answer there, and its send throws. An
-answer that has given its value has no later turn: a send from code it
-left running throws `InvalidStateError`. What a turn sent while its
-answer's commit had not yet stood waits for it, and is refused, in `logs`,
-if the answer is let go first. An answer
-the runner lets go (new arguments, `refresh`, a newer send, leaving the
-view) sends nothing more as its own; what it sent stays sent. It may also
-`fetch`, though a mutation's synchronous source still may not do both. A
-refused commit's batches are taken back without telling the code, so a
-protocol that awaits a reply times out. Its bounds are a mutation's, over all its turns (`socket answer
+value, a failure) takes it back. Earlier turns' batches precede later
+ones, and frames are never coalesced.
+
+On native hosts and the web JS target, the bundle's async helper restores
+the answer an `async` function began in after every `await` (LLP 1133.002
+D14), whichever answer settled the promise. That answer owns the send's
+permission and bounds. Once it has given its value, failed or been let go,
+its async steps cannot send, even if another answer's turn resumes them.
+
+Natively, microtasks drain in a source's call and each delivery of its own
+`fetch` or storage step. A synchronous mapper's call drains none: a waiter
+it settles resumes when an answer is next asked, including the waiter's
+own re-ask. The async helper restores the waiting answer's context in
+either case. Native socket batches, however, name the answer whose turn
+staged them: if answer B's turn resumes answer A's async step, its send
+uses A's permission and bounds but the batch names B in `logs`. A plain `.then`
+callback has no captured answer: it uses whichever answer's turn drains
+it, including a waiter's own re-ask. With no answer current, its send
+throws. Such a callback left behind by a let-go answer can therefore send
+as another answer whose turn drains it; an async step still belongs to
+the let-go answer and refuses.
+
+On the web JS target, an `async` function's steps after an `await` and the
+answer's own timers are its later turns, and each sends when it ends,
+behind what its source sent. A plain `.then` callback runs under no
+answer there, and its send throws. An answer that has given its value,
+failed or been let go has no later turn: a send from code it left running
+throws `InvalidStateError`. What a turn sent while its answer's commit
+had not yet stood waits for it, and is refused, in `logs`, if the answer
+is let go first.
+
+An answer the runner lets go (new arguments, `refresh`, a newer send,
+leaving the view) sends nothing more as its own; what it sent stays sent.
+An answer asked anew runs its source again, so key a request that must not
+repeat. An answer in flight may also `fetch`, though a mutation's
+synchronous source still may not do both. A refused commit's batches are
+taken back without telling the code, so a protocol that awaits a reply
+times out. Its bounds are a mutation's, over all its turns (`socket answer
 exceeds 256 operations`, `… 1 MiB`); overload throws without failing the
 answer. A handle that is not open, or whose socket a mutation's stream
 owns, throws `InvalidStateError`, and so does an operation after the
