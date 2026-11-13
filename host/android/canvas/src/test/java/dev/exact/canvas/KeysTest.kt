@@ -37,4 +37,23 @@ class KeysTest {
         assertEquals(0, Keys.typed(key(KeyEvent.KEYCODE_Q, KeyEvent.META_CTRL_ON or KeyEvent.META_CTRL_LEFT_ON)))
         assertEquals(0, Keys.typed(key(KeyEvent.KEYCODE_Q, KeyEvent.META_META_ON or KeyEvent.META_META_LEFT_ON)))
     }
+
+    /** Tab goes by name, not as U+0009, on a phone as on a TV, with or without Shift; a chord with it is Android's. */
+    @Test fun tabIsNamedUnlessAChordHoldsIt() {
+        val shift = KeyEvent.META_SHIFT_ON or KeyEvent.META_SHIFT_LEFT_ON
+        for (tv in listOf(false, true)) {
+            assertEquals("Tab" to "Tab", Keys.named(key(KeyEvent.KEYCODE_TAB), tv))
+            assertEquals("Tab" to "Tab", Keys.named(key(KeyEvent.KEYCODE_TAB, shift), tv))
+        }
+        for (chord in listOf(KeyEvent.META_CTRL_ON, KeyEvent.META_ALT_ON, KeyEvent.META_META_ON)) {
+            assertNull(Keys.named(key(KeyEvent.KEYCODE_TAB, chord), false))
+        }
+    }
+
+    @Test fun theDpadIsNamedOnlyOnATv() {
+        assertEquals("ArrowUp" to "ArrowUp", Keys.named(key(KeyEvent.KEYCODE_DPAD_UP), true))
+        assertEquals("Select" to "Enter", Keys.named(key(KeyEvent.KEYCODE_DPAD_CENTER), true))
+        assertNull(Keys.named(key(KeyEvent.KEYCODE_DPAD_UP), false))
+        assertNull(Keys.named(key(KeyEvent.KEYCODE_Q), true))
+    }
 }

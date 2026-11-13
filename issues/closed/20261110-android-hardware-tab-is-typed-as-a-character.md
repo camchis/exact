@@ -1,6 +1,7 @@
 # On Android a hardware keyboard's Tab on the page is sent as the character U+0009 and moves no focus
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** `Keys.named` sends Tab on the page by name, as a remote's keys go, with Shift held for that key alone in `CanvasHost::named_key`, so Tab and Shift+Tab move exact2's focus; a chord with Ctrl, Alt or Meta is left to Android.
 **Systems:** host/android/canvas/src/main/java/dev/exact/canvas/Keys.kt, host/linux/src/canvas/keys.rs
 **Severity:** P3
 **Author:** Claude (Fable 5.2), from the 2026-11-10 project review
