@@ -1,6 +1,6 @@
 // Builds module launch parts and their services for an Apple build.
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
-import { basename, resolve } from 'node:path';
+import { basename, dirname, resolve } from 'node:path';
 import { launchModules } from '../../scripts/launch-modules.mjs';
 
 export { launchModules };
@@ -36,11 +36,17 @@ export const serviceArgs = svc => ['-parse-as-library', '-emit-library', '-O', '
 
 /** The objects SwiftPM compiled ExactLaunchParts into, in `binDir` (its --show-bin-path): Swift Build links the
  * target into one `ExactLaunchParts.o`; the native build system (what a Linux cross build runs) leaves one object
- * per source in `ExactLaunchParts.build/`. Empty when neither is there. */
+ * per source in `ExactLaunchParts.build/`. That directory keeps the objects of sources since removed or renamed,
+ * and of another app's launch sources (the Swift scratch is shared), so the current build's objects are the ones
+ * its `output-file-map.json` names. Empty when neither layout is there. */
 export function launchPartsObjects(binDir) {
-  const merged = resolve(binDir, 'ExactLaunchParts.o'), dir = resolve(binDir, 'ExactLaunchParts.build');
+  const merged = resolve(binDir, 'ExactLaunchParts.o'), map = resolve(binDir, 'ExactLaunchParts.build', 'output-file-map.json');
   if (existsSync(merged)) return [merged];
-  return existsSync(dir) ? readdirSync(dir).filter(f => f.endsWith('.o')).sort().map(f => resolve(dir, f)) : [];
+  if (!existsSync(map)) return [];
+  const { '': module, ...sources } = JSON.parse(readFileSync(map, 'utf8')), at = path => resolve(dirname(map), path);
+  const objects = Object.values(sources).flatMap(entry => entry?.object ? [at(entry.object)] : []).sort();
+  // The map's '' entry is the module's own object, written only by a whole-module build in one frontend job.
+  return objects.every(existsSync) || !module?.object || !existsSync(at(module.object)) ? objects : [at(module.object)];
 }
 
 /** Throws unless the linked launch parts have at most 32 KiB of text and data

@@ -42,10 +42,25 @@ test('the launch parts are found in either SwiftPM layout, and missing ones cann
   try {
     expect(launchPartsObjects(bin)).toEqual([]);
     expect(() => auditLaunchParts(launchPartsObjects(bin), modules, () => size)).toThrow('cannot be audited: SwiftPM left no ExactLaunchParts object');
-    // The native build system (a Linux cross build): one object per source.
-    mkdirSync(resolve(bin, 'ExactLaunchParts.build'));
-    for (const f of ['Registry.swift.o', 'EighteenLaunch.swift.o', 'ExactLaunchParts.swiftmodule']) writeFileSync(resolve(bin, 'ExactLaunchParts.build', f), '');
-    expect(launchPartsObjects(bin)).toEqual(['EighteenLaunch.swift.o', 'Registry.swift.o'].map(f => resolve(bin, 'ExactLaunchParts.build', f)));
+    // The native build system (a Linux cross build): one object per source. A removed or renamed
+    // source's object, or another app's, stays in the directory; only the output-file map's count.
+    const dir = resolve(bin, 'ExactLaunchParts.build');
+    mkdirSync(dir);
+    for (const f of ['Registry.swift.o', 'EighteenLaunch.swift.o', 'Removed.swift.o', 'ExactLaunchParts.swiftmodule']) writeFileSync(resolve(dir, f), '');
+    expect(launchPartsObjects(bin)).toEqual([]);
+    writeFileSync(resolve(dir, 'output-file-map.json'), JSON.stringify({
+      '': { 'swift-dependencies': resolve(dir, 'primary.swiftdeps') },
+      '/pkg/.launch-parts/app/Registry.swift': { object: resolve(dir, 'Registry.swift.o'), dependencies: resolve(dir, 'Registry.d') },
+      '/pkg/.launch-parts/app/EighteenLaunch.swift': { object: resolve(dir, 'EighteenLaunch.swift.o') },
+    }));
+    expect(launchPartsObjects(bin)).toEqual(['EighteenLaunch.swift.o', 'Registry.swift.o'].map(f => resolve(dir, f)));
+    // A whole-module build in one job writes the '' entry's object instead.
+    writeFileSync(resolve(dir, 'output-file-map.json'), JSON.stringify({
+      '': { object: resolve(dir, 'ExactLaunchParts.o') }, '/pkg/.launch-parts/app/Renamed.swift': { object: resolve(dir, 'Renamed.swift.o') },
+    }));
+    expect(launchPartsObjects(bin)).toEqual([resolve(dir, 'Renamed.swift.o')]);
+    writeFileSync(resolve(dir, 'ExactLaunchParts.o'), '');
+    expect(launchPartsObjects(bin)).toEqual([resolve(dir, 'ExactLaunchParts.o')]);
     // Swift Build: the target linked into one object, which wins.
     writeFileSync(resolve(bin, 'ExactLaunchParts.o'), '');
     expect(launchPartsObjects(bin)).toEqual([resolve(bin, 'ExactLaunchParts.o')]);
