@@ -37,6 +37,7 @@ import { copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync,
 import { createConnection } from 'node:net';
 import { homedir, tmpdir, userInfo } from 'node:os';
 import { basename, dirname, resolve } from 'node:path';
+import { within } from './paths.mjs';
 import { HOST_DEV, PINNED_RUST, bakeWatchEnv, buildBake, claimLive, hermesBundle, cargoEnvironment, copyShaders, gpuModules, injectedProfiles, linuxBuild, mavenProblems, resolveApp, wholeProgram } from './app.mjs';
 import { ANDROID_MIN_API, hermesAndroidBundle } from './hermes-android.mjs';
 import { ANDROID_PAGE_SIZE, androidCargo } from './cargo-check.mjs';
@@ -261,7 +262,7 @@ const READER = resolve(import.meta.dir, '../host/android');
  * host/android/app/build/<name>; an app outside it builds under its own target directory. No two apps share any of it,
  * so builds of two apps at once neither mix outputs nor wait on one project's locks. */
 export function apkDirs(app) {
-  const own = !app.dir.startsWith(resolve(READER, '../..') + '/'), root = resolve(app.target, 'android');
+  const own = !within(resolve(READER, '../..'), app.dir), root = resolve(app.target, 'android');
   return own ? { app: resolve(root, 'app'), canvas: resolve(root, 'canvas'), cache: resolve(root, 'gradle'), kotlin: resolve(root, 'kotlin') }
     : { app: resolve(READER, 'app/build', app.name), canvas: resolve(READER, 'canvas/build', app.name), cache: resolve(READER, '.gradle/apps', app.name), kotlin: resolve(READER, '.kotlin/apps', app.name) };
 }

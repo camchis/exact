@@ -12,6 +12,7 @@ import nodePath, { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { HOST_DEV, cargoReproducibilityFlags, developmentBuildEnv, readBuilds, resolveApp, rustPolicy, rustRemapFlags } from './app.mjs';
 import { channelOrigin } from './origin.mjs';
+import { within } from './paths.mjs';
 
 const ROOT = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
@@ -398,7 +399,7 @@ export async function buildRust(app, { compat, env = developmentBuildEnv(), nati
   const { files: inputs, directories } = rustClosure(app, env), observed = new Map(), before = rustInputDigest(inputs, observed);
   // Contract sources outside every Cargo package feed the bake, never Cargo: a
   // Contract-only edit reuses the modules compiled from the same Rust inputs.
-  const compiledFrom = inputs.filter(path => !path.endsWith('.contract') || directories.some(dir => path.startsWith(dir + '/')));
+  const compiledFrom = inputs.filter(path => !path.endsWith('.contract') || directories.some(dir => within(dir, path)));
   const key = JSON.stringify([profile, nativeTarget, env.EXACT_UPDATE_TRUST ?? null, env.EXACT_RUST_SIGN_IDENTITY ?? null,
     hash(JSON.stringify(compiledFrom.map(path => [path, observed.get(path)])))]);
   const reused = compiledModules.get(app.dir);
