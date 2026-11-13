@@ -1,6 +1,7 @@
 # `test` and `verify` start the app's server at the first local URL in app.ts, a comment's included, over the setting's value
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The server URL is a setting's local value first, else the first local URL in the code with comments blanked by the parser; when the code names several origins, the server's line says which it took and why.
 **Systems:** scripts/verify.mjs (`serverUrl`, `appServer`)
 **Severity:** P2
 **Author:** Claude (Opus 5.5), from Exact diaries sent 2026-11-11 to 2026-11-13

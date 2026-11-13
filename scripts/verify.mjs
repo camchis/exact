@@ -91,11 +91,33 @@ export function onThisMachine(origin) {
 function builtSettings(dir, env, code = readIn(dir, 'app.ts')) {
   try { const { code: built, record } = inlineSettings(code, dir, createRequire(import.meta.url)('rolldown/utils').parseSync, env); return { code: built, values: Object.fromEntries(Object.entries(record).map(([name, s]) => [name, s.value])) }; } catch { return { code, values: {} }; }
 }
-/** The server URL the data module calls: the first local one (`http://127.0.0.1:8787`, localhost; with none, a socket's origin, `ws://…`, is its
- * server's) in app.ts as built (a setting's value, not a default it overrides), else in a module of its own it imports (`./api`'s `API`); else null. */
-export function serverUrl(dir, env = process.env) {
-  const texts = [builtSettings(dir, env).code, ...importsOf(dir, 'app.ts').map((p) => readIn(dir, p))], at = (re) => texts.map((t) => t?.match(re)?.[0]).find(Boolean);
-  return (at(LOCAL) ?? at(LOCAL_SOCKET))?.replace(/\/$/, '').replace(/^ws/, 'http') ?? null;
+/** `text` with its comments blanked, so a URL a comment names is not taken for one the code calls; as written when
+ * it does not parse. */
+function uncommented(text, path) {
+  if (!text) return text;
+  try {
+    const parsed = createRequire(import.meta.url)('rolldown/utils').parseSync(path, text);
+    if (parsed.errors?.length) return text;
+    for (const c of [...parsed.comments].reverse()) text = text.slice(0, c.start) + ' '.repeat(c.end - c.start) + text.slice(c.end);
+    return text;
+  } catch { return text; }
+}
+/** The server URL the data module calls: a setting's value that is a local URL (`http://127.0.0.1:8787`, localhost), as the
+ * build inlines it; else the first local one in app.ts's code (not its comments), else in a module of its own it imports
+ * (`./api`'s `API`); with no http one, a socket's origin (`ws://…`) is its server's. Null with none. */
+export function serverUrl(dir, env = process.env) { return serverChoice(dir, env).url; }
+
+/** `serverUrl`'s answer as `{ url, note }`: `note` says which origin it took and why when the code names more than one. */
+export function serverChoice(dir, env = process.env) {
+  const { code, values } = builtSettings(dir, env);
+  const texts = [['app.ts', uncommented(code, 'app.ts')], ...importsOf(dir, 'app.ts').map((p) => [p, uncommented(readIn(dir, p), p)])];
+  const all = (re) => texts.flatMap(([path, t]) => [...(t ?? '').matchAll(new RegExp(re.source, 'g'))].map((m) => ({ path, url: m[0] })));
+  const found = [...all(LOCAL), ...all(LOCAL_SOCKET)].map((f) => ({ ...f, url: f.url.replace(/\/$/, '').replace(/^ws/, 'http') }));
+  const setting = Object.entries(values).map(([name, value]) => ({ name, url: String(value).match(LOCAL)?.[0] ?? String(value).match(LOCAL_SOCKET)?.[0] })).find((s) => s.url);
+  const url = setting ? setting.url.replace(/\/$/, '').replace(/^ws/, 'http') : found[0]?.url ?? null;
+  const origins = [...new Set([...(setting ? [url] : []), ...found.map((f) => f.url)].map((u) => new URL(u).origin))];
+  const why = setting ? `the value of ${setting.name}` : `the first in ${found[0]?.path}'s code`;
+  return { url, note: url && origins.length > 1 ? `the app's code names ${origins.join(', ')}: the server is started at ${url}, ${why}` : null };
 }
 
 /** The app's own server, the `rest` pattern's shape: an entry Bun runs (app.json's `commands.server`, as
@@ -122,7 +144,7 @@ export function appServer(dir, env = process.env) {
   const fixture = /(^|[/\\])fixtures?[/\\]/.test(entry);
   const selected = fixture ? backendOriginSelection(dir, env) : null;
   const local = selected && onThisMachine(selected.origin);
-  const url = selected ? local ? selected.origin : null : serverUrl(dir, env);
+  const chosen = selected ? null : serverChoice(dir, env), url = selected ? local ? selected.origin : null : chosen.url;
   const why = !url ? `${entry} is left alone: app.ts calls no local URL (http://127.0.0.1:<port>), so where the app reaches it is unknown` : null;
   const refusal = url && database && command && !named
     ? `app.json's commands.server (${command.join(' ')}) names no file of the app to read, so whether it opens its database at the path DB names cannot be told: name its entry file in the command, or say it keeps none in app.json: "server": { "database": false }`
@@ -131,7 +153,7 @@ export function appServer(dir, env = process.env) {
     : null;
   const port = url ? Number(new URL(url).port || (new URL(url).protocol === 'https:' ? 443 : 80)) : null;
   if (selected && local) { const at = serverArgs.indexOf('--port'); if (at >= 0) serverArgs[at + 1] = String(port); }
-  return { entry, args: entry === named ? serverArgs : [], database, url, port, why, refusal, settings: builtSettings(dir, env).values, ...(fixture ? { fixture: true } : {}), ...(command ? { command } : {}) };
+  return { entry, args: entry === named ? serverArgs : [], database, url, port, why, refusal, settings: builtSettings(dir, env).values, ...(chosen?.note ? { note: chosen.note } : {}), ...(fixture ? { fixture: true } : {}), ...(command ? { command } : {}) };
 }
 
 // app.ts's settings as `appServer` read them: a server importing it (site's) listens where it looked, as Bun's .env loading may not.
@@ -141,7 +163,7 @@ function serverEnv(server, db) {
   return env;
 }
 
-const serverRun = (server, name) => `${(server.command ?? ['bun', server.entry, ...server.args]).join(' ')} at ${server.url}, ${server.database ? `on an empty database (.exact/${name}/db.sqlite, removed after)` : 'without a database'}`;
+const serverRun = (server, name) => `${(server.command ?? ['bun', server.entry, ...server.args]).join(' ')} at ${server.url}, ${server.database ? `on an empty database (.exact/${name}/db.sqlite, removed after)` : 'without a database'}${server.note ? `; ${server.note}` : ''}`;
 
 /** Whether anything answers HTTP at `url` (any status). */
 export const answering = (url) => fetch(url, { signal: AbortSignal.timeout(1000) }).then(() => true, () => false);
@@ -158,7 +180,7 @@ function portHolder(server) {
  * server this did not start is never stopped, nor written to. */
 export function heldLine(server) {
   const { pid, holder } = portHolder(server);
-  return `${server.url}${holder}, and the tests would ${server.database ? "write into that server's database" : 'change that server\'s state'}: stop it (${pid ? `kill ${pid}` : 'Ctrl-C where it runs'}) and run this again, which starts ${server.entry} itself${server.database ? ' on an empty one' : ''}`;
+  return `${server.url}${holder}, and the tests would ${server.database ? "write into that server's database" : 'change that server\'s state'}: stop it (${pid ? `kill ${pid}` : 'Ctrl-C where it runs'}) and run this again, which starts ${server.entry} itself${server.database ? ' on an empty one' : ''}${server.note ? `; ${server.note}` : ''}`;
 }
 
 /** Keep the URL appServer accepted, including its path and explicit default port, for exact record comparisons. */
@@ -342,7 +364,7 @@ export async function driveServer(dir, storage, say = (line) => console.error(li
       await stop();
       throw new Error(`agent: ${server.url} answered before this checkout's fixture owned its port; choose another port with --backend or PORT`);
     }
-    say(`agent: started ${server.entry} at ${server.url} for this drive (${!db ? 'no database' : storage ? `database ${relative(dir, db)}, kept for --storage ${storage}` : 'an empty database'}); stopped after`);
+    say(`agent: started ${server.entry} at ${server.url} for this drive (${!db ? 'no database' : storage ? `database ${relative(dir, db)}, kept for --storage ${storage}` : 'an empty database'}); stopped after${server.note ? `; ${server.note}` : ''}`);
     return { stop };
   } finally { if (locked) rmSync(starting, { force: true }); }
 }

@@ -12,7 +12,7 @@ import { applyPattern, createApp } from '../game/new.mjs';
 import { findings } from '../host/apple/feel/analyze.mjs';
 import { chromium } from './agent-launch.mjs';
 import { ancestors, parentsOf } from './processes.mjs';
-import { ago, appServer, buildProgress, buildWarnings, draftFields, fixedType, groups, judgeRelaunch, judgeReload, movedClock, persistedStates, pinnedLaunch, refusalsOf, relaunchFacts, relaunchStore, reloadLine, reloadNote, report, reusable, savedChanges, screenTexts, serverUrl, shotName, storedTexts, warningsOfBuild } from './verify.mjs';
+import { ago, appServer, buildProgress, buildWarnings, draftFields, fixedType, groups, judgeRelaunch, judgeReload, movedClock, persistedStates, pinnedLaunch, refusalsOf, relaunchFacts, relaunchStore, reloadLine, reloadNote, report, reusable, savedChanges, screenTexts, serverChoice, serverUrl, shotName, storedTexts, warningsOfBuild } from './verify.mjs';
 import { semanticsSummary } from './verify-semantics.mjs';
 
 const SIZES = [[390, 844], [1280, 900]];
@@ -488,6 +488,16 @@ test('the app\'s server: its entry, the URL app.ts calls, and why it cannot be r
     put({ ...setting, '.env': 'API_BASE_URL=http://127.0.0.1:8787\n', '.env.local': 'API_BASE_URL=http://localhost:9000\n' });
     assert.equal(serverUrl(dir, {}), 'http://localhost:9000');
     assert.equal(serverUrl(dir, { API_BASE_URL: 'http://127.0.0.1:7000' }), 'http://127.0.0.1:7000');
+    // A comment naming another local URL is not code, and a setting's value wins over a constant before it; the
+    // server's line says which origin it took and why.
+    put({ ...setting, 'app.ts': "// The server listens on http://127.0.0.1:8787 by default.\nconst API = import.meta.env.API_BASE_URL ?? 'http://127.0.0.1:8787';\nexport function load() { return fetch(`${API}/items`); }\n" });
+    assert.deepEqual([serverUrl(dir, { API_BASE_URL: 'http://127.0.0.1:9100' }), appServer(dir, { API_BASE_URL: 'http://127.0.0.1:9100' }).note], ['http://127.0.0.1:9100', undefined]);
+    assert.equal(serverUrl(dir, {}), 'http://127.0.0.1:8787');
+    put({ ...setting, 'app.ts': "const FALLBACK = 'http://127.0.0.1:8787'; /* or http://localhost:1 */\nconst API = import.meta.env.API_BASE_URL ?? 'http://127.0.0.1:8787';\nexport const grants = `net.fetch ${API} ${FALLBACK}`;\n" });
+    assert.deepEqual([serverChoice(dir, { API_BASE_URL: 'http://127.0.0.1:9100' })], [{ url: 'http://127.0.0.1:9100', note: "the app's code names http://127.0.0.1:9100, http://127.0.0.1:8787: the server is started at http://127.0.0.1:9100, the value of API_BASE_URL" }]);
+    put({ ...setting, 'app.ts': "const API = 'http://127.0.0.1:8080'; // not http://localhost:1\nconst OTHER = 'http://localhost:9000';\nexport const grants = `net.fetch ${API} ${OTHER}`;\n" });
+    assert.deepEqual(serverChoice(dir, {}), { url: 'http://127.0.0.1:8080', note: "the app's code names http://127.0.0.1:8080, http://localhost:9000: the server is started at http://127.0.0.1:8080, the first in app.ts's code" });
+    put(setting);
     assert.equal(appServer(dir, { API_BASE_URL: 'https://api.example.com' }).url, null);
     assert.match(appServer(dir, { API_BASE_URL: 'https://api.example.com' }).why, /^server\.ts is left alone: app\.ts calls no local URL/);
     // The spellings of reading DB, and a root shim that only imports the backend that reads it (book-club, polls, event-rsvp).
