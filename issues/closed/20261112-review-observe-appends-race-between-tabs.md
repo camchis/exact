@@ -1,6 +1,7 @@
 # Concurrent Observe queue appends can overwrite another tab's event
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** Already fixed by 9aecf9f56: every read-modify-write of the stored queue (appends, session metadata and a send's removal) holds the `<queue>:edit` Web Lock, which `tabs.test.mjs` checks for simultaneous appends and an append during a removal.
 **Systems:** modules/observe/web/service.js, modules/observe/tests/tabs.test.mjs
 **Author:** Codex
 **Date:** 2026-11-12
