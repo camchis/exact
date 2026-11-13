@@ -713,9 +713,11 @@ reports zero. The first snapshot, virtual-clock snapshots and the first after a
 clock-mode change leave these fields unavailable. A clock-mode change discards the
 open measurement window. Delayed snapshots use their actual elapsed time.
 The cadence comparison honors the canvas frame cap and excludes virtual time and
-the first frame after rest. `thermalState`, `quality`, `maxFps` and `idle` are
-read when the snapshot is taken, not over the window, as are `textureMemoryBytes`
-(the delivered textures resident on the device, render targets excluded) and
+the first frame after rest. `quality`, `maxFps` and `idle` are
+read when the snapshot is taken, not over the window (`thermalState` is the last
+drawn frame's, absent while idle), as are `textureMemoryBytes`
+(the delivered textures the renderer holds, retired ones included, render
+targets excluded) and
 `geometryMemoryBytes` (the shared vertex and index buffers' allocated bytes);
 the GPU module adds the process's footprint and, on the web, its own heap. `audioState` is the game audio output's (`running`, `suspended`,
 `interrupted`, `closed`) where the target has a player. CPU encoding is distinct

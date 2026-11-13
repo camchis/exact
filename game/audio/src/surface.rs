@@ -221,10 +221,13 @@ impl SurfacePlayer {
         target_os = "tvos"
     ))]
     pub fn state(&self) -> Option<&'static str> {
-        Some(match (&self.device, self.suspended, self.unlocked) {
-            (None, _, _) => "closed",
-            (Some(_), false, true) => "running",
-            (Some(_), _, _) => "suspended",
+        // The output as it is now, not as the last frame's sync found it: a
+        // resting canvas runs no sync.
+        Some(match &self.device {
+            None => "closed",
+            Some(player) if player.output.failure().is_some() => "closed",
+            Some(player) if !self.suspended && player.output.ready() => "running",
+            Some(_) => "suspended",
         })
     }
     #[cfg(not(any(
@@ -458,11 +461,16 @@ mod test_device {
         let _ = surface.suspend(false);
         assert_eq!(
             surface.state(),
-            Some("suspended"),
-            "until a frame finds it ready"
+            Some("running"),
+            "read now, not at the last sync"
         );
-        surface.sync(&world, 0, true, false);
-        assert_eq!(surface.state(), Some("running"));
+        DEVICE_ERROR.set(true);
+        assert_eq!(
+            surface.state(),
+            Some("closed"),
+            "a failed output plays nothing"
+        );
+        DEVICE_ERROR.set(false);
         surface.clock(true);
         assert_eq!(surface.state(), Some("closed"));
     }

@@ -94,6 +94,8 @@ pub struct WorldSurface<G: Game, P: Executor = (), const ASSETS: bool = false, H
     rung: Option<crate::quality::Rung>,
     /// Drawing stopped at rest (`Game::render_idle`); the next live frame wakes the clock.
     resting: bool,
+    /// The last frame asked for no next one: the canvas draws again only on a change.
+    still: bool,
     /// The tick the world was first seen idle at, while it stays idle.
     idle_tick: Option<u64>,
     /// The scene samples the renderer was made with (`Game::samples`).
@@ -575,6 +577,7 @@ impl<G: Game, P: Executor, const ASSETS: bool, H: crate::Hooks> Surface
         self.perf.live = !frame.seekable;
         self.perf.rendering = true;
         let wants = self.render_frame(frame, device, queue, encoder, target, format);
+        self.still = !wants;
         self.perf.rendering = false;
         if self.encoded.is_some() && self.perf.reporting.is_some() {
             let scale = self.raster_scale();
@@ -678,10 +681,15 @@ impl<G: Game, P: Executor, const ASSETS: bool, H: crate::Hooks> Surface
     fn take_performance(&mut self, now_ms: f64) -> Option<String> {
         self.perf.reporting.as_ref()?;
         let live = performance::Live {
-            thermal: self.timing.thermal_state,
+            // A resting canvas gets no frame timing, so its last would be stale.
+            thermal: if self.still {
+                Default::default()
+            } else {
+                self.timing.thermal_state
+            },
             quality: self.rung.map(|rung| rung.level.keyword()),
             max_fps: self.max_fps(),
-            idle: self.resting,
+            idle: self.still,
             audio: performance::audio(self.presentation.audio_state(), self.interrupted),
             memory: (self.render.as_ref())
                 .map(|(renderer, _)| (renderer.texture_bytes(), renderer.mesh_buffer_bytes())),

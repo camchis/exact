@@ -4168,19 +4168,23 @@ reports render dimensions, scale, samples, draw counts, frame pacing, CPU
 tick/feed/encode durations, and on every host: `quality`, the resolved rung
 (`low`, `mid`, `high`) once a binding resolved it; `maxFps`, the frame cap in
 force, `none` when the canvas draws at the display's rate; and `idle`, true
-while the canvas rests between changes (`none` under the agent's virtual
-clock). `thermalState` is `nominal`, `fair`, `serious` or `critical` where the
-host reads the device's (Apple), `none` elsewhere. Memory, in bytes:
+while the canvas asks for no frames until something changes (a world at rest
+or paused; `none` under the agent's virtual clock). `thermalState` is
+`nominal`, `fair`, `serious` or `critical` as of the canvas's last drawn frame
+where the host reads the device's (Apple); `none` elsewhere and while the
+canvas is idle, when no frame has read it. Memory, in bytes:
 `processMemoryBytes` is the process's footprint (`phys_footprint` on Apple, the
 resident set on Linux and Android), `none` on the web and Windows;
 `gameHeapBytes` is the GPU module's linear memory on the web, the simulation's
 and renderer's heap, and `none` natively, where that heap is the process's;
-`textureMemoryBytes` counts the delivered textures resident on the device
-(render targets are not counted) and `geometryMemoryBytes` the renderer's
+`textureMemoryBytes` counts the delivered textures the renderer holds on the
+device, retired ones awaiting compaction included (render targets are not
+counted) and `geometryMemoryBytes` the renderer's
 vertex and index buffers, on every host once the renderer exists.
 `audioState` is a game's audio output where its host gives it one (the web,
 Apple, Windows): `running`, `suspended` (hidden, or waiting for a gesture),
-`interrupted` (a call or alarm on iOS) or `closed` (no device: under the
+`interrupted` (suspended by the host's interruption: a call or alarm on iOS,
+the window losing focus on Windows) or `closed` (no device: under the
 agent's virtual clock, or not yet opened); `none` on the Linux family and for
 a game without audio. `gpuMs`, `gpuMaxMs`, `cpuSubmitMs` and
 `cpuSubmitMaxMs` are not measured on any host yet and stay `none`. The 16 KiB snapshot limit is separate from the public surface

@@ -268,9 +268,13 @@ fn delivered(textures: &BTreeMap<String, Texture>) -> impl Iterator<Item = &Text
         .map(|(_, t)| t)
 }
 
-/// The device bytes of the active delivered textures: [`summary`]'s `bytes`.
+/// The device bytes of every delivered texture the renderer holds: the active
+/// ones [`summary`] counts and the retired ones kept until a compaction.
 pub(crate) fn resident_bytes(textures: &BTreeMap<String, Texture>) -> u64 {
-    delivered(textures).map(|t| t.bytes).sum()
+    (textures.iter())
+        .filter(|(name, _)| !name.starts_with('\0'))
+        .map(|(_, t)| t.bytes)
+        .sum()
 }
 
 /// Active delivered textures (the 1×1 defaults excluded) for `state.world.gpu`:

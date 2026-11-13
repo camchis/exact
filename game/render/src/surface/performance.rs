@@ -20,7 +20,7 @@ pub(crate) struct Live {
     pub quality: Option<&'static str>,
     /// The surface's frame cap, 0 for the display's rate.
     pub max_fps: u32,
-    /// The canvas is at rest: it asks for no frames until something changes.
+    /// The canvas asks for no frames until something changes.
     pub idle: bool,
     /// The audio output's state, where the surface has one.
     pub audio: Option<&'static str>,
@@ -29,10 +29,14 @@ pub(crate) struct Live {
     pub memory: Option<(u64, u64)>,
 }
 
-/// The output's `state` as a snapshot names it: an interruption (a call, an
-/// alarm) suspends the output, and the snapshot says which suspension it is.
+/// The output's `state` as a snapshot names it: a suspension the host's
+/// interruption caused (an iOS call or alarm, a Windows window losing focus)
+/// is `interrupted`.
 pub(crate) fn audio(state: Option<&'static str>, interrupted: bool) -> Option<&'static str> {
-    state.map(|state| if interrupted { "interrupted" } else { state })
+    state.map(|state| match state {
+        "suspended" if interrupted => "interrupted",
+        state => state,
+    })
 }
 
 #[derive(Default)]
@@ -195,6 +199,11 @@ mod tests {
     fn an_interrupted_output_says_so_and_no_output_says_nothing() {
         assert_eq!(audio(Some("suspended"), true), Some("interrupted"));
         assert_eq!(audio(Some("running"), false), Some("running"));
+        assert_eq!(
+            audio(Some("closed"), true),
+            Some("closed"),
+            "no device is not interrupted"
+        );
         assert_eq!(audio(None, true), None);
     }
 

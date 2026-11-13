@@ -756,7 +756,7 @@ impl<const ASSETS: bool> crate::renderer::RendererWithAssets<ASSETS> {
     pub(crate) fn texture_summary(&self) -> String {
         textures::summary(&self.models.textures)
     }
-    /// Device bytes of the resident delivered textures.
+    /// Device bytes of the delivered textures held, retired ones included.
     pub(crate) fn texture_bytes(&self) -> u64 {
         textures::resident_bytes(&self.models.textures)
     }
