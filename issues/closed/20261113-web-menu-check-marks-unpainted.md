@@ -1,6 +1,7 @@
 # Web menu checks find a checkable menu's marks unpainted
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** Already fixed by 4923b456e, which shoots the marks with the focused row's wash hidden; both runtimes' tests pass in Chrome, Firefox and WebKit.
 **Systems:** host/web menus, host/web/tests/menu-checks.test.mjs
 **Severity:** P3
 **Author:** Claude (Opus 5.5), async lane triage
