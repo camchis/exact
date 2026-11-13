@@ -1,6 +1,7 @@
 # compressImage's generated type is wider than the TypeScript dispatcher test's provider
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The generated type is right (compressImage writes a PNG with type image/png, docs/reference.md and LLP 1069.002 A1.11), so the dispatcher test's record now accepts both types.
 **Systems:** contract (TypeScript types), contract/cli/tests/it/typescript.rs
 **Severity:** P3
 **Author:** Claude (Opus 5.5), async lane triage
