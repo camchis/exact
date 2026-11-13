@@ -196,6 +196,31 @@ final class GroupedAccessibilityIOSTests: GroupedListFixture {
         XCTAssertEqual((element["states"] as? [String: Any])?["checked"] as? Bool, true)
     }
 
+    /// Where a grouped list shows its authored nodes, as on tvOS, which reads no model
+    /// (`Runtime.groupedList`), a toggle row's switch is the row's element: named by the row's
+    /// label, else its own, else the row's words, and saying its state as UIKit's toggle.
+    func testAnAuthoredToggleRowsSwitchIsNamedByItsRow() throws {
+        let p = presenter { nil }
+        defer { window.isHidden = true }
+        p.apply(wireBatch([
+            ["op": "create", "id": 14, "kind": "text", "props": ["text": "Read Receipts"], "style": [:]],
+            ["op": "children", "id": 12, "ids": [14, 13]],
+        ]))
+        let toggle = try XCTUnwrap(p.controls.controls[13])
+        XCTAssertNil(host(p).lists[1], "no UIKit list: its authored rows show")
+        XCTAssertEqual(toggle.accessibilityLabel, "Read Receipts")
+        if Presenter.axRuntimeLoaded { XCTAssertEqual(toggle.accessibilityValue, "1") }
+        p.apply(wireBatch([["op": "props", "id": 14, "set": ["text": "Receipts sent"]]]))
+        XCTAssertEqual(toggle.accessibilityLabel, "Receipts sent", "the row's words as they now are")
+        p.apply(wireBatch([["op": "props", "id": 13, "set": ["accessibilityLabel": "Send read receipts"]]]))
+        XCTAssertEqual(toggle.accessibilityLabel, "Send read receipts")
+        p.apply(wireBatch([["op": "props", "id": 12, "set": ["accessibilityLabel": "Receipts"]]]))
+        XCTAssertEqual(toggle.accessibilityLabel, "Receipts")
+        // A switch that is not its row's last part is its own.
+        p.apply(wireBatch([["op": "props", "id": 13, "clear": ["accessibilityLabel"]], ["op": "children", "id": 12, "ids": [13, 14]]]))
+        XCTAssertNil(toggle.accessibilityLabel)
+    }
+
     /// Every label's text in a view, hidden ones too.
     private func labelText(in view: UIView) -> [String] {
         view.subviews.flatMap { ($0 as? UILabel).map { [$0.text ?? ""] } ?? labelText(in: $0) }.filter { !$0.isEmpty }
