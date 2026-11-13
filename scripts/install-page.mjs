@@ -177,7 +177,7 @@ export function developmentInstallPage(page, token) {
   const refresh = document.querySelector('#local-ios-refresh');
   const state = document.querySelector('#local-ios-state');
   const log = document.querySelector('#local-ios-log');
-  let polling = null;
+  let polling = null, building = false, failures = 0;
   async function request(method = 'GET', body, refresh = false) {
     const response = await fetch(endpoint + (refresh ? '?refresh=1' : ''), { method, headers: {'x-exact-install-token': token, ...(body ? {'content-type':'application/json'} : {})}, body: body ? JSON.stringify(body) : undefined });
     const value = await response.json().catch(() => ({message:'The development server returned an unreadable response.'}));
@@ -192,7 +192,7 @@ export function developmentInstallPage(page, token) {
       return option;
     }));
     if (selected && [...select.options].some(option => option.value === selected)) select.value = selected;
-    const busy = value.state === 'building';
+    const busy = building = value.state === 'building';
     select.disabled = busy || !value.available || !select.options.length;
     start.disabled = select.disabled;
     refresh.disabled = busy;
@@ -203,7 +203,17 @@ export function developmentInstallPage(page, token) {
     clearTimeout(polling);
     if (busy) polling = setTimeout(load, 1500);
   }
-  async function load(force = false) { try { paint(await request('GET', undefined, force)); } catch (error) { state.textContent = error.message; } }
+  // A poll that fails while a build runs is tried again, a few times, so a
+  // dropped connection does not hide the build's end; Refresh asks at once.
+  async function load(force = false) {
+    try { paint(await request('GET', undefined, force)); failures = 0; }
+    catch (error) {
+      state.textContent = error.message;
+      refresh.disabled = false;
+      clearTimeout(polling);
+      if (building && ++failures <= 5) polling = setTimeout(load, 1500 * 2 ** failures);
+    }
+  }
   refresh.addEventListener('click', () => load(true));
   start.addEventListener('click', async () => {
     start.disabled = true; refresh.disabled = true; state.textContent = 'Starting the local Apple build…';

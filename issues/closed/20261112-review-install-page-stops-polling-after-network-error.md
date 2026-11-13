@@ -1,6 +1,7 @@
 # A failed status poll leaves the local installer stuck in its busy state
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** A status poll that fails during a build enables Refresh and is retried up to five times, backing off from 3 s, so the page sees the build end once the server answers again.
 **Systems:** scripts/install-page.mjs, local iOS installation
 **Author:** Codex
 **Date:** 2026-11-12

@@ -213,6 +213,39 @@ test('only a Mac development response adds local Simulator and signed-device act
   assert.throws(() => developmentInstallPage(page, 'guessable'), /32 random bytes/);
 });
 
+test('a status poll that fails during a build is retried, and Refresh stays usable', async () => {
+  const script = /<script>\n(\(\(\) => \{\n  const endpoint[\s\S]*?)<\/script>/.exec(developmentInstallPage(installPage(manifest), 'a'.repeat(64)))[1];
+  const element = () => ({ disabled: false, hidden: false, textContent: '', value: '', options: [], listeners: {},
+    addEventListener(type, f) { this.listeners[type] = f; }, replaceChildren(...options) { this.options = options; this.value = options[0]?.value ?? ''; },
+    querySelector() { return this.pre ??= element(); } });
+  const nodes = Object.fromEntries(['target', 'start', 'refresh', 'state', 'log'].map(id => [`#local-ios-${id}`, element()]));
+  const document = { querySelector: selector => nodes[selector], createElement: element };
+  const target = { id: 'sim', name: 'iPhone' };
+  const answers = [{ state: 'building', available: true, targets: [target], message: 'Building' }, null,
+    { state: 'installed', available: true, targets: [target], message: 'Installed' }];
+  let requests = 0, timers = [];
+  const fetch = async () => {
+    const answer = answers[requests++];
+    if (!answer) throw new TypeError('Failed to fetch');
+    return { ok: true, json: async () => answer };
+  };
+  const settle = () => new Promise(resolve => setImmediate(resolve));
+  new Function('document', 'fetch', 'setTimeout', 'clearTimeout', script)(document, fetch,
+    f => timers.push(f), () => { timers = []; });
+  await settle();
+  assert.equal(nodes['#local-ios-refresh'].disabled, true, 'Refresh waits while the build runs');
+  for (const expected of ['Failed to fetch', 'Installed']) {
+    assert.equal(timers.length, 1, `a poll is scheduled before "${expected}"`);
+    timers.shift()();
+    await settle();
+    assert.equal(nodes['#local-ios-state'].textContent, expected);
+    if (expected !== 'Installed') assert.equal(nodes['#local-ios-refresh'].disabled, false);
+  }
+  assert.equal(requests, 3);
+  assert.equal(timers.length, 0);
+  assert.equal(nodes['#local-ios-start'].disabled, false);
+});
+
 test('install HTTP routes participate in atomic publication and preserve old pages', async () => {
   const dir = mkdtempSync(join(tmpdir(),'exact-install-publish-'));
   const web = join(dir,'web'), origin = new DirectoryOrigin(join(dir,'origin'));
