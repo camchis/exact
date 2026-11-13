@@ -15,8 +15,7 @@ import { nativeResourceMappings, nativeResourceInventory, appleAssetCatalogInven
 // everything else follows from it: the workspace cargo runs in, the target
 // directory the artifacts land in, `app.contract`, `assets/`, `gpu/`. Every
 // script that builds, serves, or drives an app resolves it here, so nothing
-// else knows the difference.
-//   bun host/web/build.mjs weird-castle-web          (EXACT_APP_DIR set)
+// else knows the difference; `EXACT_APP_DIR` selects the app for `bun host/web/build.mjs weird-castle-web`.
 // The app manifest (LLP 1030 D2; 1030.000 D7): `app.json` beside
 // `app.contract` — the W3C Web App Manifest's own keys, which the web host
 // copies out as `manifest.json`, plus `app` (identity: the id every platform

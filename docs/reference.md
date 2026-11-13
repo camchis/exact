@@ -362,7 +362,56 @@ reference a kept secret as `{secret:NAME}`, except in a URL’s scheme or author
 write `{{` for a literal brace.
 The bake checks at most eight entries against fetch and `secret.keep` grants.
 Hosts that support preloads send them at process start; the app's own reads take
-a preload's reply, and a read made for a tool is sent.
+a preload's reply, and a read made for a tool is sent. A Rust data source may
+implement `launch() -> Option<exact_runner::request::Launch>` and register its
+`launch` function with `Launch::new(env!("CARGO_PKG_NAME"), launch)`. The function
+takes `&mut dyn LaunchContext` and returns nothing. Hand each named `LaunchRequest`
+to `context.preload(request)`: it returns `Result<(), String>` with a refusal reason,
+else starts it immediately (`Foreground` waits for Opened). `when` defaults to
+`Start`; the request's `timeout_ms` is its exchange deadline.
+The context offers `secret`, durable `set_secret` and `forget_secret`, and blocking
+`fetch` under the binary's grants, without the cache. `secret` returns the value
+from when the function began, or the value the function last wrote; it does not
+observe intervening app writes. A secret write succeeds only if nobody else has
+written that secret since the function began or since its own last successful
+write. A changed version returns a refusal reason. If `set_secret` or
+`forget_secret` fails, the function cannot write that secret again during this
+launch, and each request it hands over afterwards is refused: what is stored is
+then unknown.
+The context exposes no app storage.
+On hosts that start preloads, it runs before the app's module, after the manifest's
+start requests reach the client. Its requests share the eight-entry bound.
+A handoff is refused if the app has since written any secret the function read
+or wrote, even if the function read its snapshot again. Each accepted request
+depends on all those secrets: a later write by either writer cancels it and drops
+its reply.
+While the function runs, a read waits only if it names a preload with no definition
+yet. It proceeds when that name is handed over, the function returns, or five
+seconds pass, then uses the ordinary holding rule. Unnamed reads and reads under
+an update selection wait only for existing holds. The manifest's definitions may
+hold any eligible read for one second. The function's deadline also aborts its
+blocking fetch. Requests handed over before it stand; later handoffs are refused.
+A panic cancels the function's requests where the build unwinds (a development
+build); a release build aborts on a panic there as anywhere in the crate.
+
+A read may name its preload: `fetch(url, { exactPreload: "feed" })`, or
+`Request::get(url).preload("feed")?` in Rust. Names must match `^[a-z][a-z0-9-]*$`.
+The held reply must have the same method and URL; headers and body may differ.
+With an update selected, including a plan-only update, only full request equality
+can take a preload. A missing or mismatched name also falls back to equality.
+A refresh drops both the preload it names at an equal method and URL and any
+fully equal hold; under an update selection only equality applies.
+On the web the option is accepted and ignored. A TypeScript bundle naming it needs
+runtime 13 (LLP 1162.000 D1, D2).
+
+For a read the next screen will make, use `fetch(url, { exactPrefetch: true })`
+or `Request::get(url).prefetch()` in Rust. The option is accepted and checked on
+every host, and the request is made as written, as an ordinary fetch. No host holds
+its reply yet. A tool's, wake's or device's plain read may use it too. A send,
+a mutation, a stream, a file-bodied or an independent request, or native work,
+refuses it. In TypeScript the value must be a boolean.
+A TypeScript bundle naming it needs runtime 13; the Rust module seam is ABI 9
+(LLP 1162.000 D5).
 
 A one-window Mac app ends when its window closes. An app with work the person
 expects to go on without the window (a server, a sync), as Mail and Messages
@@ -2259,8 +2308,8 @@ every host take it, and Rust sources with `Request::long_poll(cursor, from)` on
 a stream's request. An older prelude would ignore it and open an event stream,
 so it moves `typescriptRuntime` to 3: a native app with a TypeScript data module
 needs a new binary once more. A Rust source's long poll is a new kind on the
-module seam. The Rust module ABI is 7: long polls, two-way sockets
-(LLP 1016.003), cache modes (LLP 1162 D4) and admitted secret names
+module seam. The Rust module ABI is 9: prefetches (LLP 1162.000 D5), preload names (LLP 1162.000 D1), long polls,
+two-way sockets (LLP 1016.003), cache modes (LLP 1162 D4) and admitted secret names
 (LLP 1048.000 D9) require a matching binary.
 
 On the **web JS target and on macOS, iOS, Linux and Windows, TypeScript sources**
