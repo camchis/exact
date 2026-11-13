@@ -1,6 +1,7 @@
 # An old iOS openURL completion can change a replacement runner
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** `ExactSession.openURLAnswer(args)` replaces `answerOpenURL`: it stamps the generation when the open is asked and its completion, which both adapters hand to the platform for every scheme, changes the result node only while that generation runs.
 **Systems:** host/apple
 **Author:** Codex
 **Date:** 2026-11-12

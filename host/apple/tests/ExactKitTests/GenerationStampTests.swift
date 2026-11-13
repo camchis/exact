@@ -172,6 +172,40 @@ final class GenerationStampTests: XCTestCase {
         }
     }
 
+    // MARK: openURL
+
+    private static let opening = """
+    component Probe
+      state heard = "none"
+      action hear(v: string)
+        heard = v
+      view
+        column
+          input id="result" change=hear
+
+    """
+
+    func testAnOpenAnswersItsGenerationOpenedOrFailed() throws {
+        let session = try session(Self.opening)
+        session.openURLAnswer(["https://example.com/", "result"])(true)
+        XCTAssertEqual(try slots(session)["heard"] as? String, "opened")
+        session.openURLAnswer(["https://example.com/", "result"])(false)
+        XCTAssertEqual(try slots(session)["heard"] as? String, "failed")
+    }
+
+    /// UIKit's completion arrives after a reload whose page has its own
+    /// `result`, which never asked; or after the session's end.
+    func testAnOpenAnsweredAfterAReloadOrTheSessionsEndChangesNothing() throws {
+        let session = try session(Self.opening)
+        let answer = session.openURLAnswer(["app-settings:", "result"])
+        XCTAssertTrue(session.apply(try compile(Self.opening)))
+        answer(true)
+        XCTAssertEqual(try slots(session)["heard"] as? String, "none", "the replacement's handler ran")
+        let current = session.openURLAnswer(["app-settings:", "result"])
+        session.destroy()
+        current(false)
+    }
+
     func testAToolCallPolledInItsGenerationReadsItsRunner() throws {
         let session = try session()
         let reply = try XCTUnwrap(ExactTools.runner(session)(#"{"op":"called","id":1}"#))
