@@ -1,6 +1,7 @@
 # Web motion drops an explicit sensor frequency
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** A canvas input no longer adds a reader group, and a stream starts at the fastest of its readers' and inputs' frequencies, 60 Hz for a reader that names none.
 **Systems:** packages/motion
 **Severity:** P2
 **Author:** Grok 4.7
