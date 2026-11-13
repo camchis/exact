@@ -524,6 +524,7 @@ package final class NodeView: NSView, NSTextViewDelegate, NSTextFieldDelegate {
             o.autoresizingMask = [.width, .height]
             addSubview(o)
             overlay = o
+            Self.canvasOverlays.add(o)
         }
         if kind == "textarea" { makeTextArea() }
         if kind == "input" {
@@ -643,17 +644,6 @@ package final class NodeView: NSView, NSTextViewDelegate, NSTextFieldDelegate {
             materialView.layer?.cornerRadius = radius
             materialView.layer?.masksToBounds = true
         }
-    }
-
-    /// The canvas this node is painted through, if any: the nearest canvas
-    /// above whose overlay holds it.
-    package var canvasAbove: NodeView? {
-        var v: NSView = self
-        while let s = v.superview {
-            if let c = s as? NodeView, c.overlay === v { return c }
-            v = s
-        }
-        return nil
     }
 
     /// Something under a canvas repainted outside a batch (LLP 1014 D4 b, c):

@@ -275,7 +275,9 @@ package final class Presenter {
         }
         let replacementsDeferred = !inScrollCallback && textRasters.replaceVisible(candidates, wait: sliceBudget)
         var rastersDeferred = false
-        for node in candidates where node.needsTextRaster && node.rastersText {
+        var drawn = Set<ObjectIdentifier>() // owed pixels that AppKit draws: `rastersText` is asked once a pass
+        for node in candidates where node.needsTextRaster {
+            guard node.rastersText else { drawn.insert(ObjectIdentifier(node)); continue }
             // On screen without pixels: now. Otherwise nearest first, a few a slice.
             if textIsVisible(node) {
                 if inScrollCallback {
@@ -295,7 +297,7 @@ package final class Presenter {
         // Region readers own their pixel bands and publish positioned layers.
         // The ordinary backing-store band must not invalidate them a second time.
         for node in textViewportIndex!.candidates(reach: Self.textBandSlack)
-            where node.readerParagraph == nil && node.needsTextRaster && !node.rastersText && !node.textIsSmall {
+            where node.needsTextRaster && (drawn.contains(ObjectIdentifier(node)) || !node.rastersText) && node.readerParagraph == nil && !node.textIsSmall {
             let want = textBand(node, reach: Self.textBandSlack)
             guard !want.isEmpty else { continue }
             let old = visibleText[node.id]
