@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { resolve } from 'node:path';
-import { buildRust, rustArtifact, prepareRustBundle, publishedSignature, rustAbi, rustBundle, rustCard, rustCards, rustFiles, rustReceipt, tieredBytes, tieredNative } from './rust.mjs';
+import { posix, resolve, win32 } from 'node:path';
+import { buildRust, rustArtifact, localBlob, prepareRustBundle, publishedSignature, rustAbi, rustBundle, rustCard, rustCards, rustFiles, rustReceipt, tieredBytes, tieredNative } from './rust.mjs';
 import { rustRuntime } from '../host/web/rust-glue.js';
 
 test('the resident Rust baker builds and runs host-dev once for repeated requests', () => {
@@ -131,6 +131,15 @@ test('publisher companion acquisition binds exact local bytes and isolates concu
     writeFileSync(resolve(blobs,assets[1].sha256),'bad');
     assert.throws(()=>prepareRustBundle(app,'ios','aarch64-apple-ios',env),/differ from signed receipt/);
   } finally {rmSync(root,{recursive:true,force:true});}
+});
+
+test('a release record finds its local blobs under either platform separator', () => {
+  const sha='a'.repeat(64);
+  assert.equal(localBlob('/p/.exact/streams/s/releases/1.json',sha,posix),`/p/.exact/blobs/${sha}`);
+  assert.equal(localBlob('C:\\p\\.exact\\streams\\s\\releases\\1.json',sha,win32),`C:\\p\\.exact\\blobs\\${sha}`);
+  assert.equal(localBlob('C:/p/.exact/streams/s/releases/1.json',sha,win32),`C:\\p\\.exact\\blobs\\${sha}`);
+  assert.equal(localBlob('/p/receipts/1.json',sha,posix),null);
+  assert.equal(localBlob('C:\\p\\receipts\\1.json',sha,win32),null);
 });
 
 test('tiered publication binds both executors to one target, plan and module digest', () => {

@@ -8,7 +8,7 @@ import { createInterface } from 'node:readline';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
-import { dirname, relative, resolve } from 'node:path';
+import nodePath, { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { HOST_DEV, cargoReproducibilityFlags, developmentBuildEnv, readBuilds, resolveApp, rustPolicy } from './app.mjs';
 import { channelOrigin } from './origin.mjs';
@@ -30,6 +30,15 @@ function run(app, command, args, env) {
 export function rustPackage(app) { return app.manifest.rust?.module?.package ?? null; }
 export function rustOutput(app) { return resolve(app.target, 'rust-dev', hash(app.dir).slice(0, 24)); }
 
+/** The publisher's local copy of a blob a receipt names: a record under
+ * `.exact/streams/<stream>/releases/` has its blobs in `.exact/blobs/`. null for a
+ * record kept anywhere else. `path` is the platform's path module, a parameter so
+ * Windows paths can be tested on any host. */
+export function localBlob(recordPath, sha256, path = nodePath) {
+  const releases = path.dirname(recordPath);
+  return path.basename(releases) === 'releases' ? path.resolve(releases, '../../../blobs', sha256) : null;
+}
+
 /** Fetch only signed-record companion names from the publisher's blob store.
  * Cargo independently verifies the record signature and exact asset roster. */
 export function prepareRustBundle(app, platform, target, env) {
@@ -47,10 +56,8 @@ export function prepareRustBundle(app, platform, target, env) {
   for(const card of cards) {
     if(!/^[0-9a-f]{64}$/.test(card.sha256)||!Number.isSafeInteger(card.bytes)||card.bytes<0||card.bytes>32*1024*1024||card.url!==`./${card.sha256}`)throw new Error('invalid Rust companion blob card');
     let bytes;
-    if(dirname(recordPath).endsWith('/releases')) {
-      const blob=resolve(dirname(recordPath),'../../../blobs',card.sha256);
-      if(existsSync(blob))bytes=readFileSync(blob);
-    }
+    const blob=localBlob(recordPath,card.sha256);
+    if(blob&&existsSync(blob))bytes=readFileSync(blob);
     if(!bytes) {
       const origin=channelOrigin(app.manifest,head.stream.channel) ?? app.origin;
       if(!origin)throw new Error('Rust companion blobs unavailable locally; provide EXACT_RUST_BUNDLE or configure the signed origin');
