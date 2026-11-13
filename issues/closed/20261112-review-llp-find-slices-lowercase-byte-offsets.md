@@ -1,6 +1,7 @@
 # Finding text in the LLP reader can panic on ordinary Unicode content
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** Find folds each character on its own and maps every match back to the whole original characters it touches, so a run whose lowercase changes length is searched without slicing inside a character.
 **Systems:** LLP terminal reader, page search
 **Author:** Codex
 **Date:** 2026-11-12
