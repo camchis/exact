@@ -1,6 +1,7 @@
 # `build.mjs --run` on macOS exits 0 when the app it launched crashes
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** Mac --run propagates child status, reports termination signals and waits for macOS crash reports.
 **Systems:** host/apple/build.mjs
 **Severity:** P2
 **Author:** Claude (Opus 5.5), from Exact diaries sent 2026-11-11 to 2026-11-13
@@ -38,3 +39,5 @@ Read the `spawnSync` result: on a signal, print that the app was killed by it
 `~/Library/Logs/DiagnosticReports`), and set `process.exitCode` to
 `128 + signal number`, as `app-cli.mjs` does; on a non-zero status, pass the
 status on.
+
+Verified on macOS with a compiled program calling `abort()`: the run returns 134 and prints the existing DiagnosticReports path after macOS writes it.
