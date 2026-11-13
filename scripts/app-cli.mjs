@@ -22,7 +22,8 @@ const LEGS = {
   ios: (os) => os === 'darwin' || 'its simulator needs macOS',
   macos: (os, verb) => verb === 'verify' ? 'verify has no leg for it' : os === 'darwin' || 'it needs macOS',
   windows: (os) => os === 'win32' || 'it runs on Windows',
-  linux: (os, verb) => verb === 'verify' ? 'verify has no leg for it' : true,
+  // The driver opens the Linux host's binary as a Unix one (app.mjs `linuxBinary`): on macOS and Linux.
+  linux: (os, verb) => verb === 'verify' ? 'verify has no leg for it' : ['darwin', 'linux'].includes(os) || 'its headless host is driven on macOS and Linux',
   android: () => true,
 };
 

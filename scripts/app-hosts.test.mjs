@@ -37,6 +37,9 @@ test("a drive that names no host runs on one the app's manifest names", () => {
     [{ host: { macos: {} } }, 'darwin', null, 'macos'],
     [{ host: { macos: {}, linux: {} } }, 'linux', null, 'linux'],
     [{ host: { linux: {}, android: {} } }, 'darwin', 'android', 'linux'],
+    // On Windows the driver has no Linux host binary to open, so a drive takes Android.
+    [{ host: { linux: {}, android: {} } }, 'win32', 'android'],
+    [{ host: { linux: {} } }, 'win32', null],
     [native, 'win32', null],
     [{ host: { tvos: {} } }, 'darwin', null],
   ]) {
@@ -55,7 +58,8 @@ test("a drive that names no host runs on one the app's manifest names", () => {
   for (const [verb, manifest, os, why] of [['verify', native, 'win32', /names ios, macos and not the web.*ios: its simulator needs macOS; macos: verify has no leg for it.*so only the semantics check runs$/],
     ['verify', { host: { macos: {} } }, 'darwin', /names macos and not the web/], ['verify', { host: { windows: {} } }, 'linux', /windows: it runs on Windows/],
     ['test', native, 'win32', /ios: its simulator needs macOS; macos: it needs macOS\), so test runs nowhere unless named \(`test web` runs it on the web anyway\)$/],
-    ['agent', { host: { tvos: {} } }, 'darwin', /tvos: agent has no host for it/]]) {
+    ['agent', { host: { tvos: {} } }, 'darwin', /tvos: agent has no host for it/],
+    ['test', { host: { linux: {} } }, 'win32', /linux: its headless host is driven on macOS and Linux/]]) {
     const chosen = shippedHost(verb, manifest, os);
     expect(chosen.host).toBeNull();
     expect(chosen.why).toMatch(why);
