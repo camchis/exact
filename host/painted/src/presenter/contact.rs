@@ -486,13 +486,13 @@ impl<D: DataSource> Presenter<D> {
                         && (field || (c.candidate.is_none() && !c.group)))
                         .then_some((c.hit, c.origin, field))
                 });
+                let from = self.commands.len();
                 match self.pointer_pressed(x, y, now_ms) {
                     Some(error) => Err(error),
                     None => {
-                        let queued = self.commands.len();
-                        self.commands.retain(|c| c.name != "preventDefault");
+                        let blocked = self.prevented_since(from);
                         if let Some(contact) = &mut self.contact {
-                            contact.focus_blocked = self.commands.len() != queued;
+                            contact.focus_blocked = blocked;
                         }
                         if let Some((key, point, field)) = focus {
                             self.focus_on_down(key, point, now_ms, field);

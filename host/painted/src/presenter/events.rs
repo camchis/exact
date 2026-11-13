@@ -618,13 +618,12 @@ impl<D: DataSource> Presenter<D> {
             } else {
                 Event::Key(key)
             };
+            let from = self.commands.len();
             error = error.or(self
                 .host
                 .dispatch_at(id, event, now_ms)
                 .or(self.after_commit()));
-            let queued = self.commands.len();
-            self.commands.retain(|c| c.name != "preventDefault");
-            prevented |= self.commands.len() != queued;
+            prevented |= self.prevented_since(from);
             // `stopPropagation()`: no ancestor hears it (files diary F8).
             let queued = self.commands.len();
             self.commands.retain(|c| c.name != "stopPropagation");

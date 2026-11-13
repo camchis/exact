@@ -1,6 +1,7 @@
 # A leftover preventDefault cancels the next input event
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** Each dispatch site now counts and takes only the preventDefault commands its own handlers queued (prevented_since), so one an earlier event left, such as a pointerup's, no longer cancels the next key, wheel, press, beforeinput, paste or edit menu (the presenter is now host/painted).
 **Systems:** host/linux, host/windows, host/android
 **Severity:** P2
 **Author:** Grok 4.7

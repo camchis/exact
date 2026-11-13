@@ -570,14 +570,13 @@ impl<D: DataSource> Presenter<D> {
 
     /// HTML's cancel is sent only for a person's close request, before close.
     pub(super) fn dialog_close_prevented(&mut self, id: ViewId, now: f64) -> bool {
+        let from = self.commands.len();
         let error = self.host.dispatch_at(id, Event::Cancel, now);
         if let Some(error) = error.or(self.after_commit()) {
             self.host.log(error);
         }
-        let prevented = self.commands.iter().any(|c| c.name == "preventDefault");
-        self.commands
-            .retain(|c| c.name != "preventDefault" && c.name != "stopPropagation");
-        prevented
+        self.commands.retain(|c| c.name != "stopPropagation");
+        self.prevented_since(from)
     }
 
     /// A person chose row `index`: the surface closes, then the row's
