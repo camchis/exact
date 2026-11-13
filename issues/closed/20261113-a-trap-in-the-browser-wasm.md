@@ -1,6 +1,7 @@
 # A trap in the browser Wasm executor does not rebuild the data module
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** Already fixed by cc9971849: Swappable::run discards the executor and activates the module again after every failed call, which includes the browser glue's trap result.
 **Systems:** logic, host/web
 **Severity:** P2
 **Author:** Grok 4.7
