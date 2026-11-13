@@ -594,7 +594,7 @@ impl<D: DataSource> Presenter<D> {
                     self.retire_pointer();
                     return Ok(false);
                 };
-                self.pointer_cancel(now_ms)?;
+                self.cancel_before_down(now_ms)?;
                 // Cancellation may run layout/effects; it must not rebind A.
                 if !self.retained_contact_live(&retained) {
                     return Ok(false);
@@ -625,7 +625,7 @@ impl<D: DataSource> Presenter<D> {
                 return Ok(true);
             }
         }
-        self.pointer_cancel(now_ms)?;
+        self.cancel_before_down(now_ms)?;
         let Some(hit) = self
             .hit(x, y)
             .and_then(|id| self.host.kernel().node(id).map(|n| n.key))

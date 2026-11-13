@@ -1,6 +1,7 @@
 # Cancel during a sheet's press slop leaves a drag a later move can settle
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** A cancel drops a sheet drag still inside the slop, and a new down keeps the drag stage_down began for it, so no later move without a contact can start a drag (the presenter is now host/painted).
 **Systems:** host/linux, host/android
 **Severity:** P2
 **Author:** Grok 4.7
