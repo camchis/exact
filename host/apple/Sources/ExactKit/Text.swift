@@ -81,7 +81,8 @@ final class PresentedText: TextPresentation {
             let f = a[.font] as! PlatformFont
             let (ascent, descent) = CSSLineBox.content(f as CTFont, scale: scale)
             a[.exactBackground] = InlineBackground(color: fill.cgColor, ascent: ascent, descent: descent,
-                                                   box: r.backgroundBox, radii: r.backgroundRadii)
+                                                   box: r.backgroundBox, radii: r.backgroundRadii,
+                                                   reach: (r.backgroundBefore, r.backgroundAfter, r.inlineEnd))
         }
     }
     /// Every inline box's extent in the paragraph, once its runs are set,
@@ -93,9 +94,14 @@ final class PresentedText: TextPresentation {
         var boxes: [InlineBoxes.Box] = [], at: [UInt32: Int] = [:], rounded = false
         string.enumerateAttribute(.exactBackground, in: all) { value, range, _ in
             guard let fill = value as? InlineBackground, fill.box != 0 else { return }
-            rounded = rounded || !fill.radii.isEmpty
-            if let i = at[fill.box] { boxes[i].extent = NSUnionRange(boxes[i].extent, range) }
-            else { at[fill.box] = boxes.count; boxes.append(InlineBoxes.Box(extent: range, radii: fill.radii)) }
+            rounded = rounded || !fill.radii.isEmpty || fill.reach.before != 0 || fill.reach.after != 0
+            if let i = at[fill.box] {
+                boxes[i].extent = NSUnionRange(boxes[i].extent, range)
+                boxes[i].trim = fill.reach.trim // its last run's, the room kerned at its last character
+            } else {
+                at[fill.box] = boxes.count
+                boxes.append(InlineBoxes.Box(extent: range, radii: fill.radii, before: fill.reach.before, after: fill.reach.after, trim: fill.reach.trim))
+            }
         }
         guard !boxes.isEmpty else { return }
         let rtl = (string.attribute(.paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle)?.baseWritingDirection == .rightToLeft
@@ -213,18 +219,23 @@ extension TextEngine {
 /// An inline box's `background-color`, carried on the attributed source so
 /// that the main thread's paint and a worker's raster read the same value.
 /// The content area is the run's own font's, as the web's inline box is.
-/// `box` and `radii` are the run's box and its `border-radius` until
-/// `PresentedText.finish` puts the paragraph's table of boxes in their place.
+/// `box`, `radii` and `reach` are the run's box, its `border-radius` and
+/// how far its padding box stands out from its text (`before` its first
+/// character, `after` its last, less the room kerned after that character,
+/// `trim`) until `PresentedText.finish` puts the paragraph's table of boxes
+/// in their place.
 final class InlineBackground: NSObject, @unchecked Sendable {
     let color: CGColor
     let ascent: CGFloat
     let descent: CGFloat
     let box: UInt32
     let radii: [InlineRadius]
+    let reach: (before: CGFloat, after: CGFloat, trim: CGFloat)
     let boxes: InlineBoxes?
-    init(color: CGColor, ascent: CGFloat, descent: CGFloat, box: UInt32 = 0, radii: [InlineRadius] = [], boxes: InlineBoxes? = nil) {
+    init(color: CGColor, ascent: CGFloat, descent: CGFloat, box: UInt32 = 0, radii: [InlineRadius] = [],
+         reach: (before: CGFloat, after: CGFloat, trim: CGFloat) = (0, 0, 0), boxes: InlineBoxes? = nil) {
         self.color = color; self.ascent = ascent; self.descent = descent
-        self.box = box; self.radii = radii.contains { !$0.isZero } ? radii : []; self.boxes = boxes
+        self.box = box; self.radii = radii.contains { !$0.isZero } ? radii : []; self.reach = reach; self.boxes = boxes
     }
     func sharing(_ boxes: InlineBoxes?) -> InlineBackground {
         InlineBackground(color: color, ascent: ascent, descent: descent, boxes: boxes)
@@ -232,16 +243,20 @@ final class InlineBackground: NSObject, @unchecked Sendable {
     override func isEqual(_ object: Any?) -> Bool {
         guard let other = object as? InlineBackground else { return false }
         return color == other.color && ascent == other.ascent && descent == other.descent && box == other.box
-            && radii == other.radii && boxes == other.boxes
+            && radii == other.radii && reach == other.reach && boxes == other.boxes
     }
     override var hash: Int { color.hashValue ^ ascent.hashValue ^ descent.hashValue ^ box.hashValue }
 }
 
-/// A paragraph's inline boxes with backgrounds, where one is rounded: each
-/// box's range of characters and its `border-radius`, and the paragraph's
-/// direction, which says which side a box starts on.
+/// A paragraph's inline boxes with backgrounds, where one is rounded or
+/// reaches past its text: each box's range of characters, its
+/// `border-radius` and its reach (`InlineBackground.reach`), and the
+/// paragraph's direction, which says which side a box starts on.
 final class InlineBoxes: NSObject {
-    struct Box: Equatable { var extent: NSRange; let radii: [InlineRadius] }
+    struct Box: Equatable {
+        var extent: NSRange; let radii: [InlineRadius]
+        var before: CGFloat = 0, after: CGFloat = 0, trim: CGFloat = 0
+    }
     let boxes: [Box]
     let rtl: Bool
     init(_ boxes: [Box], rtl: Bool) { self.boxes = boxes; self.rtl = rtl }
@@ -366,7 +381,20 @@ enum TextLinePaint {
                 for group in groups {
                     let near = CGFloat(done) * share, far = CGFloat(done + group.count) * share
                     done += group.count
-                    let (a, z) = backwards ? (hi - far, hi - near) : (lo + near, lo + far)
+                    var (a, z) = backwards ? (hi - far, hi - near) : (lo + near, lo + far)
+                    // A box's padding past its first and last characters: from
+                    // its first glyph back, and from its last glyph's end less
+                    // the room kerned after it, which is its margin's and the
+                    // boxes' around it.
+                    if let b = group.box {
+                        let box = boxes.boxes[b], glyph = NSRange(location: from, length: to - from)
+                        if box.before != 0, NSLocationInRange(box.extent.location, glyph) {
+                            if backwards { z += box.before } else { a -= box.before }
+                        }
+                        if box.after != 0 || box.trim != 0, NSLocationInRange(NSMaxRange(box.extent) - 1, glyph) {
+                            if backwards { a += box.trim - box.after } else { z += box.after - box.trim }
+                        }
+                    }
                     if z > a { spans.append(Piece(lo: a, hi: z, box: group.box, fill: fill)) }
                 }
             }

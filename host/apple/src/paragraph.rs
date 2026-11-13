@@ -277,6 +277,15 @@ impl<D: DataSource> Host<D> {
                         ),
                     );
                 }
+                // How far its padding box stands out from its text: what its
+                // background covers beside its glyphs.
+                let reach = run.inline_background_reach();
+                if !reach.is_empty() {
+                    props.insert(
+                        "inlinePad",
+                        format!("{} {}", style::num(reach.start), style::num(reach.end)),
+                    );
+                }
                 // A run painting an inherited `color` that moves (LLP 1062 D5).
                 let mut shown = style::Shown::default();
                 shown.set(Property::Color, self.paint.runs.get(&id).copied());

@@ -13,6 +13,12 @@ extension TextEngine {
     /// line before it, where CSS puts it at the next line's start.
     package static func kernInlineEdges(_ s: NSMutableAttributedString, runs: [Run]) {
         guard runs.contains(where: { $0.inlineStart != 0 || $0.inlineEnd != 0 }) else { return }
+        kernInlineEdges(s, runs: runs.map { (text: $0.text, start: $0.inlineStart, end: $0.inlineEnd) })
+    }
+
+    /// Each run's text and its room before and after it, as `Run`'s.
+    package static func kernInlineEdges(_ s: NSMutableAttributedString, runs: [(text: String, start: CGFloat, end: CGFloat)]) {
+        guard runs.contains(where: { $0.start != 0 || $0.end != 0 }) else { return }
         let text = s.string as NSString
         func add(_ room: CGFloat, before end: Int) {
             guard room != 0, end > 0 else { return }
@@ -23,9 +29,16 @@ extension TextEngine {
         var offset = 0
         for r in runs {
             let length = r.text.utf16.count
-            add(r.inlineStart, before: offset)
-            add(r.inlineEnd, before: offset + length)
+            add(r.start, before: offset)
+            add(r.end, before: offset + length)
             offset += length
         }
     }
+}
+
+extension Spec {
+    /// Where the first line starts: `text-indent`, and the start edge of
+    /// the inline boxes the first run is in, which nothing precedes to kern
+    /// (`TextEngine.kernInlineEdges`).
+    package var firstLineIndent: CGFloat { textIndent + (runs.first?.inlineStart ?? 0) }
 }

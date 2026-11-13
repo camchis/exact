@@ -46,6 +46,10 @@ package struct InlineText {
         if let edges = props["inlineEdges"]?.split(separator: " ").compactMap({ Float($0) }), edges.count == 2 {
             value.inlineStart = CGFloat(edges[0]); value.inlineEnd = CGFloat(edges[1])
         }
+        // Its padding box's reach past its text, which its background covers.
+        if let pad = props["inlinePad"]?.split(separator: " ").compactMap({ Float($0) }), pad.count == 2 {
+            value.backgroundBefore = CGFloat(pad[0]); value.backgroundAfter = CGFloat(pad[1])
+        }
         // An image in the text is its box, with no ink or paint of its own (LLP 1011.002).
         boxShown = props["inlineBoxHidden"] != "true"
         if let box = InlineBox(prop: props["inlineBox"]) {

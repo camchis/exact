@@ -71,6 +71,8 @@ package struct Run: Hashable {
     /// share one background, rounded only at the box's own ends.
     package var backgroundBox: UInt32 = 0
     package var backgroundRadii: [InlineRadius] = []
+    /// How far that box's padding box stands out from its first and last characters: its background covers it. Paint.
+    package var backgroundBefore: CGFloat = 0, backgroundAfter: CGFloat = 0
     /// CSS visibility hides ink without changing shaping or descendant visibility.
     package var hidden = false
     /// Its colour is one its author fixed: a literal or a `light-dark()`
@@ -92,11 +94,9 @@ package struct Run: Hashable {
     package var box: InlineBox?
     /// The reader atom's icon; its box reserves horizontal room only.
     package var atomIcon: AtomIconRun?
-    /// Its inline boxes' padding, border and margin before its first glyph
-    /// and after its last, start and end by the paragraph's direction (the
-    /// kernel's `TextRun::edges`): a metric, kerned in (`attributed`).
-    package var inlineStart: CGFloat = 0
-    package var inlineEnd: CGFloat = 0
+    /// Its inline boxes' room before its first glyph and after its last, in the paragraph's direction
+    /// (`TextRun::edges`): a metric, kerned in (`TextEngine.kernInlineEdges`).
+    package var inlineStart: CGFloat = 0, inlineEnd: CGFloat = 0
 
     package static func == (lhs: Run, rhs: Run) -> Bool {
         guard lhs.size == rhs.size, lhs.weight == rhs.weight, lhs.family == rhs.family,
@@ -107,6 +107,7 @@ package struct Run: Hashable {
               lhs.strikeColor == rhs.strikeColor, lhs.href == rhs.href,
               lhs.hidden == rhs.hidden, lhs.fixedInk == rhs.fixedInk, lhs.background == rhs.background, lhs.backgroundBox == rhs.backgroundBox,
               lhs.backgroundRadii == rhs.backgroundRadii, lhs.shadow == rhs.shadow, lhs.stroke == rhs.stroke,
+              lhs.backgroundBefore == rhs.backgroundBefore, lhs.backgroundAfter == rhs.backgroundAfter,
               lhs.indent == rhs.indent, lhs.hang == rhs.hang, lhs.box == rhs.box, lhs.atomIcon == rhs.atomIcon,
               lhs.inlineStart == rhs.inlineStart, lhs.inlineEnd == rhs.inlineEnd else { return false }
         // CoreText's ranges address the original UTF16 source. Swift String's
@@ -141,6 +142,8 @@ package struct Run: Hashable {
         hasher.combine(background)
         hasher.combine(backgroundBox)
         hasher.combine(backgroundRadii)
+        hasher.combine(backgroundBefore)
+        hasher.combine(backgroundAfter)
         hasher.combine(hidden)
         hasher.combine(fixedInk)
         hasher.combine(shadow)
@@ -209,10 +212,6 @@ package struct Spec: Hashable {
     package var source = SourceMap()
     /// CSS `text-indent` in points, the paragraph's first line only.
     package var textIndent: CGFloat = 0
-    /// Where the first line starts: `text-indent`, and the start edge of
-    /// the inline boxes the first run is in, which nothing precedes to kern
-    /// (`TextEngine.kernInlineEdges`).
-    package var firstLineIndent: CGFloat { textIndent + (runs.first?.inlineStart ?? 0) }
     /// CSS `hyphens`: 0 manual (the initial value), 1 none (soft hyphens
     /// already arrive as U+034F), 2 auto.
     package var hyphens = 0
@@ -1341,6 +1340,7 @@ package final class TextEngine {
         let source = resident?.attributed ?? attributed(spec)
         let typesetter = resident?.typesetter ?? CTTypesetterCreateWithAttributedString(source)
         var indent = spec.firstLineIndent
+        let edgeStarts = LineInsets.edgeStarts(spec.runs)
         let text = source.string as NSString
         let emergencyEnds = Set(spec.emergencyBreaks.map { $0 + 1 })
         let boundaries = (resident?.lineBreakBoundaries ?? lineBoundaries(text, length: text.length)).filter { !emergencyEnds.contains($0) }
@@ -1348,7 +1348,7 @@ package final class TextEngine {
             let range = CFRange(location: piece.range.location, length: piece.range.length)
             var line = CTTypesetterCreateLine(typesetter, range)
             if piece.hyphenated { line = Self.inkedSoftHyphen(line, source: source, range: range) }
-            widest = max(widest, CSSLineBox.layoutWidth(CGFloat(CTLineGetTypographicBounds(line, nil, nil, nil))) + indent + piece.indent)
+            widest = max(widest, CSSLineBox.layoutWidth(CGFloat(CTLineGetTypographicBounds(line, nil, nil, nil))) + indent + piece.indent + (edgeStarts[piece.range.location] ?? 0))
             indent = 0
         }
         residency.putMinimum(identity, width: widest)

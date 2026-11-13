@@ -167,6 +167,40 @@ fn a_boxs_start_goes_before_its_first_run_and_nested_boxes_add() {
     assert_eq!(edges(&unstyled), [NONE; 3]);
 }
 
+/// What a box's background covers beside its text: its padding and border,
+/// and the room of the boxes inside it at its ends, never its own margin.
+#[test]
+fn a_boxs_background_reaches_its_padding_and_the_boxes_inside_it() {
+    let k = verse(
+        &[(StyleId::PaddingLeft, "3px"), (StyleId::MarginRight, "2px")],
+        &[
+            (StyleId::MarginLeft, "1px"),
+            (StyleId::BorderStyleRight, "solid"),
+            (StyleId::BorderWidthRight, "2px"),
+        ],
+    );
+    let reach = |id| k.node(id).unwrap().inline_background_reach();
+    // The box: its padding, and the "1"'s margin inside it at its start.
+    assert_eq!(
+        reach(3),
+        InlineEdges {
+            start: 4.0,
+            end: 0.0
+        }
+    );
+    // The "1": its border, not its margin.
+    assert_eq!(
+        reach(4),
+        InlineEdges {
+            start: 0.0,
+            end: 2.0
+        }
+    );
+    // No paragraph or run without a box has one.
+    assert_eq!(reach(2), NONE);
+    assert_eq!(reach(6), NONE);
+}
+
 #[test]
 fn right_to_left_its_right_side_is_its_start() {
     let k = verse(

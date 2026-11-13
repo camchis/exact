@@ -169,6 +169,8 @@ extension Spec {
             value.runs[i].background = nil
             value.runs[i].backgroundBox = 0
             value.runs[i].backgroundRadii = []
+            value.runs[i].backgroundBefore = 0
+            value.runs[i].backgroundAfter = 0
             value.runs[i].shadow = nil
             value.runs[i].stroke = nil
             value.runs[i].atomIcon = nil
@@ -196,6 +198,7 @@ package struct TextPaint: Hashable {
         let background: [Double]?
         let backgroundBox: UInt32
         let backgroundRadii: [InlineRadius]
+        let backgroundReach: [CGFloat]
         let shadow: [Double]?
         let stroke: [Double]?
         let atomIcon: AtomIconRun?
@@ -203,12 +206,14 @@ package struct TextPaint: Hashable {
             hidden = r.hidden; fixedInk = r.fixedInk; color = r.color; decoration = r.decoration
             underlineColor = r.underlineColor; strikeColor = r.strikeColor; href = r.href
             background = r.background; backgroundBox = r.backgroundBox; backgroundRadii = r.backgroundRadii
+            backgroundReach = [r.backgroundBefore, r.backgroundAfter]
             shadow = r.shadow; stroke = r.stroke; atomIcon = r.atomIcon
         }
         func apply(to run: inout Run) {
             run.hidden = hidden; run.fixedInk = fixedInk; run.color = color; run.decoration = decoration
             run.underlineColor = underlineColor; run.strikeColor = strikeColor; run.href = href
             run.background = background; run.backgroundBox = backgroundBox; run.backgroundRadii = backgroundRadii
+            (run.backgroundBefore, run.backgroundAfter) = (backgroundReach[0], backgroundReach[1])
             run.shadow = shadow; run.stroke = stroke; run.atomIcon = atomIcon
         }
     }

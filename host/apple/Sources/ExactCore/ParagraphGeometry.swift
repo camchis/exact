@@ -217,12 +217,16 @@ package struct LineInsets {
     /// The indented paragraphs (each ends after its newline), UTF-16
     /// [start, end), in order: the first line's inset and the others'.
     package var heads: [(start: Int, end: Int, first: CGFloat, rest: CGFloat)] = []
+    /// Where a run with an inline box's start room begins after a space, the
+    /// room a line starting there takes (`TextEngine.kernInlineEdges`).
+    package var edgeStarts: [Int: CGFloat] = [:]
 
     package init() {}
     /// `spec`'s; `marker` is the width of a hung run's UTF-16 range, as
     /// the paragraph's own source shapes it.
     package init(_ spec: Spec, marker: (CFRange) -> CGFloat) {
         textIndent = spec.firstLineIndent; rtl = spec.direction == 1
+        edgeStarts = Self.edgeStarts(spec.runs)
         guard spec.runs.contains(where: { $0.indent != 0 }) else { return }
         var open: (start: Int, first: CGFloat, rest: CGFloat)?
         var at = 0
@@ -249,13 +253,38 @@ package struct LineInsets {
     /// The inset of the line that starts at UTF-16 `location`: how far
     /// right its start moves (`left`) and how much room it gives (`width`).
     package func at(_ location: Int) -> (left: CGFloat, width: CGFloat) {
-        var width: CGFloat = location == 0 ? textIndent : 0
+        var width: CGFloat = location == 0 ? textIndent : edgeStarts[location] ?? 0
         var lo = 0, hi = heads.count
         while lo < hi { let mid = (lo + hi) / 2; if heads[mid].start <= location { lo = mid + 1 } else { hi = mid } }
         if lo > 0, location < heads[lo - 1].end {
             width += location == heads[lo - 1].start ? heads[lo - 1].first : heads[lo - 1].rest
         }
         return (rtl ? 0 : width, width)
+    }
+}
+
+extension LineInsets {
+    /// The UTF-16 starts of the runs whose inline box's start room follows
+    /// white space, which a line can break after: there the room starts the
+    /// next line with the run's text, as Chrome keeps a `<span>`'s padding
+    /// with its text, and the kerned space hangs at the end of the line
+    /// before. Elsewhere the kern is the room.
+    package static func edgeStarts(_ runs: [Run]) -> [Int: CGFloat] {
+        guard runs.dropFirst().contains(where: { $0.inlineStart != 0 }) else { return [:] }
+        return edgeStarts(runs.map { (text: $0.text, start: $0.inlineStart) })
+    }
+
+    /// Each run's text and its room before it, as `Run`'s.
+    package static func edgeStarts(_ runs: [(text: String, start: CGFloat)]) -> [Int: CGFloat] {
+        guard runs.dropFirst().contains(where: { $0.start != 0 }) else { return [:] }
+        var out: [Int: CGFloat] = [:], offset = 0
+        var last: Unicode.Scalar?
+        for r in runs {
+            if r.start != 0, offset > 0, last?.properties.isWhitespace == true { out[offset, default: 0] += r.start }
+            offset += r.text.utf16.count
+            if let scalar = r.text.unicodeScalars.last { last = scalar }
+        }
+        return out
     }
 }
 

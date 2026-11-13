@@ -196,6 +196,7 @@ extension NodeView {
                         if runs[i].background == nil {
                             runs[i].background = paint.background
                             (runs[i].backgroundBox, runs[i].backgroundRadii) = (paint.backgroundBox, paint.backgroundRadii)
+                            (runs[i].backgroundBefore, runs[i].backgroundAfter) = (paint.backgroundBefore, paint.backgroundAfter)
                         }
                         if visible(paint.background), !nested.contains(paint.backgroundBox) { nested.append(paint.backgroundBox) }
                     }
@@ -205,7 +206,8 @@ extension NodeView {
             }
             // A box's identity is paint only where a box is rounded: square
             // backgrounds keep sharing what they share (TextPaint's keys).
-            if !runs.contains(where: { $0.background != nil && $0.backgroundRadii.contains { !$0.isZero } }) {
+            // So is one that reaches past its text (its padding).
+            if !runs.contains(where: { $0.background != nil && ($0.backgroundRadii.contains { !$0.isZero } || $0.backgroundBefore != 0 || $0.backgroundAfter != 0) }) {
                 for i in runs.indices { runs[i].backgroundBox = 0; runs[i].backgroundRadii = [] }
             }
         }
