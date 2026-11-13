@@ -1,6 +1,7 @@
 # A closed web serial handle can write to a later connection on the same port
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** A closed or unplugged web serial handle is refused `InvalidStateError` for writes and signals, a closed one for close, and a write still queued when its connection closes is aborted before it takes the port's writer.
 **Systems:** packages/serial/web/index.js
 **Author:** Codex
 **Date:** 2026-11-12
