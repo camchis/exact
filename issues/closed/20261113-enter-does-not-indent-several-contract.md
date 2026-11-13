@@ -1,6 +1,7 @@
 # Enter does not indent several Contract bodies
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The VS Code indent pattern also opens a block after theme, params, parts, perf, sequence, a members file's `members Name`, and a test header with an `on` host list.
 **Systems:** editors/vscode
 **Severity:** P3
 **Author:** Grok 4.7
