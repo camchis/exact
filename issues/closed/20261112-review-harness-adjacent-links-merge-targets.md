@@ -1,6 +1,7 @@
 # Harness merges adjacent links with different destinations
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** A transcript line merges two runs only when their links match as well as their style, so adjacent links to different destinations stay separate runs.
 **Systems:** Harness Markdown rendering
 **Author:** Codex
 **Date:** 2026-11-12
