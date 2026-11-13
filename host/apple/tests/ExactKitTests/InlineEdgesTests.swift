@@ -67,8 +67,23 @@ final class InlineEdgesTests: XCTestCase {
         XCTAssertEqual(two.width, max(first, word + 20), accuracy: 0.5)
         // Min-content: the word carries its room; the space hangs.
         XCTAssertEqual(engine.minContentWidth(padded), word + 20, accuracy: 0.5)
-        // Glued to a word before it, with no space, it never starts a line.
-        XCTAssertTrue(LineInsets.edgeStarts(spec([run("aaaa"), run("bbbb", start: 20)]).runs).isEmpty)
+    }
+
+    /// Between two CJK characters a line breaks with no space before the run,
+    /// and the room still goes to the next line with its text, as in Chrome
+    /// 154: `中文<span style="padding-left:20px">中文</span>` 36 px wide keeps
+    /// "中文" on the first line and puts the span's "中" 20 px into the second.
+    func testAStartAfterACharacterThatIsNoSpaceMovesWithItsText() {
+        let pair = engine.paragraph(spec([run("中文")]), width: .infinity).width
+        let padded = spec([run("中文"), run("中文", start: 20)])
+        let p = engine.paragraph(padded, width: pair + 4)
+        XCTAssertGreaterThanOrEqual(p.lines.count, 2)
+        XCTAssertEqual(CTLineGetStringRange(p.lines[0]).length, 2, "the first line keeps both of its characters")
+        XCTAssertEqual(p.insets.at(2).left, 20, "the second line starts at the room")
+        // The first line's width leaves the room it kerned to the next.
+        XCTAssertEqual(p.width, pair / 2 + 20, accuracy: 0.5)
+        // Min-content: the run's first character carries its room.
+        XCTAssertEqual(engine.minContentWidth(padded), pair / 2 + 20, accuracy: 0.5)
     }
 
     /// A box's background covers its padding (CSS 2 §14.2): from its first
@@ -90,6 +105,37 @@ final class InlineEdgesTests: XCTestCase {
         let padded = try fill([run("a "), boxed("code", start: 4, end: 7, pad: (4, 4)), run(" b")])
         XCTAssertEqual(padded.minX, bare.minX, accuracy: 0.05, "the room starts where the bare box did")
         XCTAssertEqual(padded.width, bare.width + 8, accuracy: 0.05)
+        // A square box with a margin alone paints its text and not the margin.
+        let margined = try fill([run("a "), boxed("code", start: 0, end: 10, pad: (0, 0)), run(" b")])
+        XCTAssertEqual(margined.minX, bare.minX, accuracy: 0.05)
+        XCTAssertEqual(margined.width, bare.width, accuracy: 0.05)
+    }
+
+    /// Boxes inside one another each paint their own background into their
+    /// own padding, the inner over the outer (CSS 2 Appendix E), as Chrome
+    /// paints `<span style="padding:0 2px;background:A;border-radius:4px">p
+    /// <span style="padding:0 4px;background:B">x</span></span>`: the outer
+    /// from 2 before "p" to 2 past the inner's padding, the inner 4 each side.
+    func testNestedBoxesEachPaintTheirOwnPadding() throws {
+        let a: [Double] = [255, 0, 0, 255], b: [Double] = [0, 0, 255, 255]
+        var p = run("p", start: 2), x = run("x", start: 4, end: 6)
+        p.background = a; p.backgroundBox = 8; p.backgroundRadii = Array(repeating: InlineRadius(px: 4), count: 4)
+        (p.backgroundBefore, p.backgroundAfter) = (2, 6)
+        x.background = b; x.backgroundBox = 9; (x.backgroundBefore, x.backgroundAfter) = (4, 4)
+        x.outerBackgrounds = [OuterBackground(color: a, box: 8, radii: p.backgroundRadii, before: 2, after: 6)]
+        let bare = engine.paragraph(spec([run("a "), run("p"), run("x"), run(" b")]), width: .infinity)
+        let padded = engine.paragraph(spec([run("a "), p, x, run(" b")]), width: .infinity)
+        let fills = TextLinePaint.backgrounds(padded.lines[0], at: .zero)
+        XCTAssertEqual(fills.count, 2, "\(fills)")
+        guard fills.count == 2 else { return }
+        let (outer, inner) = (fills[0], fills[1])
+        XCTAssertEqual(outer.color.components?.first ?? 0, 1, "the outer box paints first")
+        XCTAssertEqual(outer.rect.minX, self.x(bare, 2), accuracy: 0.05)
+        XCTAssertEqual(outer.rect.maxX, self.x(bare, 4) + 12, accuracy: 0.05)
+        XCTAssertNotNil(outer.path, "its own corners rounded")
+        XCTAssertEqual(inner.rect.minX, self.x(bare, 3) + 2, accuracy: 0.05)
+        XCTAssertEqual(inner.rect.maxX, self.x(bare, 4) + 10, accuracy: 0.05)
+        XCTAssertNil(inner.path)
     }
 
     /// The kernel's request carries the edges, and the paragraph it measures

@@ -75,6 +75,19 @@ package struct InlineText {
 
 }
 
+/// A box with a background around a run's own (`Run.background`), which
+/// paints under it: its colour, node, `border-radius` and padding box's
+/// reach past its first and last characters, as the run's own fields.
+package struct OuterBackground: Hashable {
+    package var color: [Double]
+    package var box: UInt32
+    package var radii: [InlineRadius]
+    package var before: CGFloat, after: CGFloat
+    package init(color: [Double], box: UInt32, radii: [InlineRadius], before: CGFloat, after: CGFloat) {
+        self.color = color; self.box = box; self.radii = radii; self.before = before; self.after = after
+    }
+}
+
 /// One corner of an inline box's `border-radius`: px plus a percentage, or
 /// a `calc()`, of the fragment's width across and its height down.
 package struct InlineRadius: Hashable {

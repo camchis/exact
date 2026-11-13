@@ -38,6 +38,13 @@ extension TextEngine {
     /// size, so a `pre-wrap` "Say " is as wide as "Say" and its space, as
     /// Chrome measures it. `pre`'s (4) count.
     package static func uncountedTrailingWidth(_ line: CTLine, whiteSpace: Int, source: NSAttributedString, room: CGFloat) -> CGFloat {
+        // The start room of a run the next line starts with (`exactBreakRoom`).
+        let range = CTLineGetStringRange(line)
+        return trailingSpaces(line, whiteSpace: whiteSpace, source: source, room: room)
+            + breakRoom(endingAt: range.location + range.length, in: source)
+    }
+
+    private static func trailingSpaces(_ line: CTLine, whiteSpace: Int, source: NSAttributedString, room: CGFloat) -> CGFloat {
         if whiteSpace == 4 { return 0 }
         let trailing = CGFloat(CTLineGetTrailingWhitespaceWidth(line))
         guard whiteSpace == 1 else { return trailing }
@@ -52,7 +59,7 @@ extension TextEngine {
     /// The part of a line's trailing white space that its width counts
     /// (`uncountedTrailingWidth` leaves the rest out), in a box `room` wide.
     package static func countedTrailingWidth(_ line: CTLine, whiteSpace: Int, source: NSAttributedString, room: CGFloat) -> CGFloat {
-        max(0, CGFloat(CTLineGetTrailingWhitespaceWidth(line)) - uncountedTrailingWidth(line, whiteSpace: whiteSpace, source: source, room: room))
+        max(0, CGFloat(CTLineGetTrailingWhitespaceWidth(line)) - trailingSpaces(line, whiteSpace: whiteSpace, source: source, room: room))
     }
 
     package static func inkedSoftHyphen(_ line: CTLine, source: NSAttributedString, range: CFRange) -> CTLine {
@@ -201,7 +208,11 @@ extension TextEngine {
         // The room beside the line's ink (CoreText's offset for a right flush)
         let slack = CGFloat(CTLineGetPenOffsetForFlush(line, 1, room))
         guard slack - counted >= 0 else { return rtl ? slack : 0 }
-        return CGFloat(CTLineGetPenOffsetForFlush(line, flush, room)) - counted * flush + (rtl ? counted : 0)
+        // The start room of the run the next line starts with is kerned on
+        // this line's last glyph, and is the next line's (`exactBreakRoom`).
+        let range = CTLineGetStringRange(line)
+        let leaves = rtl ? 0 : source.map { breakRoom(endingAt: range.location + range.length, in: $0) } ?? 0
+        return CGFloat(CTLineGetPenOffsetForFlush(line, flush, room)) - counted * flush + (rtl ? counted : 0) + leaves * flush
     }
 }
 
@@ -217,8 +228,8 @@ package struct LineInsets {
     /// The indented paragraphs (each ends after its newline), UTF-16
     /// [start, end), in order: the first line's inset and the others'.
     package var heads: [(start: Int, end: Int, first: CGFloat, rest: CGFloat)] = []
-    /// Where a run with an inline box's start room begins after a space, the
-    /// room a line starting there takes (`TextEngine.kernInlineEdges`).
+    /// Where a later run with an inline box's start room begins, the room a
+    /// line starting there takes (`TextEngine.kernInlineEdges`).
     package var edgeStarts: [Int: CGFloat] = [:]
 
     package init() {}
@@ -260,31 +271,6 @@ package struct LineInsets {
             width += location == heads[lo - 1].start ? heads[lo - 1].first : heads[lo - 1].rest
         }
         return (rtl ? 0 : width, width)
-    }
-}
-
-extension LineInsets {
-    /// The UTF-16 starts of the runs whose inline box's start room follows
-    /// white space, which a line can break after: there the room starts the
-    /// next line with the run's text, as Chrome keeps a `<span>`'s padding
-    /// with its text, and the kerned space hangs at the end of the line
-    /// before. Elsewhere the kern is the room.
-    package static func edgeStarts(_ runs: [Run]) -> [Int: CGFloat] {
-        guard runs.dropFirst().contains(where: { $0.inlineStart != 0 }) else { return [:] }
-        return edgeStarts(runs.map { (text: $0.text, start: $0.inlineStart) })
-    }
-
-    /// Each run's text and its room before it, as `Run`'s.
-    package static func edgeStarts(_ runs: [(text: String, start: CGFloat)]) -> [Int: CGFloat] {
-        guard runs.dropFirst().contains(where: { $0.start != 0 }) else { return [:] }
-        var out: [Int: CGFloat] = [:], offset = 0
-        var last: Unicode.Scalar?
-        for r in runs {
-            if r.start != 0, offset > 0, last?.properties.isWhitespace == true { out[offset, default: 0] += r.start }
-            offset += r.text.utf16.count
-            if let scalar = r.text.unicodeScalars.last { last = scalar }
-        }
-        return out
     }
 }
 

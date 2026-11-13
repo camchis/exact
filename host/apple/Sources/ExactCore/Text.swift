@@ -72,6 +72,8 @@ package struct Run: Hashable {
     package var backgroundRadii: [InlineRadius] = []
     /// How far that box's padding box stands out from its first and last characters: its background covers it. Paint.
     package var backgroundBefore: CGFloat = 0, backgroundAfter: CGFloat = 0
+    /// The boxes around that one with backgrounds of their own, nearest first. Paint.
+    package var outerBackgrounds: [OuterBackground] = []
     /// CSS visibility hides ink without changing shaping or descendant visibility.
     package var hidden = false
     /// Its colour is one its author fixed: a literal or a `light-dark()`
@@ -106,7 +108,7 @@ package struct Run: Hashable {
               lhs.strikeColor == rhs.strikeColor, lhs.href == rhs.href,
               lhs.hidden == rhs.hidden, lhs.fixedInk == rhs.fixedInk, lhs.background == rhs.background, lhs.backgroundBox == rhs.backgroundBox,
               lhs.backgroundRadii == rhs.backgroundRadii, lhs.shadow == rhs.shadow, lhs.stroke == rhs.stroke,
-              lhs.backgroundBefore == rhs.backgroundBefore, lhs.backgroundAfter == rhs.backgroundAfter,
+              lhs.backgroundBefore == rhs.backgroundBefore, lhs.backgroundAfter == rhs.backgroundAfter, lhs.outerBackgrounds == rhs.outerBackgrounds,
               lhs.indent == rhs.indent, lhs.hang == rhs.hang, lhs.box == rhs.box, lhs.atomIcon == rhs.atomIcon,
               lhs.inlineStart == rhs.inlineStart, lhs.inlineEnd == rhs.inlineEnd else { return false }
         // CoreText's ranges address the original UTF16 source. Swift String's
@@ -143,6 +145,7 @@ package struct Run: Hashable {
         hasher.combine(backgroundRadii)
         hasher.combine(backgroundBefore)
         hasher.combine(backgroundAfter)
+        hasher.combine(outerBackgrounds)
         hasher.combine(hidden)
         hasher.combine(fixedInk)
         hasher.combine(shadow)
@@ -895,41 +898,6 @@ package final class TextEngine {
         return s
     }
 
-    /// Eight spaces of `font`, letter spacing included: a tab stop's interval.
-    package static func tabInterval(_ font: CTFont, letterSpacing: CGFloat) -> CGFloat {
-        let space = CTLineGetTypographicBounds(CTLineCreateWithAttributedString(
-            NSAttributedString(string: " ", attributes: [.font: font])), nil, nil, nil)
-        return 8 * (CGFloat(space) + letterSpacing)
-    }
-
-    /// CSS `tab-size: 8` (its initial value): a preserved tab advances to the
-    /// next multiple of eight spaces of the paragraph's own font, letter
-    /// spacing included, from the line's start. CoreText's default is twelve
-    /// stops 28 pt apart; Chrome's is this (LLP 1053 G5).
-    private func setTabStops(_ s: NSMutableAttributedString, run: Run) {
-        TextEngine.setTabStops(s, interval: TextEngine.tabInterval(font(run) as CTFont, letterSpacing: run.letterSpacing))
-    }
-
-    package static func setTabStops(_ s: NSMutableAttributedString, interval: CGFloat) {
-        guard interval > 0, s.length > 0 else { return }
-        let range = NSRange(location: 0, length: s.length)
-        let paragraph = ((s.attribute(.paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle)?.mutableCopy() as? NSMutableParagraphStyle) ?? NSMutableParagraphStyle()
-        paragraph.tabStops = []
-        paragraph.defaultTabInterval = interval
-        s.addAttribute(.paragraphStyle, value: paragraph, range: range)
-    }
-
-    /// CSS direction sets the paragraph base; normal Unicode bidi still
-    /// orders each run. The first strong character never selects the base.
-    package static func setBaseDirection(_ s: NSMutableAttributedString, direction: Int) {
-        let range = NSRange(location: 0, length: s.length)
-        s.enumerateAttribute(.paragraphStyle, in: range) { value, range, _ in
-            let paragraph = (value as? NSParagraphStyle)?.mutableCopy() as? NSMutableParagraphStyle ?? NSMutableParagraphStyle()
-            paragraph.baseWritingDirection = direction == 1 ? .rightToLeft : .leftToRight
-            s.addAttribute(.paragraphStyle, value: paragraph, range: range)
-        }
-    }
-
     /// Urgent raster work stays on the text engine's owning thread and uses
     /// the existing bounded residency policy for its exact painted typesetter.
     package func rasterLines(_ spec: Spec, ranges: [CFRange], width: CGFloat = .infinity) -> (NSAttributedString, [CTLine]) {
@@ -1347,7 +1315,8 @@ package final class TextEngine {
             let range = CFRange(location: piece.range.location, length: piece.range.length)
             var line = CTTypesetterCreateLine(typesetter, range)
             if piece.hyphenated { line = Self.inkedSoftHyphen(line, source: source, range: range) }
-            widest = max(widest, CSSLineBox.layoutWidth(CGFloat(CTLineGetTypographicBounds(line, nil, nil, nil))) + indent + piece.indent + (edgeStarts[piece.range.location] ?? 0))
+            let leaves = TextEngine.breakRoom(endingAt: NSMaxRange(piece.range), in: source) // the next piece's
+            widest = max(widest, CSSLineBox.layoutWidth(CGFloat(CTLineGetTypographicBounds(line, nil, nil, nil)) - leaves) + indent + piece.indent + (edgeStarts[piece.range.location] ?? 0))
             indent = 0
         }
         residency.putMinimum(identity, width: widest)
