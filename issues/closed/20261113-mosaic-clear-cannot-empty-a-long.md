@@ -1,6 +1,7 @@
 # Mosaic Clear cannot empty a long stroke log, and the failure is silent
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** Clear deletes the board at once and its strokes in batches of 1,000, each batch scheduling the next, `recent` lists only strokes of the board as it is now, and the view shows `cleared.error`.
 **Systems:** apps/mosaic
 **Severity:** P2
 **Author:** Grok 4.7
