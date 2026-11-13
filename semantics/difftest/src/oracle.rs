@@ -170,6 +170,15 @@ impl Oracle {
             out.push_str(&text_value(&self.plan, c.answer.0, &c.answer.1));
             out.push('\n');
         }
+        // The native modules' names, which the runner answers from the
+        // module's substitute and never asks of this source.
+        for m in &self.plan.modules {
+            out.push_str("module ");
+            out.push_str(&crate::observe::quote(
+                self.plan.str(self.plan.sources[m.source.0 as usize].name),
+            ));
+            out.push('\n');
+        }
         for (name, t, v) in self.facts.borrow().iter() {
             out.push_str("fact ");
             out.push_str(&crate::observe::quote(name));

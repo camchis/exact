@@ -208,6 +208,37 @@ fn host_facts_are_the_runners_own_sources_never_a_gated_resources() {
     );
 }
 
+/// A native module's read is answered by the runner from the module's
+/// substitute (#401): its boot answer is a host fact, the oracle's text names
+/// the module's source, and a step that re-asks the app's own source beside
+/// it leaves the module's answer where it was.
+#[test]
+fn a_module_read_is_a_host_fact_and_its_source_a_module() {
+    let path = crate::leanrun::project().join("corpus/resources/module.contract");
+    let source = std::fs::read_to_string(&path).unwrap();
+    let s = script::scripted("module", &source, Some(&path))
+        .unwrap()
+        .remove(0);
+    let plan = compile(&s.case).unwrap();
+    let (lines, oracle) = observe::run(
+        plan.clone(),
+        Oracle::for_case(&plan, &s.case),
+        &s.case.events,
+    );
+    crate::expectations_on(&s, &lines).unwrap();
+    let oracle = oracle.unwrap();
+    assert_eq!(oracle.host_sources(), ["geolocationStatus"]);
+    let text = oracle.text();
+    assert!(text.contains("module \"geolocationStatus\"\n"), "{text}");
+    assert!(text.contains("fact \"status\" "), "{text}");
+    // The app's own source is the oracle's, asked once per argument.
+    assert_eq!(text.matches("answer \"here\"").count(), 2, "{text}");
+    assert!(
+        !lines.iter().any(|l| l.starts_with(observe::MODULE_MOVED)),
+        "{lines:#?}"
+    );
+}
+
 #[test]
 fn scripted_state_bounds_and_membership_check_the_runner_observation() {
     let source = r#"component App
