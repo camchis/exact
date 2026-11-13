@@ -1,6 +1,7 @@
 # A streamed fetch drops a Request body when init.body is absent
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** A streamed fetch of a `Request` with a body and no `init.body` is refused before it opens, as a stream `init.body` is, instead of sending an empty body.
 **Systems:** host/web-js
 **Severity:** P2
 **Author:** Grok 4.7
