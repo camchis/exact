@@ -73,7 +73,10 @@ final class GroupedAccessibilityIOSTests: GroupedListFixture {
         XCTAssertEqual(presses, [13])
     }
 
+    /// With UIKit's accessibility runtime, which reads a list cell's traits from its subviews and
+    /// took the `checkmark.circle` symbol for a selection: the host's traits are the cell's.
     func testAStandardRowsNameAndSelectionComeFromItsParts() throws {
+        guard Presenter.axRuntimeLoaded else { throw missing("accessibility", "UIKit reads a cell's subviews into its traits only with its accessibility runtime") }
         var row = Row(view: 10, symbol: "checkmark.circle", title: "Milk", secondary: "Two bottles", pressable: true)
         let p = presenter {
             var m = self.model()

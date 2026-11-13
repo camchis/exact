@@ -40,10 +40,7 @@ final class GroupedCell: UICollectionViewListCell {
     /// element, as each row of Settings is: the row's name with the switch's value and traits, and
     /// activating it flips the switch. A list cell's custom accessory is not that on every iOS
     /// (17's VoiceOver read the switch after the row, with no name), so this cell says it itself.
-    weak var toggle: UISwitch? { didSet { if toggle !== oldValue { own = markedNotEnabled ? .notEnabled : [] } } }
-    /// Its own traits while it is a toggle's element. UIKit's accessibility answers a list cell's
-    /// traits from its subviews, the switch among them, so these are kept apart from both.
-    private var own: UIAccessibilityTraits = []
+    weak var toggle: UISwitch?
     override var isAccessibilityElement: Bool {
         get { toggle != nil || super.isAccessibilityElement }
         set { super.isAccessibilityElement = newValue }
@@ -51,18 +48,6 @@ final class GroupedCell: UICollectionViewListCell {
     override var accessibilityValue: String? {
         get { toggle?.accessibilityValue ?? super.accessibilityValue }
         set { super.accessibilityValue = newValue }
-    }
-    override var accessibilityTraits: UIAccessibilityTraits {
-        get { toggle.map { own.union($0.accessibilityTraits) } ?? super.accessibilityTraits }
-        // An insert or remove reads the union first: what only the switch says stays the switch's,
-        // except the `.notEnabled` that `interact` marks the cell with itself. A row that is no
-        // toggle is configured while its old switch is still a subview, which UIKit reads in.
-        set {
-            guard let toggle else { return super.accessibilityTraits = newValue.subtracting(.toggleButton) }
-            var switchOnly = toggle.accessibilityTraits.subtracting(own)
-            if markedNotEnabled { switchOnly.remove(.notEnabled) }
-            own = newValue.subtracting(switchOnly)
-        }
     }
     override func accessibilityActivate() -> Bool {
         guard let toggle else { return super.accessibilityActivate() }
@@ -72,7 +57,26 @@ final class GroupedCell: UICollectionViewListCell {
         }
         return true
     }
+    private var switchTraits: UIAccessibilityTraits { toggle?.accessibilityTraits ?? [] }
+    #else
+    private var switchTraits: UIAccessibilityTraits { [] }
     #endif
+
+    /// Its traits, which the host sets (`GroupedListView.accessibility`, `interact`), with its
+    /// switch's. UIKit's accessibility answers a list cell's traits from its subviews: it reads a
+    /// checkmark-like symbol (`checkmark.circle`) as `.selected`, and a switch's traits in, so an
+    /// insert or remove would write them back, and they would outlast the row.
+    private var own: UIAccessibilityTraits = []
+    override var accessibilityTraits: UIAccessibilityTraits {
+        get { own.union(switchTraits) }
+        // An insert or remove reads the union first: what only the switch says stays the switch's,
+        // except the `.notEnabled` that `interact` marks the cell with itself.
+        set {
+            var switchOnly = switchTraits.subtracting(own)
+            if markedNotEnabled { switchOnly.remove(.notEnabled) }
+            own = newValue.subtracting(switchOnly)
+        }
+    }
 
     var row: UInt32?
     /// Whether `interact` put `.notEnabled` in its traits, set before it does.
