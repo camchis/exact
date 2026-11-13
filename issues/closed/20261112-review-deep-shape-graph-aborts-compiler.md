@@ -1,6 +1,7 @@
 # A deep acyclic shape graph aborts before the type-depth refusal
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The shape cycle check and the shape depth measure keep their own stacks, so a long acyclic chain of shapes reaches `type-too-deep` instead of exhausting the native stack.
 **Systems:** contract/types/src/checks.rs, contract/types/src/bounds.rs
 **Author:** Codex
 **Date:** 2026-11-12
