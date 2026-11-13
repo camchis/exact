@@ -637,6 +637,11 @@ too), and
 next resume when a recreated activity lost the result (LLP 1133.002 D9). Overlapping requests queue in order;
 identical permission sets share a result. `done` receives the set of permission names the platform answered, empty
 when nothing was asked or the result was lost or cancelled. Record a permanent denial only for a name in that set.
+`startActivityForResult(intent, failed, done)` starts an activity over the resumed one and answers its result. Asked
+while the activity shows but is paused, as it is when a permission dialog's answer arrives (before `onResume`), the
+start waits for the resume; the app stopping first ends it. `failed` names why nothing started: `InvalidStateError`
+(no activity showing), `AbortError` (the app stopped first), `NotFoundError` (no app handles the intent),
+`NotAllowedError` (a `SecurityException`) or `UnknownError`. Without `failed`, such a start answers `RESULT_CANCELED`.
 `invoke(handle, handler, args, reply)` runs an app handler on the host's owner thread and delivers its answer on the
 main thread. The activity binds the roster's names as it
 is made (`Native.bindExtensions`). Outside the agent the host binds them as in production; under it, those a drive

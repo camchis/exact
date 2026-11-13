@@ -511,6 +511,7 @@ open class ExactActivity : Activity() {
         view.running(true)
         Exact.hidden(false)
         if (measured) Exact.owner?.windowFrames?.attach(window)
+        Extensions.started()
     }
 
     /** A driver's launch: the window's frames are measured for `perf frames` while it shows (LLP 1079.000 §6.2). */
@@ -538,6 +539,7 @@ open class ExactActivity : Activity() {
         Exact.owner?.windowFrames?.detach()
         Exact.hidden(true)
         if (reads()) pads.background()
+        if (reads()) Extensions.stopped(isChangingConfigurations)
         view.running(false, reads())
         // Behind the hide, the pads' release and the stop of the turns (none queued after it), what they and anything
         // since the pause committed is on disk before Android may kill it.
