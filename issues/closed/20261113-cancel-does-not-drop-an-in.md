@@ -1,6 +1,7 @@
 # Cancel does not drop an in-flight takePhoto
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** Cancel, and back from the camera, assign `shot = none` so a photo still being taken is dropped, and `taken` uses a photo only while the camera route is on top.
 **Systems:** apps/photo-editor
 **Severity:** P1
 **Author:** Grok 4.7

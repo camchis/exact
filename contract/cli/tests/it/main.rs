@@ -162,6 +162,7 @@ mod passkeys;
 mod payments;
 mod pedometer;
 mod persist;
+mod photo_cancel;
 mod photos;
 mod picker;
 mod picture_in_picture;
