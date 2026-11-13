@@ -1,6 +1,7 @@
 # The iOS software keyboard drops a textarea's Enter and Backspace
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** TextArea dispatches the software keyboard's Return (an unmarked newline in insertText) and Backspace (deleteBackward) as key events first and skips the edit when one is prevented, unless pressesBegan already delivered that hardware key (heard).
 **Systems:** host/apple
 **Severity:** P2
 **Author:** Grok 4.7
