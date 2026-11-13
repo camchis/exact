@@ -1,6 +1,7 @@
 # An asset index at a root URL with a query panics during update checking
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** resolve_url follows RFC 3986 section 5.2: an absent path is /, an empty or fragment-only card keeps the base query, and dot removal keeps empty segments and a final slash, while same-origin, credential and climb refusals stay.
 **Systems:** update/src/envelope.rs, update/src/store.rs
 **Author:** Codex
 **Date:** 2026-11-12
