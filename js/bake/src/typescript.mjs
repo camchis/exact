@@ -1396,9 +1396,26 @@ function checkFiles(stage, libraries, files) {
   libraries = realpathSync.native(libraries);
   const allowed = path => within(path, stage) || (within(path, libraries) && configuredLibrary(relative(libraries, path)));
   for (const path of files) {
-    if (path && !allowed(realpathSync.native(path))) throw new Error('module outside captured app: ' + path);
+    if (path && !allowed(realpathSync.native(path))) throw new Error('module outside captured app: ' + path + undeclaredSource(path));
   }
   checkPeers(stage,files);
+}
+
+// More on a refusal of a package's TypeScript source: the stage holds a package's manifests and declarations, not its
+// source, so the checker reaching a package's `.ts` means an import did not resolve to declarations inside the stage.
+// It names the package and what to check, without claiming which export or edge it was.
+export function undeclaredSource(path) {
+  if (!/\.[cm]?tsx?$/.test(path) || /\.d\.[cm]?tsx?$/.test(path)) return '';
+  for (let dir = dirname(path); ; dir = dirname(dir)) {
+    const manifest = join(dir, 'package.json');
+    if (existsSync(manifest)) {
+      let name = null;
+      try { name = JSON.parse(readFileSync(manifest, 'utf8')).name ?? null; } catch { /* not JSON: say nothing */ }
+      if (!name) return '';
+      return `: this is TypeScript source in the package ${name} (${manifest}). The package staging step copies declaration files, not source files. Check that the imported package entry resolves to declarations inside the stage (for a package whose entry is TypeScript source, a \`types\` export beside it, as @exact/convex has), and that those declarations do not depend on unstaged TypeScript source.`;
+    }
+    if (dirname(dir) === dir) return '';
+  }
 }
 
 // Use the compiler's graph, including relative declaration imports and exports,

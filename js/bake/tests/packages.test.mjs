@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { rolldown } from 'rolldown';
 import { parseSync } from 'rolldown/utils';
-import { check, configure, dataBundle, replayCaptured } from '../src/typescript.mjs';
+import { check, configure, dataBundle, replayCaptured, undeclaredSource } from '../src/typescript.mjs';
 
 const libraries = join(dirname(fileURLToPath(import.meta.resolve(`@typescript/typescript-${process.platform}-${process.arch}/package.json`))), 'lib');
 
@@ -340,5 +340,55 @@ for (const commonjs of [false, true]) test(`a linked ${commonjs ? 'CommonJS' : '
     }
   } finally {
     fixture.close();
+  }
+});
+
+const undeclared = (name, manifest) => `: this is TypeScript source in the package ${name} (${manifest}). The package staging step copies declaration files, not source files. Check that the imported package entry resolves to declarations inside the stage (for a package whose entry is TypeScript source, a \`types\` export beside it, as @exact/convex has), and that those declarations do not depend on unstaged TypeScript source.`;
+
+test("a package's TypeScript source outside the stage is named with what to check", () => {
+  const root = realpathSync.native(mkdtempSync(join(tmpdir(), 'exact-undeclared-')));
+  try {
+    const pkg = join(root, 'packages', 'probe-lib');
+    mkdirSync(join(pkg, 'src'), { recursive: true });
+    writeFileSync(join(pkg, 'package.json'), JSON.stringify({ name: 'probe-lib', exports: { '.': { default: './src/index.ts' } } }));
+    for (const file of ['index.ts', 'view.mts', 'deep.tsx']) expect(undeclaredSource(join(pkg, 'src', file))).toBe(undeclared('probe-lib', join(pkg, 'package.json')));
+    // A declaration, JavaScript, or a file with no named package around it is not this case.
+    for (const file of [join(pkg, 'src', 'index.d.ts'), join(pkg, 'src', 'index.d.mts'), join(pkg, 'src', 'index.js'), join(root, 'loose.ts')]) expect(undeclaredSource(file)).toBe('');
+    writeFileSync(join(pkg, 'package.json'), '{"private":true}');
+    expect(undeclaredSource(join(pkg, 'src', 'index.ts'))).toBe('');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// As a web build stages it, inside the app's output: with no declarations staged for the import, TypeScript walks up
+// into the app's own node_modules, reaches the package's source, and the check refuses it (a stage outside the app's
+// ancestors fails with TS2307 instead).
+test("a check staged inside the app refuses a package's undeclared source, naming the package", async () => {
+  const root = realpathSync.native(mkdtempSync(join(tmpdir(), 'exact-undeclared-app-')));
+  const put = (file, text) => { mkdirSync(dirname(file), { recursive: true }); writeFileSync(file, text); };
+  try {
+    const app = join(root, 'app'), pkg = join(root, 'packages', 'probe-lib'), stage = join(app, 'dist', '.gen', 'typescript');
+    const manifest = { name: 'probe-lib', version: '0.0.1', type: 'module', exports: { '.': { default: './index.ts' } } };
+    put(join(pkg, 'package.json'), JSON.stringify(manifest));
+    put(join(pkg, 'index.ts'), 'export function shout(text: string): string { return text.toUpperCase(); }\n');
+    mkdirSync(join(app, 'node_modules'), { recursive: true });
+    symlinkSync(pkg, join(app, 'node_modules', 'probe-lib'), process.platform === 'win32' ? 'junction' : 'dir');
+    put(join(app, 'package.json'), '{"name":"probe-app","private":true}');
+    const entry = "import { shout } from 'probe-lib';\nexport const loud: string = shout('hi');\n";
+    put(join(app, 'app.ts'), entry);
+    put(join(stage, 'app.ts'), entry);
+    put(join(stage, '__exact_entry.ts'), "export * from './app';\n");
+    put(join(stage, '__exact_paths.json'), JSON.stringify({ app, mounts: [] }));
+    configure(stage, false, parseSync);
+    const refused = await check(stage, join(libraries, 'tsc'), libraries).then(() => null, (error) => error.message);
+    expect(refused).toBe('module outside captured app: ' + join(pkg, 'index.ts') + undeclared('probe-lib', join(pkg, 'package.json')));
+    // Declarations beside the source are the repair.
+    put(join(pkg, 'package.json'), JSON.stringify({ ...manifest, exports: { '.': { types: './index.d.ts', default: './index.ts' } } }));
+    put(join(pkg, 'index.d.ts'), 'export declare function shout(text: string): string;\n');
+    configure(stage, false, parseSync);
+    await check(stage, join(libraries, 'tsc'), libraries);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
   }
 });

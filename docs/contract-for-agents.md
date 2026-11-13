@@ -2953,6 +2953,26 @@ sample host's `a` and `b`), and in an app `main` (a later Mac window `window-2`,
 `window-3`, in the order they open). `session` is unique only within the process and
 `hostSession` new at each launch; key nothing durable by either.
 
+### A package of TypeScript for the data module
+
+Packages imported by the data module need declarations that resolve inside the
+captured stage. Exact stages package manifests and `.d.ts`, `.d.mts` and `.d.cts`
+files, but not package source. For a package exporting TypeScript source, an
+explicit `types` condition is one way to provide those declarations, as
+`@exact/convex` does:
+
+```json
+"exports": { ".": { "types": "./index.d.ts", "default": "./index.ts" } }
+```
+
+Provide declarations for each imported subpath too, and keep their imports within
+the staged declaration graph. Without usable declarations, the check can fail with
+TS2307 or reject source resolved outside the stage as `module outside captured app`.
+
+Keep declarations in step with the source. Generate them using the package's
+TypeScript configuration with declaration-only emit enabled (`tsc --declaration
+--emitDeclarationOnly`), or maintain them by hand for a small API.
+
 ### A package's native module, library and web assets
 
 A package fills the data module's one native module (`native.call` in `app.ts`) from the
