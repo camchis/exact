@@ -718,6 +718,11 @@ fn refused_group_drop_publishes_timer_receipts() {
         reply.contains("\"text\":\"\""),
         "timer removal missing from batch: {reply}"
     );
+    // The refused action ended the hold: the batch's `reorder-state` says
+    // the session settles, so the page lands the ghost and finishes it.
+    assert!(reply.contains("\"phase\":\"settling\""), "{reply}");
+    accepted(&h.reorder_motion(&wire(&h, 20, b.list, false, 2_010.)));
+    assert!(h.reorder_drags.active.is_none());
 }
 
 /// A row's first measurement at its estimate, after the list's first report,

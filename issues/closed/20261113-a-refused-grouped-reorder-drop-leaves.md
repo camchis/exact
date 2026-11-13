@@ -1,6 +1,7 @@
 # A refused grouped reorder drop leaves the ghost
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** Not a defect as described: a refused drop ends the hold in the runner, and the reply's batch carries the session's reorder-state (phase settling), which group-glue.js's state() lands and finishes; a test now asserts both.
 **Systems:** host/web
 **Severity:** P2
 **Author:** Grok 4.7
