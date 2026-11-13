@@ -1,6 +1,7 @@
 # The LLP reader cannot open a bare filename from the current directory
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** A bare file name's corpus is the current directory (`.`), and the document is named `./<name>` as that corpus's index names it, so it opens with its neighbours.
 **Systems:** LLP reader data source
 **Author:** Codex
 **Date:** 2026-11-12
