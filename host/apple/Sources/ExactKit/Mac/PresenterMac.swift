@@ -918,7 +918,7 @@ package final class Presenter {
     /// window; the browser fires no blur on removal, so neither does this
     /// host), and never while a batch is being applied — it waits for the
     /// batch to finish, then goes if its view survived it.
-    private var applying = false
+    var applying = false
     var isApplying: Bool { applying }
     /// Each painted popover's region not yet told the kernel, the latest, with the view it is for (`tellRegion`).
     var regionsUntold: [UInt32: (view: ObjectIdentifier?, block: HostBlock?)] = [:]
@@ -955,7 +955,7 @@ package final class Presenter {
         return true
     }
     private var waiting: [(UInt32, () -> Void)] = []
-    private var afterBatchWork: [() -> Void] = []
+    var afterBatchWork: [() -> Void] = []
     /// Work for after the batch being applied, or now: a hatch's act on an
     /// element never lands inside a batch (LLP 1075.003 §3.4).
     func afterBatch(_ work: @escaping () -> Void) { if applying { afterBatchWork.append(work) } else { work() } }
