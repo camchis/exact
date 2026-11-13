@@ -649,8 +649,8 @@ async function targetKeyFixture() {
   const [glue, rt] = await Promise.all(['/glue.js', '/events.js'].map(url => fetch(url).then(r => r.text())));
   const attach = await fetch('/wasm-input.js').then(r => r.text());
   const on = rt.slice(rt.indexOf('export function on('), rt.indexOf('// Each event family')).replace('export ', '');
-  // onKey hears a key with nothing focused through atBody, the line before it (0c3cf4405f).
-  const onKey = [rt.split('\n').find(line => line.startsWith('let BodyHeard;')), rt.split('\n').find(line => line.startsWith('export const onKey =')).replace('export ', '')].join('\n');
+  // onKey hears a key with nothing focused through atBody, declared before it (0c3cf4405f).
+  const onKey = rt.slice(rt.indexOf('let BodyHeard;'), rt.indexOf('export function onMIDI')).replace('export ', '');
   const bindWasm = new Function('el', 'heard', `
     let keyEvent = null, bodyHeard; // glue.js declares both; attach reads them (0c3cf4405f)
     const views = new Map([[1, el]]), retiredViews = new WeakSet(), inputReady = true, page = null;

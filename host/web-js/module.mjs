@@ -379,12 +379,12 @@ ${patch}`;
  * mount.js), which a development build's emitter names (regions.rs passes
  * the region id) and which leaves with its scope. */
 const INSPECT_HOOKS = {
-  'tree.js': [/^export function viewId\(e\) \{.*\n/m, (line) => `${line}globalThis.$exactViewId = viewId;\n`],
-  'mount.js': [/^  let rows = new Map\(\), single = false, order = null;\n/m, (line) => `${line}  if (arguments[5] !== undefined) { const e = { region: arguments[5], rows: () => order ?? [], key, live: () => a.isConnected }; (globalThis.$exactEaches ??= new Set()).add(e); onEnd(() => globalThis.$exactEaches.delete(e)); }\n`],
+  'tree.js': [/^export function viewId\(e\) \{\n[\s\S]*?^\}\n/m, (fn) => `${fn}globalThis.$exactViewId = viewId;\n`],
+  'mount.js': [/^  let rows = new Map\(\),\n    single = false,\n    order = null;\n/m, (line) => `${line}  if (arguments[5] !== undefined) { const e = { region: arguments[5], rows: () => order ?? [], key, live: () => a.isConnected }; (globalThis.$exactEaches ??= new Set()).add(e); onEnd(() => globalThis.$exactEaches.delete(e)); }\n`],
 };
 export const inspectHooked = Object.keys(INSPECT_HOOKS);
 /** `text`, runtime file `file`'s source, with its inspect hook. Throws when
- * the file no longer has the line the hook hangs on. */
+ * the file no longer has the lines the hook hangs on. */
 export function withInspectHooks(file, text) {
   const [at, hook] = INSPECT_HOOKS[file];
   if (!at.test(text)) throw new Error(`${file}: inspect mode's hook has no line to hang on (${at})`);
