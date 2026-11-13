@@ -993,6 +993,7 @@ impl<D: DataSource> Host<D> {
                     self.update(id, batch);
                 }
             }
+            self.reveal_animations(r, batch);
             // This commit's springs, at its own time: the style (the target)
             // is in the page before the frames that approach it start playing.
             // Adopt this receipt's time/targets/transitions while the hold is

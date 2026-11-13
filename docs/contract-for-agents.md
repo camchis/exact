@@ -3600,6 +3600,11 @@ names read in any ASCII case (`0.3S EASE` is `0.3s ease`), its numbers are CSS's
 (`1.s` and `infs` are no times), and a keyframes name keeps its case: in
 `animation="Spin 1s EASE"` the name is `Spin` and `EASE` is the easing.
 
+In a virtualized list, `-exact-animation-trigger="view"` (the default) holds a
+prefetched row's animations until the row first overlaps its list's port.
+`"none"` starts them on insertion. Reveal preserves authored pauses; leaving
+and returning to the port replays only if the row was retired and mounted again.
+
 ### Motion that follows a scroll
 
 A value that follows a scroller is a scroll-driven animation, CSS's own, not a `scroll` action
