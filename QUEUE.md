@@ -1159,11 +1159,6 @@ sits on that list carries the trade it would take.
   (Charlie, 2026-10-22); wasmi is ratified, per-source routing deferred, and
   Q5/Q7 remain open with no work waiting. Its Summary keeps the mixed-language
   rulings. LLP 1032's engine comparisons remain research for phone measurements.
-- **The compatibility executor still says `wasmtime`** (LLP 1029 §8;
-  Charlie, 2026-10-22). `bake/src/compat.rs` emits that label for `Swappable`
-  and reads it to admit wasm. Rename it once, deliberately, including its
-  readers: the compatibility ids containing the label change. Done when receipts name
-  the actual executor and classification accounts for the changed ids.
 
 - **Delivery, unified** — LLP 1030 r2 and LLP 1030.000 r2. Landed: stage 1 (the
   asset row), stage 2 (the manifest), the compatibility id, the `delivery`
