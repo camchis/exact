@@ -1,6 +1,7 @@
 # An Apple altimeter poll while hidden under-counts dropped samples
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** A poll answered while the app is hidden withholds its samples by counting each of them as dropped, as Android does, so the cursor skips none uncounted.
 **Systems:** packages/altimeter
 **Severity:** P2
 **Author:** Grok 4.7
