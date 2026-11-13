@@ -1,6 +1,7 @@
 # Fieldnotes' iOS inbox drive deletes shares that predate the test
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** Each run makes its own inbox directory (in the group container on the simulator), names it to the app with `EXACT_AGENT_SHARE_INBOX` and removes only that directory, so the installed app's inbox is never read or cleared.
 **Systems:** Fieldnotes share-inbox fixture, iOS test isolation
 **Author:** Codex
 **Date:** 2026-11-12
