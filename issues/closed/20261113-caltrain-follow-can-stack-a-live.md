@@ -1,6 +1,7 @@
 # Caltrain Follow can stack a Live Activity, and Delay counts time the host drops
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** Follow shows and acts only when no departure is followed or being started, Delay and End only once an id names the activity (so the delay grows only with an update that carries one), and the service alert's Start hides and refuses while a start is out.
 **Systems:** apps/caltrain, Apple activity arm
 **Severity:** P2
 **Author:** Grok 4.7
