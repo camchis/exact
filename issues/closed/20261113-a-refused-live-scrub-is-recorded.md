@@ -1,6 +1,7 @@
 # A refused live scrub is recorded as already shown
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** apply_live records a scrub frame as shown, and retires the run before it, only once the frame lands (set_tokens returns Ok, or there is nothing to set); a refused frame leaves both as they were.
 **Systems:** runner
 **Severity:** P2
 **Author:** Grok 4.7
