@@ -1,6 +1,7 @@
 # A tabpanel inside a tablist is never deferred
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The semantics' panels walk descends into a tablist as the runner's tab_panels does, stopping only at navigationKey, so a named tabpanel inside its tablist waits for its tab on both sides.
 **Systems:** semantics, runner
 **Severity:** P2
 **Author:** Grok 4.7
