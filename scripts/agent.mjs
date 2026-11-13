@@ -303,6 +303,7 @@ export async function main(argv, injected = {}) {
             'pass fetch <url-prefix> (LLP 1103: a matching fetch fails as a refused connection; --fail-fetch <url-prefix> arms one before the first data load)',
             "call <tool> <json> [--door <door>] (a system's call of a tool, as its door hands it, LLP 1133.023 §10: state.intents lists the tools and the calls, state intents.entities <kind> [<text>] answers as the content index's query; --call '<tool> <json>' is a cold one at launch)",
             'perf [<target>] [during "<op>" …]',
+            'perf world:<surface> [during "<op>" …] (tick spans; during refuses a remount, restore or recording replacement)',
             'perf frames [late <n>]',
             'perf frames health [app|scroll|window] [during "<op>" …]',
             'perf frames capture start [ms]|stop|clear',

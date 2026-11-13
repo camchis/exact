@@ -935,7 +935,11 @@ no CPU frame perf clock calls unless tick spans are armed; samples do not enter 
 mean milliseconds. `tick.other` completes the tick. `tickSpans.tickMs` measures
 the same engine interval, before presentation; the exclusive per-tick means sum
 to its mean. Span distributions include zero for ticks before a name first appeared. These rings also retain
-16,384 ticks, including under the agent clock; `during` reads the added ticks. Armed perf also reads back, a few
+16,384 ticks, including under the agent clock; `during` reads the added ticks.
+Each read names its world `incarnation` and recording `generation`; `during`
+refuses a remount, restart, restore, module reload or recording reset even when counters match.
+The incarnation includes a random namespace for the loaded module.
+These identities stay outside saves and hashes. Armed perf also reads back, a few
 frames late and asynchronously, `perf.culled` (instances each view drew: `camera`,
 `shadows[0..3]`) and, where timestamps are granted, `world.gpuMs` rings for every
 pass by `GPU_PASS_NAMES`: forward, the cascades, local shadows, `cull`, skin palettes,
