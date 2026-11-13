@@ -15,7 +15,7 @@ import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSyn
 import { basename, dirname, isAbsolute, relative, resolve } from 'node:path';
 import { rustPackage, rustOutput, rustInputs, rustCards } from '../../scripts/rust.mjs';
 import { gpuModules, shaderWatchRoots, rustPolicy, rebuildPolicy } from '../../scripts/app.mjs';
-import { webDist, cargoReproducibilityFlags, compilerPaths, developmentBuildEnv, developmentCandidate, devBinRun, pendingBuildInputs, readBuilds, resolveApp } from '../../scripts/app.mjs';
+import { HOST_DEV, webDist, cargoReproducibilityFlags, compilerPaths, developmentBuildEnv, developmentCandidate, devBinRun, pendingBuildInputs, readBuilds, resolveApp } from '../../scripts/app.mjs';
 import { developmentLinks } from '../apple/build.mjs';
 import { acceptsHTML, webRequestURL } from '../../scripts/origin.mjs';
 import { guardFlags } from '../../scripts/help.mjs';
@@ -702,12 +702,12 @@ function contractGraph() {
   } catch { return { files: new Set(), dirs: new Set(), shallow: [], sources: new Set() }; }
 }
 async function startModuleCompiler() {
-  const built = await phasedAsync('the module producer (exact-js-bake --release; the first run takes a few minutes)', 'cargo', ['build', '-q', '--release', '-p', 'exact-js-bake'], { cwd: root, env: toolingEnv }, child => { dev = child; });
+  const built = await phasedAsync(`the module producer (exact-js-bake --profile ${HOST_DEV}; the first run takes a few minutes)`, 'cargo', ['build', '-q', '--profile', HOST_DEV, '-p', 'exact-js-bake'], { cwd: root, env: toolingEnv }, child => { dev = child; });
   if (stopping || dev !== built.child) return;
   if (built.status !== 0) throw new Error('the module producer did not build');
   const scratch = resolve(app.target, 'module-dev');
   mkdirSync(scratch, { recursive: true });
-  const child = dev = spawn(resolve(app.target, 'release/exact-js-bake'), [app.dir, '--serve'], {
+  const child = dev = spawn(resolve(app.target, HOST_DEV, 'exact-js-bake'), [app.dir, '--serve'], {
     cwd: root, env: toolingEnv, detached: true, stdio: ['pipe', 'pipe', 'pipe'],
   });
   console.log(`compiler pid ${child.pid}`);
