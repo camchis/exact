@@ -2132,9 +2132,18 @@ RTL, overflow safety, margins, bounds, percentages, insets, box sizing,
 text, and block-level flex/grid children. The 72 mismatched frames before
 the patch now match Chrome. `block_justify_self_overrides_the_container_default`
 also failed before the patch and holds the vendor's per-item override; no
-Contract attribute is added. The remaining fixture records the absolute-child
-follow-up in `QUEUE.md`: automatic insets still give x=0 instead of Chrome's
-x=40. Floats remain disabled in Exact.
+Contract attribute is added. Floats remain disabled in Exact.
+
+Absolute children align inside the parent's inline content-box edges when
+both inline insets are automatic, including descendants hoisted to a
+positioned ancestor. Explicit insets retain precedence. Chrome 151.0.7922.34
+(2026-11-12) applies overflow safety from an absolute child's own `justify-self`
+only; the parent's `safe` modifier does not affect its static position.
+Physical left/right keywords are preserved until layout: block static
+positions treat them as inline start/end, while in-flow block and grid items
+keep their physical meaning. The fixture adds 70 cases for these paths;
+`absolute_block_justify_self_overrides_the_container_default` covers the
+vendor's per-item override in both directions, including overflow safety.
 
 ## Patch 67: a scroll container's end padding extends its children's margin boxes
 
