@@ -1,6 +1,7 @@
 # clock until can put a password's revealed value in its error
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** `clock until state` says only what a masked read gives: a revealed read names a missing field's enclosing value by kind, and a value the masked read cannot give is said to be unreadable, never taken revealed.
 **Systems:** scripts/agent-held.mjs, agent diagnostics
 **Author:** Codex
 **Date:** 2026-11-12
