@@ -1686,7 +1686,6 @@ and the Linux headless CPU renderer without claiming display frame timing.
 
 - **macOS live trackpad replay (LLP 1079.000, 2026-10-28).** Add a reliable completion acknowledgement for synthetic phased wheels before admitting them under platform timing. Immediate layout reads exposed zero or partial motion; posting the later phases first did not resolve it. The carrier currently refuses with `platform-trackpad-replay-unqualified`; ordinary wheels and frozen-clock functional replay remain available.
 - **A minimized frame-health card (LLP 1079.000 §7.2).** The card is opaque and takes the touches within its bounds, so on a phone it covers over a third of the app. A minimized form, resting in its corner as the card does, would leave the app usable while it watches.
-- **Frame-health publication from the hook (LLP 1079.000 §5.1).** `FrameHealth.record` and `landed` call `FrameHealthPublication.request`, which at most twice a second schedules a run-loop block and wakes the loop; Core Foundation copies the block, allocates and locks. An expiring agent lease also removes observers there. Move both out of the hook onto an existing pass, leaving it a flag.
 - **Late work that lands unchanged leaves no hitch (LLP 1079.000 §1).** A frame whose owner batch changes nothing is never applied, so when it finishes late it counts as a late frame but the detail ring records no apply-deadline event. Record the late frame's start, deadline and landing as an event of its own.
 
 - **NucBox: qualify an AMD overlay diagnostic if the paint crash recurs**
