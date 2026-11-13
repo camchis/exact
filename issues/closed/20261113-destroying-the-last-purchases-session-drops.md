@@ -1,6 +1,7 @@
 # Destroying the last purchases session drops billing replies
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** Destroying the last session answers every call still waiting on the first connection and the showing sheet's purchase with `AbortError`, clears them, and ends the client, so the next session can start a purchase.
 **Systems:** packages/purchases
 **Severity:** P2
 **Author:** Grok 4.7
