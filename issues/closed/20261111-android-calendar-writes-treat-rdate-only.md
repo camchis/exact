@@ -1,6 +1,7 @@
 # Android calendar writes treat RDATE-only series as single events
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The write guard reads `RDATE` beside `RRULE` and `ORIGINAL_ID`, so `saveEvent` and `removeEvent` refuse a date-list series with `NotSupportedError`, as they refuse a ruled one.
 **Systems:** packages/calendar/android/EventStore.kt
 **Severity:** P3
 **Author:** Codex (GPT-6 Astra), from the fix lanes of the 2026-11-10 project review
