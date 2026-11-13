@@ -743,6 +743,16 @@
           "description": "iOS: `minimumOS` (default 17.0), `deviceFamily` (iphone, ipad), and the keys below.",
           "type": "object",
           "properties": {
+            "infoPlist": {
+              "description": "No keys are admitted. Each refusal gives tested grant advice, points to the bundle metadata reference for a derived key, or asks for a feedback note naming a key Exact does not write.",
+              "type": "object",
+              "additionalProperties": false
+            },
+            "entitlements": {
+              "description": "No keys are admitted. Each refusal gives tested grant advice, points to the bundle metadata reference for a derived key, or asks for a feedback note naming a key Exact does not write.",
+              "type": "object",
+              "additionalProperties": false
+            },
             "resources": {
               "description": "Resource trees a data module reads through `bundle:/` (LLP 1133.007 D6), on iOS, iPadOS and tvOS: copied, modes kept, into the bundle's `ExactResources/` folder before it is signed, which then holds them and nothing else. Read only, through `fs.read bundle:/<to>` (`fs.read bundle:/Resources/data-files`), the line the Mac's `host.macos.resources` takes for the same `to`. A tree holds no links and no Mach-O code; changing it requires a new binary, never an update.",
               "type": "array",
@@ -905,6 +915,16 @@
           "description": "macOS: `minimumOS` (default 14.0), the first window's size, and the keys below.",
           "type": "object",
           "properties": {
+            "infoPlist": {
+              "description": "No keys are admitted. Each refusal gives tested grant advice, points to the bundle metadata reference for a derived key, or asks for a feedback note naming a key Exact does not write.",
+              "type": "object",
+              "additionalProperties": false
+            },
+            "entitlements": {
+              "description": "No keys are admitted. Each refusal gives tested grant advice, points to the bundle metadata reference for a derived key, or asks for a feedback note naming a key Exact does not write.",
+              "type": "object",
+              "additionalProperties": false
+            },
             "presenter": {
               "enum": ["native", "painted"],
               "description": "Absent: native. Painted builds the app’s <macos-crate>-painted binary as a benchmark carrier; distribution is refused until LLP 1149’s accessibility gate."

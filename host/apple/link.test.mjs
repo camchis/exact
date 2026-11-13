@@ -1,5 +1,6 @@
 import { capturePrivacyManifest } from './privacy.mjs';
-import { test } from 'bun:test';
+import { test, spyOn } from 'bun:test';
+import * as appleToolchain from './toolchain.mjs';
 import assert from 'node:assert/strict';
 import {copyFileSync, cpSync, existsSync, mkdtempSync, mkdirSync, readdirSync, readFileSync, writeFileSync, rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
@@ -606,16 +607,39 @@ test.skipIf(process.platform !== 'darwin' || !['clang', 'codesign', 'sips', 'dsy
       const clipBin = resolve(binDir, 'clip', 'Clip');
       mkdirSync(resolve(binDir, 'clip'));
       copyFileSync(bin, clipBin);
-      const result = assembleIOS({ app, library, paths: { bundle, executable: 'ExactClip', capture }, binDir, bin, device,
+      const options = { app, library, paths: { bundle, executable: 'ExactClip', capture }, binDir, bin, device,
         clipBin, production, distribution: archived, ipa, bakedCompat: compat, bakedPlan: plan, buildReceipt: build,
         libDir: capture, gpuArtifacts: [gpu], looseArms: [[true, dylib, ...pairs[0]]],
         modulesBuilt: dylib, modulesLoadName: pairs[1][0], hasSvg: true, svgBuilt: dylib, svgLoadName: pairs[2][0],
         canvasGpuBuilt: dylib, canvasGpuLoadName: pairs[3][0], serviceDylibs: [{ built: service, load: pairs[4][0], framework: pairs[4][1] }],
-        args: [], unsigned: true, sha1: '-', linkRoot: binDir, sdkName: 'iphoneos' }, {
+        args: [], unsigned: true, sha1: '-', linkRoot: binDir, sdkName: 'iphoneos' };
+      const helpers = {
         runApple: run, infoPlist: () => plistFile({ CFBundleIdentifier: app.id, CFBundleExecutable: 'ExactClip', CFBundlePackageType: 'APPL' }),
         copyAppleStaticTrees() {}, writeUsageStrings() {}, assertAppleIdentity() {}, distributionKeys: () => ({}),
         receipt: () => whole, shippedReceipt, copyAppleGpuProducts, entitlements: () => plistFile({}), appClip: () => ({ id: app.id + '.Clip', name: 'Clip', executable: 'Clip' }),
-      });
+      };
+      if (!production) {
+        // Inspect the app after AlarmKit's plist writes, before compiling its separate extension.
+        const { appleMetadataProblem } = await import('./plist.mjs');
+        const metadataWritten = new Error('alarm metadata inspected');
+        const execute = appleToolchain.spawnSync;
+        const probe = spyOn(appleToolchain, 'spawnSync').mockImplementation((command, args, opts) => {
+          const result = execute(command, args, opts);
+          if (command === 'plutil' && args[0] === '-replace' && args[1] === 'ExactAlarmCountdown') {
+            probe.mockRestore();
+            const metadata = JSON.parse(run('plutil', ['-convert', 'json', '-o', '-', resolve(bundle, 'Info.plist')]).stdout);
+            for (const key of ['NSSupportsLiveActivities', 'ExactAlarmCountdown']) {
+              assert.equal(metadata[key], true);
+              assert.match(appleMetadataProblem(`host.ios.infoPlist.${key}: not a known key`), /Exact writes this key itself from its declarations.*cannot be set here/);
+            }
+            throw metadataWritten;
+          }
+          return result;
+        });
+        try { assert.throws(() => assembleIOS({ ...options, alarm: {} }, helpers), error => error === metadataWritten); }
+        finally { probe.mockRestore(); }
+      }
+      const result = assembleIOS(options, helpers);
       for (const owner of [bundle, resolve(bundle, 'AppClips/Clip.app'), ...(production ? [...pairs, [null, 'ExactGpu']].map(([, name]) => resolve(bundle, 'Frameworks', `${name}.framework`)) : [])]) {
         const privacy = resolve(owner, 'PrivacyInfo.xcprivacy'); assert.equal(run('plutil', ['-lint', privacy]).status, 0);
         const usesDisk = diskService && (owner.endsWith('/ExactService.framework') || (!production && owner.endsWith('.app')));

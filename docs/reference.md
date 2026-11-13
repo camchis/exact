@@ -1444,6 +1444,17 @@ enters the compatibility id. An older bake without the fields answers `""`.
 The web JS build uses these variables at build time and answers `""` for each
 unset variable. No `app.json` version key is defined.
 
+## Apple bundle metadata
+
+Exact writes Info.plist keys and entitlements from grants, named manifest fields,
+packages and build inputs. Entitlements remain derived (LLP 1069.008 D4).
+The `host.ios` and `host.macos` dictionaries `infoPlist` and `entitlements` refuse
+all supplied keys together; their values never enter a bundle. Diagnostics give
+specific grant advice only where tests apply those lines, including companion
+grants, through the bake and platform writer. Other derived keys cannot be set
+there. For a key Exact never writes, record a `bun exact.mjs feedback note` from
+the app directory naming the key and what the native module needs.
+
 ## Apple privacy manifests
 
 Apple builds write `PrivacyInfo.xcprivacy` before signing each app, App Clip,
