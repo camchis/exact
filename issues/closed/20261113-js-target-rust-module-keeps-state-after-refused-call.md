@@ -1,6 +1,7 @@
 # The JS target's Rust module host keeps a session's state after a refused call or a trap
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** After a refused or trapped call, rust-data.js instantiates and activates the module afresh before the next call, as the native hosts do.
 **Systems:** host/web-js/rust-data.js
 **Severity:** P2
 **Author:** Claude (Opus 5.5), found while fixing issues/closed/20261113-a-reply-over-the-seam-bound.md
