@@ -1331,37 +1331,47 @@ function settleBuild(dist) {
   return built.status === 0 ? 0 : built.status ?? 1;
 }
 
+/** The files of the app in `app` that a build of it into `out` reads: its files at any depth, but for what builds and
+ * tools write (`out` and what is kept beside it, dependencies, dot directories but `.env`s, generated types, test
+ * reports). `newest`: the latest modification time among them. `digest`: of their paths, which a build's receipt
+ * records as `sources`, so that a file come or gone since the build is a change whatever its time; it names no file. */
+export function appSources(app, out) {
+  const SKIP = new Set(['node_modules', 'target', 'test-results', 'playwright-report']);
+  const paths = [];
+  let newest = 0;
+  const walk = (dir) => {
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      const path = resolve(dir, e.name);
+      if (SKIP.has(e.name) || (e.name.startsWith('.') && !e.name.startsWith('.env')) || e.name.endsWith('.d.ts') || path === out || path.startsWith(`${out}.`)) continue;
+      if (e.isDirectory()) walk(path);
+      else if (e.isFile()) { paths.push(relative(app, path).split(sep).join('/')); newest = Math.max(newest, statSync(path).mtimeMs); }
+    }
+  };
+  walk(resolve(app));
+  return { newest, digest: sha256(Buffer.from(paths.sort().join('\n'))) };
+}
+
 /** For a build whose app's sources are beside it, as `settleBuild` builds a changed setting again: a function a
- * request for a page awaits (`asksPage`), which builds the site again once a source changed since the build (newer than its
- * receipt), as a framework's dev server does, or once another build with other settings replaced it (a test run's,
- * for its own API), and answers the build's output when it failed (null when it built or nothing changed). Null for a build without its sources (a site copied to a host), which is served as it is. */
+ * request for a page awaits (`asksPage`), which builds the site again once a source changed since the build (newer
+ * than its receipt) or one came or went (`appSources`), as a framework's dev server does, or once another build with
+ * other settings replaced it (a test run's, for its own API), and answers the build's output when it failed (null when
+ * it built or nothing changed). Null for a build without its sources (a site copied to a host), which is served as it is. */
 function rebuildOnChange(dist) {
   let marker;
   try { marker = JSON.parse(readFileSync(resolve(dist, '.exact-build.json'), 'utf8')); } catch { return null; }
   const app = sourcesOf(dist, marker.app?.id);
   if (!app || (!marker.release && resolve(dist) !== webDist())) return null;
   const out = resolve(dist), receipt = () => { try { return statSync(resolve(dist, '.exact-build.json')).mtimeMs; } catch { return 0; } };
-  // What a build reads: the app's files at any depth, but for what builds and tools write (its outputs,
-  // dependencies, dot directories but `.env`s, generated types, test reports).
-  const SKIP = new Set(['node_modules', 'target', 'test-results', 'playwright-report']);
-  const newest = (dir) => {
-    let at = 0;
-    for (const e of readdirSync(dir, { withFileTypes: true })) {
-      const path = resolve(dir, e.name);
-      if (SKIP.has(e.name) || (e.name.startsWith('.') && !e.name.startsWith('.env')) || e.name.endsWith('.d.ts') || path === out || path.startsWith(`${out}.`)) continue;
-      if (e.isDirectory()) at = Math.max(at, newest(path)); else if (e.isFile()) at = Math.max(at, statSync(path).mtimeMs);
-    }
-    return at;
-  };
   let since = receipt(), checked = 0, running = null;
   const target = marker.target === 'js' ? [] : ['--wasm'], release = marker.release ? ['--out', dist] : [];
   return () => {
     if (running) return running;
     if (Date.now() - checked < 300) return null;
     checked = Date.now();
-    let settings = [];
-    try { settings = settingChanges(JSON.parse(readFileSync(resolve(dist, '.exact-build.json'), 'utf8')).env ?? {}, process.env, app); } catch { /* being replaced */ }
-    if (!settings.length && newest(app) <= Math.max(since, receipt())) return null;
+    let settings = [], built = null;
+    try { const now = JSON.parse(readFileSync(resolve(dist, '.exact-build.json'), 'utf8')); settings = settingChanges(now.env ?? {}, process.env, app); built = now.sources; } catch { /* being replaced */ }
+    const sources = appSources(app, out);
+    if (!settings.length && sources.newest <= Math.max(since, receipt()) && sources.digest === built) return null;
     const started = Date.now();
     console.log(`${app}: ${settings.length ? `the build has other settings than this server (${settings.map((c) => c.name).join(', ')})` : 'a source changed since the build'}: building it again`);
     running = new Promise((done) => {
