@@ -1,6 +1,7 @@
 # A grouped reorder step with no flags traps the wasm page
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** Decode accepts each op's flags exactly (a step 1 through 4, a begin 0 through 2, every other op 0), so a step with no flags is refused with an error instead of trapping the wasm page.
 **Systems:** host/web
 **Severity:** P2
 **Author:** Grok 4.7

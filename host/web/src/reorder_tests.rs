@@ -573,6 +573,12 @@ fn op_21_moves_the_gap_into_another_grouped_list_and_drops_there() {
     };
     let r = h.reorder_motion(&wire(&h, 15, 1, b.list, false, 0.));
     assert!(r.contains("\"phase\":\"active\""), "{r}");
+    // A step that names none of the four is refused, and the session stays.
+    for flags in [0, 5] {
+        let r = h.reorder_motion(&wire(&h, 22, flags, b.list, false, 0.));
+        assert!(r.contains("error"), "{r}");
+    }
+    assert!(h.reorder_drags.active.is_some());
     // Op 21 is refused without its record; with it, b certifies its gap.
     assert!(h
         .reorder_motion(&wire(&h, 21, 0, target, false, 5.))
