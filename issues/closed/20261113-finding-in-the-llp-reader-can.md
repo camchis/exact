@@ -1,6 +1,7 @@
 # Finding in the LLP reader can panic when casefold lengths cancel
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** Already fixed by 28c46a27b (LLP page find maps matches to whole characters): find folds each character on its own and maps a match back to the whole original characters, with no slicing at lowercase offsets; a test now pins the issue's U+2126 OHM SIGN and İ run.
 **Systems:** apps/llp data, page find
 **Severity:** P2
 **Author:** Grok 4.7
