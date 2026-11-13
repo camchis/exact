@@ -917,3 +917,14 @@ it once rather than N times. Exact's `js/src/pure.js` wrapper, which made
 iteration live by taking a snapshot per step, is gone.
 `js/tests/it/pure.rs` checks mutation during iteration against Chrome and
 the scaling. Replay on a refresh unless upstream iterates live.
+
+## Local patch 40, a header list's sorted order kept between indexed reads
+
+`Headers` keeps its entries' indexes in name order once an indexed read
+asks (`Headers::sorted_entry`), and drops them when a header is added or
+deleted; a changed value keeps its place. `bindings/headers_ops.rs` reads
+an iteration step's name or value through it, where it copied and sorted
+the whole list for each, so iterating N headers sorted them 2N times.
+`PartialEq` compares the entries alone. `stdlib/fetch.rs` tests the reads
+across changes; `js/tests/it/pure.rs` checks the scaling and, against
+Chrome, mutation during iteration. Replay on a refresh.

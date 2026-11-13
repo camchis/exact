@@ -213,6 +213,16 @@ export function exercise(source: string): string {
     owner.href='https://example.test/?only=1';views.push(viewed.next().done,owner.searchParams.size);
     return JSON.stringify({seen,visits,steps,views,first,linked,href:url.href,same:params===url.searchParams,entries:Array.from(params),bad:URL.canParse('/x'),parse:URL.parse('not a url'),nul:new URLSearchParams([['\0','\0']]).get('\0')});
   }
+  if(source==='headersWork') {
+    // Iterating 4,000 unchanged headers three ways, within the test's turn budget
+    const headers=new Headers();
+    for(let i=0;i<4000;i++)headers.append(`x-${i}`,String(i));
+    let seen=0;
+    for(const pair of headers)seen+=pair.length/2;
+    headers.forEach(()=>{seen++;});
+    for(const _ of headers.keys())seen++;
+    return String(seen);
+  }
   if(source==='searchParamsWork') {
     // Iterating 2,000 unchanged pairs three ways, within the test's turn budget
     const n=2000, query=Array.from({length:n},(_,i)=>`k${i}=${i}`).join('&');
@@ -293,6 +303,11 @@ export function exercise(source: string): string {
       said(()=>new Response('x',{statusText:'Done \u2713'})), said(()=>new Response('x',{statusText:'a\nb'})),
       said(()=>Response.json(undefined)), said(()=>Response.redirect('https://example.test/x',200)), said(()=>Response.redirect('http://[',200)), said(()=>Response.redirect('/relative')),
       Response.redirect('https://example.test/x',301.9).status];
+    // A headers iterator reads the sorted list at its index as the list is at each step
+    const listed=new Headers({b:'2',D:'4',a:'1'}), stepped=listed.keys(), steps:unknown[]=[stepped.next().value];
+    listed.delete('a');steps.push(stepped.next().value);listed.append('c','3');listed.append('B','5');
+    steps.push(stepped.next().value,stepped.next().done);listed.set('e','6');steps.push(stepped.next().value);
+    listed.forEach((v,k)=>{steps.push(k+v);if(k==='b')listed.set('bb','7');});
     const original=new Response('copied',{headers:{'X-A':'b'}}), copy=original.clone();
     copy.headers.set('X-A','c');
     // Headers: a cookie a server sets is refused, a redirect's take no change, and a clone keeps its original's guard
@@ -389,7 +404,7 @@ export function exercise(source: string): string {
       Promise.race([new Response('{"a":1}').json(),Promise.resolve('fallback')]),Promise.race([new Response().json(),Promise.resolve('fallback')]).then(v=>v,nameOf),
       Promise.race([(()=>{const used=new Response('u');used.text();return used.json();})(),Promise.resolve('fallback')]).then(v=>v,nameOf),
       Promise.race([Response.prototype.json.call({}),Promise.resolve('fallback')]).then(v=>v,nameOf),bytesOf(extracted)])
-      .then(bodies=>JSON.stringify({shapes,bodies,statuses,refused,guards,clones,converted,ownHeaders,startedNow,headers:[original.headers.get('x-a'),copy.headers.get('x-a')]})) as unknown as string;
+      .then(bodies=>JSON.stringify({shapes,bodies,statuses,refused,guards,clones,converted,ownHeaders,startedNow,steps,headers:[original.headers.get('x-a'),copy.headers.get('x-a')]})) as unknown as string;
   }
   if(source==='abort') {
     // A fetch's `signal`, before and after the request starts; the reply of

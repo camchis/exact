@@ -1,6 +1,7 @@
 # Native Headers iteration copies and sorts the whole list twice per entry
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** A header list keeps its name order between indexed reads, dropped only when a header is added or deleted, so each iteration step reads one entry rather than copying and sorting the list.
 **Systems:** vendored Ibex Headers, native JavaScript data sources
 **Author:** Codex
 **Date:** 2026-11-12
