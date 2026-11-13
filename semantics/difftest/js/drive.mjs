@@ -91,15 +91,49 @@ Object.defineProperty(ElementProto, 'sheet', {
   configurable: true,
 });
 // A date, time or datetime-local input holds HTML's value format, within its
-// `min` and `max`, or nothing (runner/src/runner/control.rs).
-const DATE = '\\d{4,}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])', TIME = '([01]\\d|2[0-3]):[0-5]\\d(:[0-5]\\d(\\.\\d{1,3})?)?';
-const FORMATS = { date: new RegExp(`^${DATE}$`), time: new RegExp(`^${TIME}$`), 'datetime-local': new RegExp(`^${DATE}T${TIME}$`) };
+// `min` and `max` compared as the times they name, or nothing: the runner's
+// checks (runner/src/runner/control.rs `control_payload`) on the kernel's
+// parse (kernel/src/control.rs `date_value`), in milliseconds as a BigInt.
+const twoDigits = (s, below) => /^\d\d$/.test(s) && Number(s) < below ? BigInt(s) : null;
+function dateValue(s) {
+  const m = /^(\d{4,})-(\d\d)-(\d\d)$/.exec(s);
+  // The year is a u32 there, and never 0.
+  if (!m || Number(m[1]) > 0xffffffff || Number(m[1]) === 0) return null;
+  const y = BigInt(m[1]), month = Number(m[2]), day = Number(m[3]);
+  const leap = y % 4n === 0n && (y % 100n !== 0n || y % 400n === 0n);
+  const lengths = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  if (month < 1 || month > 12 || day < 1 || day > lengths[month - 1]) return null;
+  const years = y - 1n, before = lengths.slice(0, month - 1).reduce((a, b) => a + b, 0) + day - 1;
+  // 719162 days precede 1970-01-01 in the proleptic Gregorian calendar.
+  return (365n * years + years / 4n - years / 100n + years / 400n + BigInt(before) - 719162n) * 86400000n;
+}
+function timeValue(s) {
+  const [hh, mm, sec, ...rest] = s.split(':');
+  const h = twoDigits(hh, 24), m = mm === undefined ? null : twoDigits(mm, 60);
+  if (h === null || m === null || rest.length) return null;
+  let seconds = 0n;
+  if (sec !== undefined) {
+    const dot = sec.indexOf('.'), whole = twoDigits(dot < 0 ? sec : sec.slice(0, dot), 60), fraction = dot < 0 ? '' : sec.slice(dot + 1);
+    if (whole === null || (dot >= 0 && !/^\d{1,3}$/.test(fraction))) return null;
+    seconds = whole * 1000n + BigInt((fraction || '0').padEnd(3, '0'));
+  }
+  return (h * 60n + m) * 60000n + seconds;
+}
+const VALUES = {
+  date: dateValue,
+  time: timeValue,
+  'datetime-local': s => { const at = s.search(/[T ]/); if (at < 0) return null; const d = dateValue(s.slice(0, at)), t = timeValue(s.slice(at + 1)); return d === null || t === null ? null : d + t; },
+};
 function datetime(e, text) {
-  const f = e.localName === 'input' && FORMATS[e.type];
-  if (!f || text === '') return true;
-  if (!f.test(text)) return false;
-  const bound = k => { const b = e.getAttribute(k); return b && f.test(b) ? b : null; };
-  return !(bound('min') && text < bound('min')) && !(bound('max') && text > bound('max'));
+  const kind = e.localName === 'input' && e.type.toLowerCase(), value = VALUES[kind];
+  if (!value || text === '') return true;
+  const n = value(text);
+  if (n === null) return false;
+  const bound = k => { const b = e.getAttribute(k); return b == null ? null : value(b); };
+  const lo = bound('min'), hi = bound('max');
+  // HTML's time domain wraps at midnight.
+  if (kind === 'time' && lo !== null && hi !== null && lo > hi) return !(n < lo && n > hi);
+  return !(lo !== null && n < lo) && !(hi !== null && n > hi);
 }
 const fire = (e, type) => { for (const f of [...(e.$listeners?.[type] ?? [])]) f({ type, target: e, currentTarget: e, composedPath() { const path = []; for (let n = e; n; n = n.parentNode) path.push(n); return path; }, stopPropagation() {}, preventDefault() {}, key: '' }); };
 

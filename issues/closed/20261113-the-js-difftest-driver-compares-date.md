@@ -1,6 +1,7 @@
 # The JS difftest driver compares date and time bounds as strings
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The JS drive parses date, time and datetime-local values and their bounds to milliseconds as the kernel does and applies control_payload's checks, a reversed time range and a space-split datetime included.
 **Systems:** semantics
 **Severity:** P2
 **Author:** Grok 4.7
