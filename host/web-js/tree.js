@@ -1,17 +1,10 @@
 // The element tree: elements built or adopted from a rendered page, their props and styles, and view ids.
 import { markdownText } from './markdown.js';
 import { oneActivation, suppressedInvocation, releaseAsset as rel } from './elements.js';
-import {
-  listRow,
-  listItem,
-  syncListItemRoles,
-  listOwner,
-  renderMarkup,
-} from './navigation.js';
+import { listRow, listOwner, renderMarkup } from './navigation.js';
 import { Docs } from './document.js';
 import { Refusal } from './shape.js';
 import { regions } from './regions.js';
-import './said.js';
 import { backdropValue as backdropCss } from './backdrop.js';
 import { onEnd, effect, say, inflight, After, Paint, Probes, Media, Links, Scrolls, Selects } from './rt.js';
 import { Adopt, adopting } from './mount.js';
@@ -53,7 +46,7 @@ export function h(p, tag, cls, attrs, text, ns) {
   if (text !== 0) e.textContent = text;
   if (tag === 'iframe') Hooks.frame(e, attrs?.['data-app-src']);
   if (tag === 'button') oneActivation(e);
-  p.append(owner ? listItem(e, owner) : e);
+  p.append(owner ? Hooks.listItem(e, owner) : e);
   // an `audio` is the same media host (LLP 1042 §8)
   if (tag === 'video' || tag === 'audio') Media.media(e, attrs);
   Paint?.list(e);
@@ -240,8 +233,8 @@ export function P(e, name, f) {
       e.setAttribute(name, v);
       if (name.startsWith('data-exact-')) Paint?.facts(e);
     }
-    if (name === 'role') syncListItemRoles(e);
-    else if (name === 'popover' && e.parentElement?.hasAttribute('data-exact-list-item')) listItem(e);
+    if (name === 'role') Hooks.listRoles?.(e);
+    else if (name === 'popover' && e.parentElement?.hasAttribute('data-exact-list-item')) Hooks.listItem(e);
     if (e.localName === 'a' && (name === 'rel' || name === 'target' || name === 'href')) Links?.prop(e, name, v);
   });
 }
@@ -402,7 +395,8 @@ export function Sr(e, prop, unit, f) {
 export const backdropValue = (v, report = true) =>
   backdropCss(v, report ? why => say(`unset backdrop-filter: ${why}`) : undefined);
 /** Loaded pieces' hooks: `style(e, prop, value)` takes a dynamic row's write on a node the motion piece holds
- * (motion.js); `image(e)` an image built or adopted with a symbol or `app:/` source (symbols.js). */
+ * (motion.js); `image(e)` an image built or adopted with a symbol or `app:/` source (symbols.js); `frame(e, v)` an
+ * iframe's app file (iframes.js); `listItem(e, owner)` and `listRoles(e)` a List's row and its role (list-items.js). */
 export const Hooks = {};
 /** `S` on a node the motion engine follows (`mo`): while a hold owns it, a
  * write goes to the authored style the hold restores. */

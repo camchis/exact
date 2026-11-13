@@ -210,6 +210,8 @@ pub fn emit(plan: &Plan, site_attrs: bool, dev_reload: bool) -> Result<Output, S
     }
     let links = commands::links(plan, &parts);
     let iframes = commands::iframes(&parts);
+    let lists = commands::lists(plan);
+    let button_fills = commands::button_fills(plan, &parts);
     let mut em = Em {
         plan,
         sites: &sites,
@@ -803,6 +805,8 @@ pub fn emit(plan: &Plan, site_attrs: bool, dev_reload: bool) -> Result<Output, S
             (em.media, "import{mediaUse as $media}from\"./media.js\";"),
             (links, "import{linkUse as $links}from\"./links.js\";"),
             (iframes, "import\"./iframes.js\";"),
+            (lists, "import\"./list-items.js\";"),
+            (button_fills, "import\"./button-fill.js\";"),
             (midi, "import{midi as $midi}from\"./midi.js\";"),
             (transport, "import{sequence as $sequence,transport as $transport}from\"./transport.js\";"),
             (!facts.is_empty(), facts.as_str()),
