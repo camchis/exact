@@ -1,6 +1,7 @@
 # A horizontal scrollbar shortens when no vertical bar is drawn
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The horizontal track leaves the corner only when the vertical axis draws a bar (overflow auto or scroll with a scroll range).
 **Systems:** host/linux
 **Severity:** P3
 **Author:** Grok 4.7
