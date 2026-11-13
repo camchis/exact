@@ -801,23 +801,7 @@ final class WebViews {
 
     func tap(_ owner: NodeView, request values: [String: Any], at: [Double]) -> [String: Any] {
         guard let entry = entries[owner.id] else { return ["error": "iframe \(owner.id) is unavailable"] }
-        let selector = javascriptString(values["selector"] as? String)
-        let x = (values["x"] as? Double).map { String($0) } ?? "innerWidth / 2"
-        let y = (values["y"] as? Double).map { String($0) } ?? "innerHeight / 2"
-        let script = """
-        (() => {
-          const x = \(x), y = \(y);
-          const selector = \(selector);
-          const target = (selector ? document.querySelector(selector) : null) || document.elementFromPoint(x, y) || document.body;
-          if (!target) return JSON.stringify({ok:false, error:'guest tap found no target'});
-          // Script input is intentionally untrusted (@ref LLP 1020 D4;
-          // exact1 20260806-webview-frame-guest-click-delivery).
-          target.dispatchEvent(new PointerEvent('pointerdown', {bubbles:true, composed:true, clientX:x, clientY:y, button:0, buttons:1}));
-          target.dispatchEvent(new PointerEvent('pointerup', {bubbles:true, composed:true, clientX:x, clientY:y, button:0, buttons:0}));
-          target.dispatchEvent(new MouseEvent('click', {bubbles:true, composed:true, clientX:x, clientY:y, button:0}));
-          return JSON.stringify({ok:true});
-        })()
-        """
+        let script = GuestInput.tap(selector: values["selector"] as? String, x: values["x"] as? Double, y: values["y"] as? Double)
         switch guestResponse(request(entry, script: script), operation: "tap") {
         case .failure(let error):
             return ["error": error.message]
@@ -831,29 +815,8 @@ final class WebViews {
 
     func type(_ owner: NodeView, request values: [String: Any]) -> [String: Any] {
         guard let entry = entries[owner.id] else { return ["error": "iframe \(owner.id) is unavailable"] }
-        let selector = javascriptString(values["selector"] as? String)
         let key = values["key"] as? String
-        let text = values["text"] as? String ?? ""
-        let action: String
-        if let key {
-            action = "target.dispatchEvent(new KeyboardEvent('keydown', {key:\(javascriptString(key)), bubbles:true, composed:true})); target.dispatchEvent(new KeyboardEvent('keyup', {key:\(javascriptString(key)), bubbles:true, composed:true}));"
-        } else {
-            action = "if ('value' in target) target.value = \(javascriptString(text)); else target.textContent = \(javascriptString(text)); target.dispatchEvent(new InputEvent('input', {data:\(javascriptString(text)), inputType:'insertText', bubbles:true, composed:true})); target.dispatchEvent(new Event('change', {bubbles:true, composed:true}));"
-        }
-        let script = """
-        (() => {
-          const selector = \(selector);
-          const active = document.activeElement;
-          const editable = active && active.matches?.('input,textarea,[contenteditable]') ? active : null;
-          const target = (selector ? document.querySelector(selector) : null) || editable || document.querySelector('input,textarea,[contenteditable]');
-          if (!target) return JSON.stringify({ok:false, error:'guest type found no target'});
-          // Script input is intentionally isTrusted:false (@ref LLP 1020 D4).
-          target.focus();
-          \(action)
-          // A password's value is never agent output (#134): a fixed mark.
-          return JSON.stringify({ok:true, value:'value' in target ? (target.type === 'password' && target.value ? '•••' : target.value) : target.textContent});
-        })()
-        """
+        let script = GuestInput.type(selector: values["selector"] as? String, key: key, text: values["text"] as? String ?? "")
         let object: [String: Any]
         switch guestResponse(request(entry, script: script), operation: "type") {
         case .failure(let error):
@@ -920,16 +883,6 @@ final class WebViews {
       return JSON.stringify(out);
     })()
     """
-
-    private func javascriptString(_ value: String?) -> String {
-        guard let value,
-              let data = try? JSONSerialization.data(withJSONObject: [value]),
-              var text = String(data: data, encoding: .utf8)
-        else { return "null" }
-        text.removeFirst()
-        text.removeLast()
-        return text
-    }
 }
 
 extension ExactSession {
