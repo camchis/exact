@@ -1,6 +1,7 @@
 # Photos fixture panics on valid JSON options that are not an object
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The Photos fixture takes empty text or `null` as no options, an object as the options, and refuses any other JSON value with the error malformed JSON gets, before it changes its state or asks storage.
 **Systems:** Photos fixture, Rust data source, image codec validation
 **Author:** Codex
 **Date:** 2026-11-12
