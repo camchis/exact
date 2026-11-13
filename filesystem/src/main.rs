@@ -147,6 +147,19 @@ fn retain(root: &Directory, input: &Value) -> io::Result<Value> {
     Ok(json!({"bytes":total, "token":token}))
 }
 
+/// Whether `leaf` in `dir`, reached by the four `parts`, is a stream's head or
+/// lock under another spelling. A lookup can match more than ASCII case: APFS
+/// folds Unicode case (`ſ` is `s`), and NTFS also matches 8.3 short names. So
+/// the files are compared, not the names.
+fn names_stream_file(root: &Directory, dir: &Directory, leaf: &str, parts: &[&str]) -> bool {
+    let same = |a: io::Result<Kind>, b: io::Result<Kind>| matches!((a, b), (Ok(a), Ok(b)) if a.identity == b.identity);
+    parts.len() == 4
+        && same(root.kind(parts[0]), root.kind(".exact"))
+        && ["exact.json", ".lock"]
+            .iter()
+            .any(|guarded| same(dir.kind(leaf), dir.kind(guarded)))
+}
+
 fn operate(root: &Directory, input: &Value, locked: Option<&Lock>) -> io::Result<Value> {
     if let Some(lock) = locked {
         lock.verify(root)?;
@@ -219,6 +232,11 @@ fn operate(root: &Directory, input: &Value, locked: Option<&Lock>) -> io::Result
             let commit = || {
                 if let Some(lock) = locked {
                     lock.verify(root)?;
+                }
+                if op == "put" && names_stream_file(root, &dir, &leaf, &parts) {
+                    return Err(refuse(
+                        "stream heads require putHead; stream locks are never replaced",
+                    ));
                 }
                 if op == "head" {
                     let lock =

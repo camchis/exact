@@ -521,3 +521,31 @@ fn puts_cannot_replace_case_variants_of_a_stream_head_or_lock() {
     }
     operate(&root, &json!({"op":"put", "path":".exact/blobs/abc", "bytes":STANDARD.encode("blob"), "immutable":true, "token":TOKEN}), None).unwrap();
 }
+
+/// A spelling the volume's lookup folds onto the head or lock (APFS folds
+/// `ſ` to `s` and the Kelvin sign to `k`; NTFS matches 8.3 short names) is
+/// the same file, and a put of it is refused. On a volume that does not fold,
+/// the put is a file of its own.
+#[test]
+fn puts_cannot_replace_a_stream_head_or_lock_by_a_folded_spelling() {
+    let fixture = Fixture::new();
+    let root = fixture.dir("origin");
+    let cohort = fixture.path("origin/.exact/prod/cohort");
+    fs::create_dir_all(&cohort).unwrap();
+    fs::write(cohort.join("exact.json"), "head").unwrap();
+    fs::write(cohort.join(".lock"), "lock").unwrap();
+    for name in ["exact.j\u{17f}on", ".loc\u{212a}"] {
+        let folds = cohort.join(name).exists();
+        let put = operate(
+            &root,
+            &json!({"op":"put", "path":format!(".exact/prod/cohort/{name}"), "bytes":STANDARD.encode("forged"), "token":TOKEN}),
+            None,
+        );
+        assert_eq!(put.is_err(), folds, "{name}: {put:?}");
+        assert_eq!(
+            fs::read_to_string(cohort.join("exact.json")).unwrap(),
+            "head"
+        );
+        assert_eq!(fs::read_to_string(cohort.join(".lock")).unwrap(), "lock");
+    }
+}
