@@ -1,6 +1,7 @@
 # Android calls drop Telecom operations before the scope exists
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** An end the list makes frees the call (its entry, the `phoneCall` claim) whether or not Telecom has added it, and once Telecom adds a call its block disconnects one that ended, does a notification button pressed meanwhile, or answers or sets active (and inactive) the entry as it is then.
 **Systems:** packages/calls
 **Severity:** P1
 **Author:** Grok 4.7
