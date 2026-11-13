@@ -365,7 +365,10 @@ equal. Exact keeps a chosen file across launches under the name it was
 chosen by (exact2 LLP 1069.010.000 D4), and a Mac bookmark follows the file
 when it is renamed, so the two differ after a rename. The provider still
 decides what the name admits; Ibex still opens only `leaf`, refuses every
-path beneath it, and refuses `rm`, `mkdir` and `readdir` on it. `bindings/storage.d.ts` declares
+path beneath it, and refuses `rm` on it. After admission, `readdir` on the
+selected file reports `ENOTDIR` and `mkdir` reports `EEXIST` without touching
+the leaf, even if it is absent or replaced by a directory.
+`bindings/storage.d.ts` declares
 `fs.recentDocuments()` and `fs.forgetDocument(path)`, which Exact's prelude
 answers from the host's kept list; no Ibex source runs either. Replay both on
 a refresh.

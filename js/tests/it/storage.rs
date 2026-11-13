@@ -1106,6 +1106,26 @@ fn a_document_the_person_chose_is_storage_without_app_directories() {
 }
 
 #[test]
+fn selected_file_directory_errors_reach_typescript_without_widening_access() {
+    let root = Root::new();
+    std::fs::create_dir_all(&root.0).unwrap();
+    let file = root.0.join("chosen");
+    std::fs::write(&file, b"original").unwrap();
+    let doc = exact_data::documents::mint(&file, 9121).unwrap();
+    let mut module = root.module();
+    module.set_document_owner(9121);
+    module.activate().unwrap();
+    let mut store = Store::new(GRANTS, Vec::<(String, Vec<u8>)>::new());
+    assert_eq!(
+        call(&mut module, &mut store, "doc-file-codes", &doc),
+        "Unavailable ENOTDIR Unavailable EEXIST Unavailable failed \
+         Unavailable ENOTDIR Unavailable ENOTDIR Unavailable ENOTDIR"
+    );
+    assert_eq!(std::fs::read(&file).unwrap(), b"original");
+    exact_data::documents::forget(9121);
+}
+
+#[test]
 fn typescript_file_reads_obey_the_encoded_result_boundary() {
     let root = Root::new();
     let folder = root.0.join("chosen");
