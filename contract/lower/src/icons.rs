@@ -22,7 +22,7 @@ pub(crate) struct Resolved {
     pub name: String,
     pub sf: String,
     pub view_box: String,
-    /// Empty when the SVG is no template, which the web draws as the file.
+    /// Empty for a non-template SVG, drawn as a file on the web and Linux.
     /// An even-odd icon's starts `evenodd:` (stage 14 C2), in the plan's row
     /// and the source form alike; a nonzero one's is the `d`s alone, as
     /// before. Every reader strips it through `exact_kernel::Icon`.
@@ -63,7 +63,7 @@ pub(crate) fn is_refused(name: &str) -> bool {
     REFUSED.with(|r| r.borrow().iter().any(|n| n == name))
 }
 
-/// The SVG every host but the web draws ([`crate::icon_svg`]'s template).
+/// The SVG subset drawn as a tinted path ([`crate::icon_svg`]'s template).
 pub(crate) const TEMPLATE: &str = "filled `<path>`s in one opaque colour under the `<svg>`'s viewBox, all by one `fill-rule` (nonzero or evenodd), with no stroke, transform, opacity or other element";
 
 /// An icon's SVG's most bytes.
@@ -75,10 +75,9 @@ fn apple(target: &str) -> bool {
 }
 
 /// The source `target` draws for `icon`, by D10's rule (the one
-/// `tamber-icon-missing` checks): Apple the SF Symbol, else a template
-/// SVG's path (stage 9 A; not yet a watch's), every other host a
-/// template's path, and the web an SVG as written; `None` where it draws
-/// none.
+/// `tamber-icon-missing` checks): Apple draws the SF Symbol, falling back
+/// to a template path except on watchOS. Other hosts draw template paths;
+/// the web and Linux also draw non-template SVG files.
 fn drawn(
     target: &str,
     icon: &tamber::Icon,
@@ -88,7 +87,9 @@ fn drawn(
     match apple(target) {
         true if icon.sf.is_some() => Some("sf"),
         true => (template && target != "watchos").then_some("svg"),
-        false => (template || (target == "web" && svg.is_some())).then_some("svg"),
+        false => {
+            (template || (matches!(target, "web" | "linux") && svg.is_some())).then_some("svg")
+        }
     }
 }
 
@@ -194,8 +195,7 @@ impl<'a> Home<'a> {
 /// its design file's `assets/` (the app's, or its package's), it doesn't
 /// read as one, a template is over its size (its path travels in the plan
 /// and in every literal source), or a package's is no template (stage 13,
-/// Q2: the web, which alone draws an SVG as written, stages the app's
-/// `assets/` only).
+/// Q2: non-template files are loaded from the app's `assets/` only).
 fn svg_of(icon: &tamber::Icon, home: Home) -> Result<Option<crate::icon_svg::Svg>, String> {
     let file = match (&icon.svg, home.root) {
         (None, _) => return Ok(None),
@@ -364,7 +364,7 @@ pub(crate) fn declare<'a>(
                 (Some(s), Some(file)) => refuse(
                     "tamber-icon-svg",
                     format!(
-                        "`{}`: {} is no one-colour shape ({}), and the app ships {target}, which draws an icon only as {TEMPLATE}{} (the web alone draws any SVG as written). To fix it, {}; or start from an SVG already in that form (Material Symbols' are){}",
+                        "`{}`: {} is no one-colour shape ({}), and the app ships {target}, which draws an icon only as {TEMPLATE}{} (the web and Linux also draw non-template SVG files). To fix it, {}; or start from an SVG already in that form (Material Symbols' are){}",
                         icon.name,
                         home.shown(file),
                         s.not_template.as_deref().unwrap_or(""),
