@@ -6349,11 +6349,15 @@ half on a Retina Mac, a pixel on a 1x screen), where `0.5` is one only at 2x:
 line with no margin of its own (space around it is the `gap` or `margin` you
 write). Between the rows of a `list` write neither: its children are rows, and
 the separator there is the platform's (LLP 1115.000 D16). A row whose value is a number and no text
-(`opacity`, `flex-grow`, `z-index`, `font-weight`, `column-count`,
+(`opacity`, `flex-grow`, `font-weight`, `column-count`,
 `column-rule-width`) takes a number where it is computed: a string-typed
 expression there is refused, since the native hosts read no text on it (the
 literal keywords and `px` of `column-count` and `column-rule-width` compile to
-their numbers). `max-width` and `max-height` take `none`, CSS's initial maximum, or `auto`, and the web writes
+their numbers). `z-index` takes an integer or `"auto"`, its initial value, including in
+a conditional (`z-index=(lifted ? 2 : "auto")`). An applicable integer,
+including zero, makes a stacking context; `auto` does not. Nonzero values
+stay within their parent's paint turn on every host (LLP 1083.000 §3.1).
+`max-width` and `max-height` take `none`, CSS's initial maximum, or `auto`, and the web writes
 `none` for either. A number field's (`input type="number"`, written so)
 `min`, `max` and `step` take numbers, as a range's do; its `value` is its text.
 On the Mac, Up/Down and accessibility increment/decrement step the number even with

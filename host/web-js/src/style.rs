@@ -854,6 +854,14 @@ fn invalid_unset(row: &str) -> String {
     format!("(()=>{{const e=globalThis.exact;e?.journal?.push(`t=${{e.now?.()??0}} invalid {row} value ${{JSON.stringify(v)}}; unset`);return \"unset\"}})()")
 }
 
+static Z_INDEX_MAP: std::sync::LazyLock<String> = std::sync::LazyLock::new(|| {
+    format!(
+        "v=>{{const z=({})(v);return Number.isNaN(z)?{}:z}}",
+        crate::paint::Z_INDEX,
+        invalid_unset("z-index")
+    )
+});
+
 // The bounded cursor vocabulary is the schema's, including dynamic bindings.
 static CURSOR_MAP: std::sync::LazyLock<String> = std::sync::LazyLock::new(|| {
     format!(
@@ -1008,7 +1016,7 @@ pub fn style_writes(id: u16, timeline: bool, written: bool) -> Result<Vec<Write>
         }
         StyleId::TextAlign => vec![with("text-align", "v=>v"), with("--exact-button-align", "v=>v==null?v:({left:'start',start:'start',right:'end',end:'end'})[v]??'center'")],
         StyleId::Cursor => vec![with("cursor", &CURSOR_MAP)],
-        StyleId::ZIndex => vec![with("z-index", crate::paint::Z_INDEX)],
+        StyleId::ZIndex => vec![with("z-index", &Z_INDEX_MAP)],
         // @ref LLP 1055 D5/D7 — the browser runs it; its `@keyframes` are in
         // the stylesheet (emit.rs), under the author's names.
         StyleId::Animation if timeline => vec![
@@ -1230,6 +1238,7 @@ pub fn style_row(id: u16, written: bool) -> Result<(String, String), String> {
             | StyleCodec::U16
             | StyleCodec::U32
             | StyleCodec::I32
+            | StyleCodec::AutoI32
     ) || matches!(
         row,
         StyleId::FontFamily

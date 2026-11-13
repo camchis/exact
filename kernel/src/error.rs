@@ -42,6 +42,8 @@ pub enum DecodeError {
     /// A colour row's tag byte named neither a fixed colour nor a
     /// `light-dark()` pair (LLP 1034 D1).
     BadColorValue(u8),
+    /// An auto-integer tag was neither auto (0) nor an integer (1).
+    BadAutoI32(u8),
     /// The frame does not start with the EXWF magic.
     BadMagic,
     /// Invalid or unsupported CSS clipping path.
