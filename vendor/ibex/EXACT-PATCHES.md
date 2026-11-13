@@ -298,6 +298,10 @@ remains available.
 declare empty workspaces. This stops Cargo from discovering an enclosing checkout
 when formatting excluded path dependencies or running the printed installer command
 in a nested worktree. Preserve these boundaries when refreshing the vendored crates.
+The installer's own workspace takes none of the root's profiles, so its manifest
+optimizes dependencies in the dev profile as the root's does: unoptimized, sha2
+takes about nine seconds to verify each bundle under `--check`, which setup and
+`sdkReport` run per target.
 `scripts/app-workspace.test.mjs` checks the installer's workspace with locked,
 offline Cargo metadata in ordinary and nested checkout layouts.
 

@@ -103,6 +103,11 @@ test('the Hermes installer owns its workspace in ordinary and nested checkouts',
       assert.deepEqual(metadata.packages.map(p => p.manifest_path), [manifest]);
       assert.deepEqual(metadata.workspace_members, [metadata.packages[0].id]);
     }
+    // Its own workspace takes none of the root's profiles, so it optimizes its dependencies itself, as the root's dev
+    // profile does: setup's `--check` hashes each bundle with sha2, nine seconds a target unoptimized.
+    const own = Bun.TOML.parse(readFileSync(resolve(root, installer, 'Cargo.toml'), 'utf8'));
+    const rootProfile = Bun.TOML.parse(readFileSync(resolve(root, 'Cargo.toml'), 'utf8')).profile.dev.package['*'];
+    assert.deepEqual(own.profile?.dev?.package?.['*'], rootProfile);
   } finally { rmSync(outer, {recursive:true, force:true}); }
 }, 60_000);
 
