@@ -1,6 +1,7 @@
 # A refused mode-boundary color is latched and never reparsed
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** When a mode boundary's tuple refuses the inherited colour text, boundary_rows leaves that text unset, clears the row it implied before and drops its theme row, so the next visit parses the text again; the row is indexed only after the parse succeeds.
 **Systems:** runner
 **Severity:** P2
 **Author:** Grok 4.7

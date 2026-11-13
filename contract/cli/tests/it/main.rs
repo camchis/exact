@@ -233,6 +233,7 @@ mod tamber_base_scale;
 mod tamber_base_shadow;
 mod tamber_binding;
 mod tamber_binding_kinds;
+mod tamber_boundary;
 mod tamber_cli;
 mod tamber_describe_library;
 mod tamber_gen;
