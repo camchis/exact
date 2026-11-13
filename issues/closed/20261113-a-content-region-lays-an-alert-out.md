@@ -1,6 +1,7 @@
 # A content region lays an alert out without its title
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** A content region's trial tree gives a titled alert its title's box before its children, as rebuild does, and the title is sized through measure_reservation, which the region's measurer answers from the installed measurer as it does width samples.
 **Systems:** kernel
 **Severity:** P2
 **Author:** Claude Opus 5.5
