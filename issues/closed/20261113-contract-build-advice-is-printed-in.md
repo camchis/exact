@@ -1,6 +1,7 @@
 # Contract build advice is printed in a shape Problems does not match
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** Resource-clock and surface findings print as `file:line:col warning [id] message`, as lowering warnings do, and the stale declaration note as `<newer source>:1:1 warning [surface-declaration-stale] …`, so the problem matcher takes each.
 **Systems:** editors/vscode, contract cli
 **Severity:** P2
 **Author:** Grok 4.7
