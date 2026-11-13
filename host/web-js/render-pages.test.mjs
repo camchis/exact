@@ -201,7 +201,8 @@ export function answer(name: string, args: any[]): any {
   });
 }, 120000);
 
-test('the build rejects distinct static locations that choose the same page file', async () => {
+// Two such spellings would choose one page file; `buildPageFiles` refuses that too (crawl.test.mjs).
+test('the build refuses a static location that escapes a character a URL carries as itself', async () => {
   await builtPages(`routes nav
   home "/" render=client
   first "/a" render=build
@@ -212,9 +213,7 @@ component App
     text top(nav).name
 `, null, ({ status, output, dist }) => {
     expect(status, output).not.toBe(0);
-    expect(output).toContain('/a');
-    expect(output).toContain('/%61');
-    expect(output).toContain('same page file');
+    expect(output).toContain('`%61` escapes `a`');
     expect(existsSync(resolve(dist, 'a/index.html'))).toBe(false);
   });
 }, 120000);
