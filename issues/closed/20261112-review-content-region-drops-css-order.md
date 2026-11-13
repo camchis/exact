@@ -1,6 +1,7 @@
 # A content region ignores CSS order in flex and grid layout
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** A content region's derived tree now hands the engine each flex or grid container's children in `order`-modified document order, through the same rule ordinary layout uses.
 **Systems:** kernel/src/region/tree.rs, kernel/src/layout/order.rs
 **Author:** Codex
 **Date:** 2026-11-12
