@@ -1,6 +1,7 @@
 # A live-page wake timer ignores a budget raised after delivery
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** A budget an event raises after delivery re-arms the live wall timer for the remaining time, and the timer expires the wake only once the clock has passed `started + budget`.
 **Systems:** host/web-js
 **Severity:** P2
 **Author:** Grok 4.7

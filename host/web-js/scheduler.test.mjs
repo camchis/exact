@@ -164,6 +164,49 @@ test('a queued tool call waits at most five seconds behind a running call', asyn
   } finally { globalThis.exact = old; rmSync(dir, { recursive: true, force: true }); }
 });
 
+test('a live wake\'s deadline timer moves with a budget an event raises after delivery', async () => {
+  const dir = mkdtempSync(resolve(tmpdir(), 'exact-wake-budget-'));
+  cpSync(resolve(ROOT, 'host/web-js/wakes.js'), resolve(dir, 'wakes.js'));
+  writeFileSync(resolve(dir, 'rt.js'), `export const clock={now:0,agent:false},wall={now:0},inflight={n:0},data={},After=[],Clocked=[],Mutations=[],drive=()=>{};
+export const time=()=>{clock.now=Math.max(clock.now,wall.now)};`);
+  writeFileSync(resolve(dir, 'held.js'), 'export const Counting=new Set(),heldTickets=()=>[];');
+  const set = globalThis.setTimeout, clear = globalThis.clearTimeout, timers = new Map();
+  let ids = 0;
+  try {
+    const { wakes } = await import(pathToFileURL(resolve(dir, 'wakes.js')).href);
+    const { wall } = await import(pathToFileURL(resolve(dir, 'rt.js')).href);
+    const { Counting } = await import(pathToFileURL(resolve(dir, 'held.js')).href);
+    globalThis.setTimeout = (f, ms) => { timers.set(++ids, { f, due: wall.now + ms }); return ids; };
+    globalThis.clearTimeout = id => timers.delete(id);
+    // The wall timers due by `now`, as the browser fires them.
+    const at = async now => {
+      wall.now = now;
+      for (const [id, t] of [...timers].filter(([, t]) => t.due <= now)) { timers.delete(id); t.f(); }
+      await Promise.resolve();
+    };
+    const pull = () => () => Counting.add({});
+    const wk = wakes({
+      events: { 'sync.short': [pull, 'wake', 16, [], 'short', 1000], 'sync.long': [pull, 'wake', 16, [], 'long', 5000] },
+      say: () => {}, value: v => v, run: f => f(), toEpoch: ms => ms, onLine: () => true, lists: new Map(), changed() {},
+    });
+    const first = wk.raise('sync.short', [], { id: 'task' });
+    await Promise.resolve();
+    expect(wk.state().deadline).toBe(1000);
+    await at(500);
+    const second = wk.raise('sync.long', [], { id: 'task' });
+    await Promise.resolve();
+    expect(wk.state().deadline).toBe(5000);
+    await at(1000);
+    expect(wk.state().invocations.map(i => i.state)).toEqual(['running', 'queued']);
+    await at(5000);
+    expect(await first).toBe('expired');
+    expect(await second).toBe('expired');
+  } finally {
+    globalThis.setTimeout = set; globalThis.clearTimeout = clear;
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test.each([false, true])('a wake after an idle spell has its full budget (agent: %s)', async agent => {
   const server = Bun.serve({ hostname: '127.0.0.1', port: 0, fetch(request) {
     const path = new URL(request.url).pathname;
