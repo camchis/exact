@@ -313,6 +313,9 @@ pub fn media_accept(token: &str) -> bool {
 /// progress (`kernel/src/control.rs`). No host widens either itself.
 pub(crate) const FULL_WIDTH: &[(StyleId, &str)] = &[(StyleId::Width, "100%")];
 
+/// A `select` is no wider than what holds it (LLP 1115.000 D10.4).
+pub(crate) const CONTAINED: &[(StyleId, &str)] = &[(StyleId::MaxWidth, "100%")];
+
 /// The tag an `input` control lowers with (a `select` keeps its own).
 pub(crate) fn tag(kind: &str, t: Tag) -> Tag {
     match kind {
