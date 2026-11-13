@@ -1,6 +1,7 @@
 # An Android material picker keeps the theme and clock it opened with
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The Material picker reads night mode from LocalConfiguration and watches the 12/24-hour setting while open, telling an open time picker's state when it changes.
 **Systems:** host/android
 **Severity:** P3
 **Author:** Grok 4.7
