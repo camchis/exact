@@ -1,6 +1,7 @@
 # The local-network tests fulfill a previous runner's ticket
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** Not a defect: libtest runs each test on a thread of its own, so `PARKED` starts empty at every boot (checked with --test-threads=1 and 2: each test a new ThreadId, the list empty), and within one runner a token is never reused.
 **Systems:** contract cli tests, runner module continuations
 **Severity:** P2
 **Author:** Grok 4.7
