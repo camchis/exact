@@ -926,12 +926,12 @@ test('interactive faults resolve backend, warn on impossible prefixes, and reloa
   expect(warnings[0]).toContain('matches no granted origin');
   expect(() => faultRequest('pass', ['fetch','backend'], [])).toThrow(/exactly one/);
   const calls=[];
-  const session={host:'web', now:12, logCursor:9,
+  const session={host:'web', now:12, logCursor:9, contact:{x:4,y:5},
     state: async()=>({background:{queued:1,inFlight:0},faults:[]}),
     clock:async arg=>{calls.push(arg);return {settled:true};}, carrier:{reset:async options=>{calls.push(options);}}};
   expect(await reloadWeb(session)).toEqual({reloaded:true});
   expect(calls).toEqual(['data',{keep:true,failFetch:''}]);
-  expect(session.now).toBe(0);
+  expect([session.now, session.contact]).toEqual([0, null]);
   expect(driverCapabilities()).toContain('reload (interactive)');
   await expect(reloadWeb({host:'ios', keptStore:'default'})).rejects.toThrow('on ios each drive is a new launch, so run a second drive to see a relaunch (it opens on the store `default` this one kept)');
   await expect(reloadWeb({host:'android'})).rejects.toThrow(/on android each drive is a new launch, so run a second drive to see a relaunch, and an authored test's `reload` relaunches the host$/);

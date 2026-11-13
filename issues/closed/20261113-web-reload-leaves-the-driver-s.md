@@ -1,6 +1,7 @@
 # Web reload leaves the driver's contact and file drag set
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** A web reload clears the session's contact slot, and the Chrome carrier cancels a held file drag on the old document and forgets it.
 **Systems:** scripts
 **Severity:** P2
 **Author:** Grok 4.7

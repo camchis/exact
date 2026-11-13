@@ -568,8 +568,11 @@ async function openWebUnlocked({
             clickCount: 1,
           });
         else if (contact) await call('Input.dispatchTouchEvent', { type: 'touchCancel', touchPoints: [] });
+        if (dragged)
+          await call('Input.dispatchDragEvent', { type: 'dragCancel', x: dragged.x, y: dragged.y, data: dragged.data });
         await frame();
         contact = null;
+        dragged = null;
         await evaluate('sessionStorage.clear()');
         if (!keep) await call('Storage.clearDataForOrigin', { origin: page.origin, storageTypes: 'all' });
         const destination = withEpoch(withFaults(keep ? await evaluate('location.href') : page.href, failFetch), epoch);
