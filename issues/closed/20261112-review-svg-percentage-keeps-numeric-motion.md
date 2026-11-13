@@ -1,6 +1,7 @@
 # SVG percentage geometry keeps an obsolete numeric motion value
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** A motion sync now retires each SVG geometry row a shape has that is not a length now, and the painted host drops its presented value for it, so the shape draws the percentage.
 **Systems:** kernel/src/motion.rs, kernel/src/svg/scene.rs, native SVG presentation
 **Severity:** P2
 **Author:** Codex, repository review
