@@ -1043,13 +1043,15 @@ test('docs prints the section on its words first, matching whole words', () => {
     [['exit', 'animation'], 'docs/recipes/motion.md', /-exact-exit-animation/],
     [['-exact-exit-animation'], 'docs/recipes/motion.md', /-exact-exit-animation/],
     [['call'], 'docs/recipes/native-module.md', /func call/],
+    [['tool'], 'docs/recipes/tools.md', /^# Recipe: tools an agent or the system calls/],
     [['later'], 'docs/reference.md', /Answer::Later/],
     [['screenshot'], 'docs/recipes/ios-driving.md', /screenshot\s+\.exact\/x\.png compare/],
     [['scheme', 'fixed'], 'docs/recipes/theme.md', /scheme=fixed/],
     [['tabular', 'numbers'], 'docs/contract-for-agents.md', /^### Tabular numbers/],
     [['grant'], 'docs/recipes/files-and-grants.md', /^# Recipe: files, SQLite and grants/],
-    [['sheet'], 'docs/recipes/navigation-stack.md', /Cancel\/Save sheet/],
-    [['sheets'], 'docs/recipes/navigation-stack.md', /Cancel\/Save sheet/],
+    // Its opening no longer says "sheet" (8db3f8578): the topic prints the recipe's worked app.
+    [['sheet'], 'docs/recipes/navigation-stack.md', /^<!-- check: app -->\n```contract\nroutes nav/],
+    [['sheets'], 'docs/recipes/navigation-stack.md', /^<!-- check: app -->\n```contract\nroutes nav/],
     // A whole word: `logs` is the driver's op, not "catalogs".
     [['logs'], 'docs/contract-for-agents.md', /^The driver has ten operations[^]*`logs`/],
     [['colours'], 'docs/recipes/theme.md', /^# Recipe: theme: colours/],

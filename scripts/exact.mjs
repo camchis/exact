@@ -1225,6 +1225,10 @@ const TOPICS = {
   'tab bar': 'Recipe: tabs', 'back button': 'Recipe: a navigation stack', share: 'Host commands',
   'dark mode': 'Recipe: theme: colours, light and dark, icons',
   'safe area': 'Declarations',
+  // A module's `func call`; the tools recipe's title says "calls" of tool lines, which `docs tool` finds.
+  call: 'Recipe: a native module in Swift',
+  // Said densely in passing elsewhere: the declared sources' bullets, a native module's `later(…)`.
+  optimistic: 'Optimistic writes: the overlay', later: 'Rust data sources',
   font: 'Recipe: app.json, assets and modules', image: 'Recipe: app.json, assets and modules',
   deploy: 'Recipe: porting an app, a release build, splitting the work',
   accessibility: 'Native views: accessibility', strings: 'Recipe: app.json, assets and modules',
