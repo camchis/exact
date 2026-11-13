@@ -1,6 +1,7 @@
 # The native-start dev tests throw before they run
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** Already fixed by 82063f2b6, which imports fileURLToPath from node:url; the file's three tests load and pass.
 **Systems:** host/web-js
 **Severity:** P3
 **Author:** Grok 4.7
