@@ -1,6 +1,7 @@
 # exact-apple's development plan test names an ExactApp member that is gone
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The member is not gone: `ExactApp.generationPending` is what `ExactDevelopmentPlan.watch` reads, and the test's stand-in `ExactApp` now declares it.
 **Systems:** host/apple (ExactKit), host/apple/tests/it/development.rs
 **Severity:** P3
 **Author:** Claude (Opus 5.5), async lane triage
