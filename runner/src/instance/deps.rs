@@ -1,5 +1,5 @@
 //! The dependency table: what every binding, site, derive and resource
-//! argument reads, scanned once from the plan when a runner boots.
+//! argument reads, scanned once for an immutable program.
 //!
 //! @ref LLP 1005 §8 (the Deps table and dirty-set sweep)
 //!

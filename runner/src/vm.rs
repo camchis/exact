@@ -11,7 +11,9 @@
 
 mod column;
 pub use column::Column;
+mod constants;
 mod decoded;
+pub(crate) use constants::Constants;
 mod list_call;
 mod prepared;
 use decoded::Decoded;
@@ -296,6 +298,7 @@ pub struct Outcome {
 /// allocation, never a fresh one.
 pub struct Strings {
     cells: Vec<std::cell::OnceCell<Value>>,
+    constants: Option<std::sync::Arc<Constants>>,
 }
 
 impl Strings {
@@ -304,6 +307,14 @@ impl Strings {
         let cells = (0..plan.strings.len()).map(|_| std::cell::OnceCell::new());
         Strings {
             cells: cells.collect(),
+            constants: None,
+        }
+    }
+
+    pub(crate) fn with_constants(plan: &Plan, constants: std::sync::Arc<Constants>) -> Self {
+        Self {
+            constants: (!constants.is_empty()).then_some(constants),
+            ..Self::new(plan)
         }
     }
 
@@ -312,6 +323,7 @@ impl Strings {
     pub fn of(values: impl IntoIterator<Item = Value>) -> Strings {
         Strings {
             cells: values.into_iter().map(std::cell::OnceCell::from).collect(),
+            constants: None,
         }
     }
 
@@ -511,6 +523,13 @@ fn eval_machine(
         env,
         code,
         allowed_writes,
+        constants: env.strings.constants.as_deref().and_then(|pool| {
+            let base = code
+                .as_ptr()
+                .addr()
+                .checked_sub(env.plan.code.as_ptr().addr())?;
+            (base.checked_add(code.len())? <= env.plan.code.len()).then_some((pool, base))
+        }),
         cursor: Reader::new(code),
         out: Outcome::default(),
         extents: std::mem::take(&mut scratch.extents),
@@ -682,6 +701,7 @@ struct Run<'e, 'a> {
     allowed_writes: &'e [u32],
     /// Where the last instruction was read up to.
     cursor: Reader<'e>,
+    constants: Option<(&'e Constants, usize)>,
     out: Outcome,
     extents: Extents,
     decoded: Decoded,
@@ -695,6 +715,11 @@ impl Host<Value> for Run<'_, '_> {
     fn fetch(&mut self, pos: usize) -> Result<Option<(Instruction, usize)>, Trap> {
         if pos >= self.code.len() {
             return Ok(None);
+        }
+        if let Some((pool, base)) = self.constants {
+            if let Some(kept) = pool.get(base, pos, self.code.len()) {
+                return Ok(Some(kept));
+            }
         }
         if let Some(kept) = self.decoded.get(pos) {
             return Ok(Some(kept));
@@ -1014,8 +1039,7 @@ impl Host<Value> for Run<'_, '_> {
         self.out.refreshes.push(r as u32);
     }
 
-    /// Called as each callback item begins: from the first, instructions
-    /// are kept decoded.
+    /// A callback keeps instructions that miss the shared pool locally.
     #[inline]
     fn steps(&mut self, n: usize, pc: usize) -> Result<(), Trap> {
         self.decoded.start(self.code.len());

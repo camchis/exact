@@ -293,7 +293,7 @@ pub fn render_with<D: DataSource + 'static, F: Fn() -> D>(
 /// and the web build's delivery facts available before any initializer runs.
 #[allow(clippy::too_many_arguments)]
 pub fn render_with_at<D: DataSource + 'static, F: Fn() -> D>(
-    plan: &Plan,
+    plan: impl Into<exact_runner::Program>,
     data: &F,
     viewport: exact_runner::Viewport,
     location: &str,
@@ -304,6 +304,8 @@ pub fn render_with_at<D: DataSource + 'static, F: Fn() -> D>(
     now_ms: f64,
     delivery: &exact_runner::delivery::Delivery,
 ) -> Result<Rendered, String> {
+    let program = plan.into();
+    let plan = &program;
     let direct = direct_for(plan, ids, projection)?;
     let mut page = settle_at(
         plan, data, viewport, location, deadline, direct, now_ms, delivery, None,
@@ -423,7 +425,7 @@ pub(crate) type OnBoot<'a, D> = &'a mut dyn FnMut(&mut Runner<Anonymous<D>>);
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn settle_at<D: DataSource + 'static, F: Fn() -> D>(
-    plan: &Plan,
+    plan: &exact_runner::Program,
     data: &F,
     viewport: exact_runner::Viewport,
     location: &str,

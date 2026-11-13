@@ -1383,3 +1383,63 @@ fn a_navigation_gets_the_head_before_the_render_and_the_rest_after() {
     brotli::BrotliDecompress(&mut &unchunk(&body)[..], &mut page).unwrap();
     assert!(String::from_utf8(page).unwrap().contains(">Post 9<"));
 }
+
+#[test]
+fn hidden_build_files_are_not_http_assets() {
+    let dir = dist("hidden-assets");
+    for name in [
+        ".gen/plan.map.json",
+        ".env",
+        "assets/.secret.json",
+        ".exact/install/index.html",
+        ".well-known/assetlinks.json",
+    ] {
+        let path = dir.join(name);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, "fixture asset").unwrap();
+    }
+    let server = run(Serve {
+        dist: dir,
+        port: 0,
+        name: "Blog".into(),
+        origin: None,
+        deadline: Duration::from_secs(5),
+        renders: 2,
+        queue: 8,
+        viewport: Default::default(),
+        lifetime: Duration::ZERO,
+        generations: None,
+    });
+    for path in [
+        "/.gen/plan.map.json",
+        "/%2egen/plan.map.json",
+        "/.env",
+        "/assets/.secret.json",
+    ] {
+        for method in ["GET", "HEAD"] {
+            let (status, _, body) =
+                fetch(server.addr, &format!("{method} {path} HTTP/1.1\r\n\r\n"));
+            assert_eq!(status, 404, "{method} {path}");
+            assert!(!body.contains("fixture asset"));
+        }
+    }
+    for path in ["/.exact/install/", "/.well-known/assetlinks.json"] {
+        let (status, _, body) = get(server.addr, path);
+        assert_eq!((status, body.as_str()), (200, "fixture asset"), "{path}");
+    }
+    std::thread::scope(|scope| {
+        for id in 0..8 {
+            let addr = server.addr;
+            scope.spawn(move || {
+                let (status, _, body) = get(addr, &format!("/live/request-{id}"));
+                assert_eq!(status, 200);
+                assert!(body.contains(&format!(">Post request-{id}<")), "{body}");
+                for other in 0..8 {
+                    if other != id {
+                        assert!(!body.contains(&format!(">Post request-{other}<")));
+                    }
+                }
+            });
+        }
+    });
+}

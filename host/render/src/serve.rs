@@ -5,7 +5,7 @@
 //! the router sends to its not-found route, is rendered with a new
 //! runner and module realm (D10), then composed over the
 //! built shell ([`crate::page`]). A `client` route gets the shell. Files
-//! under `dist/` are served as they are; `/.exact/health` answers `ok`.
+//! in the public part of `dist/` are served as they are; `/.exact/health` answers `ok`.
 //! Renders run on a fixed set of workers behind a bounded queue: a request
 //! that finds the queue full is a 503 at once. A failed render, or one that
 //! panics, is a 500 and the server keeps serving. Each render prints one
@@ -106,7 +106,7 @@ impl Stopper {
 
 struct Shared {
     serve: Serve,
-    plan: Plan,
+    plan: exact_runner::Program,
     delivery: exact_runner::delivery::Delivery,
     shell: String,
     /// A page's CSP header lines, none when the app sends none (D11).
@@ -232,7 +232,7 @@ impl Server {
             stop: Arc::new(AtomicBool::new(false)),
             shared: Shared {
                 serve,
-                plan,
+                plan: plan.into(),
                 delivery,
                 shell,
                 csp,

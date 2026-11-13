@@ -13,7 +13,7 @@
 
 use crate::page::{body_close_js, body_open_js, preload_image, runtime_style_of, Js, Sheet};
 use crate::{activation, direct_for, encoded, retire, settle_at, Ids, Projection, Rendered};
-use exact_plan::{ActivatePolicy, PaintPolicy, Plan};
+use exact_plan::{ActivatePolicy, PaintPolicy};
 use exact_runner::DataSource;
 use exact_web::document::{
     before_root, digest, project_tree, read_checkpoint, route_at, Document, Site, Writing,
@@ -38,7 +38,7 @@ pub(crate) struct Streamed {
 /// before it sent.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn render_js<D: DataSource + 'static, F: Fn() -> D>(
-    plan: &Plan,
+    plan: &exact_runner::Program,
     data: &F,
     viewport: exact_runner::Viewport,
     location: &str,
@@ -432,7 +432,7 @@ component Cards
 
     #[test]
     fn a_boot_document_is_replaced_when_the_settled_page_needs_a_kernel() {
-        let plan = contract::compile(SOURCE).unwrap();
+        let plan = exact_runner::Program::new(contract::compile(SOURCE).unwrap());
         let (release, hold) = mpsc::channel();
         let hold = Arc::new(Mutex::new(Some(hold)));
         let mut release = Some(release);
@@ -514,7 +514,7 @@ component Cards
         button "Delete" press=bump
       button "Keep" press=bump
 "#;
-        let plan = contract::compile(source).unwrap();
+        let plan = exact_runner::Program::new(contract::compile(source).unwrap());
         let (release, hold) = mpsc::channel();
         let hold = Arc::new(Mutex::new(Some(hold)));
         let mut release = Some(release);
