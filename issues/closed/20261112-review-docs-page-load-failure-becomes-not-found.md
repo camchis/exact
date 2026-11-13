@@ -1,6 +1,7 @@
 # A failed docs page download becomes a successful “Page Not Found” result
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** loadPage answers the not-found page only for a route with no page and lets a failed page download reject, and the article then shows that the page didn't load with a Try Again button that refreshes it.
 **Systems:** docs/site/app.ts, docs/site/app.contract
 **Author:** Codex
 **Date:** 2026-11-12
