@@ -1,6 +1,7 @@
 # Web Observe drops or restores rows because appends skip the lock
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** Every read-modify-write of the stored queue, appends and a send's removals alike, holds one edit Web Lock until it has saved; the send keeps its own lock across its fetches, so an append does not wait on one.
 **Systems:** modules/observe
 **Severity:** P2
 **Author:** Grok 4.7
