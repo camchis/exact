@@ -1,6 +1,7 @@
 # logic ABI's web wire test runs a script Bun refuses to parse
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The test's script strips each whole import statement from the bridge, a trailing comment included, and its call carries the socket turn the ABI 11 call request now ends with.
 **Systems:** logic/abi
 **Severity:** P3
 **Author:** Claude (Opus 5.5), async lane triage
