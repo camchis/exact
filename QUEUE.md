@@ -1,4 +1,5 @@
 # Queue
+- **The async lane's Mac still lacks what two of its checks need** (2026-11-13). On the Mac Studio that runs the first tier, its `vm-extract` step reports UNAVAILABLE: Charon and Aeneas are not installed (`semantics/vm-extract/README.md`, "Tools"). The second tier is not started: it needs the `aarch64-pc-windows-gnullvm` Rust target, the pinned `x86_64-unknown-linux-gnu` Hermes bundle, and `JAVA_HOME` set to Homebrew's OpenJDK (installed, not linked) in its environment. An issue the lane files is written into its root's working tree and is neither committed nor pushed: its notes reach origin, its issue files do not.
 
 - The bake producer's HTTP-namespace test fails on main with Bun 1.4.2: `served_pair` in `js/bake/tests/producer.rs` runs `bun --input-type=module -e <probe> <out>`, which refuses `<out>` as a module. Reproduced with origin/main's producer and bake library.
 - The guides' TypeScript check fails on main at `docs/contract-for-agents.md:1141`: the partial element-handle example is fenced as `ts` but leaves `nodes`, `comments` and `toComment` undefined. Reproduced with origin/main's guide contents; the other 13 examples pass.

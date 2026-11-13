@@ -1,6 +1,7 @@
 # The async lane's results are not on origin, and failures on main go unattributed
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The first tier runs again against expo/exact (--newest --interval 3600) and pushed refs/notes/async for afde7b25e on 2026-11-13; that baseline's failures were sorted into the lane's environment (fixed in scripts/async.mjs) and real ones, filed as 2026-11-13 issues; QUEUE.md's failing-test entries remain to be fixed or deleted.
 **Systems:** scripts/async.mjs, scripts/known.mjs, QUEUE.md
 **Severity:** P1
 **Author:** Claude (Fable 5.2), from the 2026-11-10 project review
