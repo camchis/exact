@@ -1,6 +1,7 @@
 # Four iOS XCTests fail on main: follow-end rest, render inventory, profiled coverage and a bar item's alert
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** Each test was behind the presenter or UIKit, so each test changed: the follow fixture is not smooth for the test of an instant follow, the warmed paragraph starts below the port so a worker paints it, the inventory test checks where the blur's row ends because iOS 26's edge effect starts it, and the bar test waits for the alert to finish presenting before `back`.
 **Systems:** host/apple UIKit presenter, host/apple/tests/ExactKitTests
 **Severity:** P3
 **Author:** Claude (Opus 5.5), async lane triage
