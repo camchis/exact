@@ -1,6 +1,7 @@
 # A web calendar file inserts UID, DURATION, and URL with raw breaks
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** UID is written as escaped TEXT, URL and DURATION lose any CR or LF, and TEXT escaping turns a lone CR into `\n` as well, so no value breaks its content line.
 **Systems:** packages/calendar
 **Severity:** P2
 **Author:** Grok 4.7
