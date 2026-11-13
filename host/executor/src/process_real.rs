@@ -533,7 +533,8 @@ pub(super) fn exec(
     let (mut stdout, mut stderr) = (Vec::new(), Vec::new());
     let (mut eof, mut exit) = ([false, false], None);
     let (mut timed_out, mut overflow, mut escalate) = (false, false, None::<f64>);
-    let (mut exited_at, mut cut_off) = (None::<Instant>, false);
+    let (mut exited_at, mut cut_off) = (None::<f64>, false);
+    let drain = spec.drain_timeout;
     loop {
         cut_off |= clock.passed(cut);
         if (abort.signal().aborted() || cut_off) && escalate.is_none() {
@@ -550,9 +551,7 @@ pub(super) fn exec(
             escalate = None;
         }
         // Output past the drain after its exit is not waited for (D2).
-        if exited_at
-            .is_some_and(|at| at.elapsed() > Duration::from_millis(spec.drain_timeout as u64))
-        {
+        if !(eof[0] && eof[1]) && clock.passed(exited_at.map(|at| at + drain)) {
             child.close_pipes();
             eof = [true, true];
         }
@@ -563,6 +562,7 @@ pub(super) fn exec(
             deadline.filter(|_| !timed_out),
             cut.filter(|_| !cut_off),
             escalate,
+            exited_at.map(|at| at + drain),
         ]
         .into_iter()
         .flatten()
@@ -591,7 +591,7 @@ pub(super) fn exec(
             Ok(Input::Child(_, Seen::Eof(None))) => eof = [true, true],
             Ok(Input::Child(_, Seen::Exit(code, signal))) => {
                 exit = Some((code, signal));
-                exited_at = Some(Instant::now());
+                exited_at = Some(clock.now());
             }
             _ => {}
         }

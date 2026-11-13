@@ -1,6 +1,7 @@
 # An execFile drain waits on wall time
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** execFile records its child's exit on the supervision clock and waits for the drain's deadline there, so the agent's clock ends the drain.
 **Systems:** host
 **Severity:** P2
 **Author:** Grok 4.7

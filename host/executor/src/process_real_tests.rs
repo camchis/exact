@@ -744,3 +744,42 @@ fn a_child_whose_thread_cannot_start_fails_its_call() {
         assert!(!mark.exists(), "{role}: the child ran on");
     }
 }
+
+/// Under the agent, an `execFile` whose child exited with its output still
+/// open closes that output when the agent's clock reaches the drain, not
+/// when the wall does.
+#[test]
+fn an_exec_files_drain_runs_on_the_agents_clock() {
+    let (wake, woke) = channel();
+    let core = Core::under_agent(&[("/bin/sh", "real")], || {
+        Core::start(
+            None,
+            "process.spawn /bin/sh",
+            Box::new(move || {
+                let _ = wake.send(());
+            }),
+        )
+    });
+    let clock = core.work_clock().expect("under the agent");
+    let call = serde_json::json!({ "kind": "execFile", "program": "/bin/sh",
+        "args": ["-c", "sleep 30 & echo left"], "encoding": "utf8" });
+    core.run(request(1, call, false), None).unwrap();
+    // The shell exits; `sleep` keeps its output open until the drain, 5 s on.
+    let deadline = Instant::now() + BOUND;
+    let due = loop {
+        if let Some(due) = clock.due() {
+            break due;
+        }
+        assert!(Instant::now() < deadline, "the drain is not on the clock");
+        std::thread::sleep(Duration::from_millis(2));
+    };
+    core.begin_pump();
+    assert!(core.drain().is_empty(), "answered before the drain");
+    clock.advance(due);
+    let out = collect(&core, &woke, |o| !o.is_empty());
+    let Outcome::Response(r) = &out[0] else {
+        panic!("{out:?}")
+    };
+    let reply: serde_json::Value = serde_json::from_slice(&r.body).unwrap();
+    assert_eq!(text(&reply["stdout"]), "left\n");
+}
