@@ -1,6 +1,7 @@
 # An installed command expands dollar signs in the app's name
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The installed command single-quotes the bundle path for the shell, so `$`, backticks, spaces and quotes in the bundle or home directory name reach `open` as written.
 **Systems:** scripts/exact.mjs, macOS command shims
 **Author:** Codex
 **Date:** 2026-11-12
