@@ -1,6 +1,7 @@
 # Unicode whitespace in an indented code block panics the Markdown readers
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The Markdown parser and the harness's streaming code path remove a fence's indentation as up to its width of spaces and tabs, so leading Unicode whitespace stays in the code and no cut falls inside a character.
 **Systems:** Markdown parser, LLP reader, harness streaming replies
 **Author:** Codex
 **Date:** 2026-11-12
