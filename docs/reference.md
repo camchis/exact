@@ -2943,7 +2943,7 @@ For a PDF picker, declare the type in `app.json`:
 In `app.contract`, receive the selected file's display name and app path.
 Cancelling keeps the previous choice:
 
-```contract
+```text
 component PdfPicker
   state name = "No PDF selected"
   state path = ""
@@ -2963,7 +2963,7 @@ Put a PDF at `fixtures/report.pdf` beside `app.test.contract`, then run
 `bun exact.mjs test web`. The test's `pick` answers the picker that `tap`
 opened; paths are relative to the test file:
 
-```contract
+```contract-test
 test "choose a PDF and cancel the next picker" on web
   tap "pdf"
   pick "pdf" "fixtures/report.pdf"
