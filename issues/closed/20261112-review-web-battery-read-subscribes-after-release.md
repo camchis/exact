@@ -1,6 +1,7 @@
 # Web battery read subscribes after its last reader leaves
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** Each release of a device source is counted, and a battery read that a release overtook while it waited on `navigator.getBattery()` answers without subscribing.
 **Systems:** @exact/device, web module lifecycle
 **Author:** Codex
 **Date:** 2026-11-12
