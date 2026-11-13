@@ -1,6 +1,7 @@
 # Component advance breaks equal-deadline timer order
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** cadvance's due fold orders timers with Timer.precedes, as the flat advance does, so a wait=idle timer loses an equal deadline to an ordinary one in both semantics.
 **Systems:** semantics
 **Severity:** P3
 **Author:** Grok 4.7
