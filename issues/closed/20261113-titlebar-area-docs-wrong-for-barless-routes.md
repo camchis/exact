@@ -1,6 +1,7 @@
 # The title-bar area's docs say an app with routes always has a toolbar, which is false when every route says `navigationBar="none"`
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The title-bar guides describe barless routes, retained session toolbars and the overlay row independently of whether the app has routes.
 **Systems:** docs/contract-grammar.md, contract/cli/src/vocab/concepts.md (`titlebar`), docs/contract-for-agents.md
 **Severity:** P3
 **Author:** Claude (Opus 5.5), from Exact diaries sent 2026-11-11 to 2026-11-13
@@ -48,3 +49,23 @@ the title row is free and `window-controls-overlay` applies. The reporter also
 asked for a line that `open()` leaves the stack at `[root, top]`, so the host's
 Back always lands on the root; that belongs in the router's section, if it is
 still true.
+
+## Verification
+
+A Mac Contract fixture with routes and `navigationBar="none"` retained
+`titlebar-area 78,0 342×32` before and after pushing its detail route; the
+window reported no installed toolbar. `TitleBarAreaMacTests` also covers the
+empty overlay toolbar and the zero area under a session toolbar.
+
+`open` is not always `[root, top]`: `route/src/router.rs` builds the
+destination's declared ancestor chain. The router guide now explains the
+direct-child case and deeper chains. The CLI vocabulary regression fails on
+the old answer; the vocabulary suite compiles the title-bar example too.
+
+
+The guides distinguish a toolbar retained by navigation history from one supplied
+by a single-location app's root header. Hiding that header or setting its route to
+`navigationBar="none"` removes its toolbar before history retains one.
+`HeaderMacTests.testASingleLocationRootHeaderDoesNotRetainItsToolbarWithoutHistory`
+checks both changes on a booted single-location app. The title-bar vocabulary test
+requires that exception, and the retention citation is LLP 1115.000 (as built).

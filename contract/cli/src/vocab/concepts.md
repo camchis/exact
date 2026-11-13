@@ -1390,9 +1390,15 @@ Window Controls Overlay's `env(titlebar-area-x|y|width|height)` is the part of t
 bar the page may draw in, beside the window's controls. On the Mac, under
 `viewport-fit="cover"`, it is AppKit's title bar less the traffic lights: in a 900-point
 window `78 0 822×32` with a left-to-right title bar, `0 0 822×32` with a right-to-left one.
-It is all zero in full screen and while the window has a toolbar (an
-app with routes has one), and undefined elsewhere: in a browser tab, on iOS, Linux and
-Windows, and on a Mac window that does not cover its title bar. Give each a fallback.
+It is all zero in full screen and while the session's toolbar fills the title bar.
+Once navigation history retains a toolbar, it stays (LLP 1115.000, retention as built).
+In a single-location app, a root header can bring a toolbar before history retains
+one; it goes away when that header hides or its route says `navigationBar="none"`.
+With no stack, or before any route has shown a bar while all mounted routes say
+`navigationBar="none"`, navigation brings no toolbar. An authored toolbar or sidebar
+can still supply one.
+Elsewhere the area is undefined: in a browser tab, on iOS, Linux and Windows, and on a
+Mac window that does not cover its title bar. Give each a fallback.
 `"display_override": ["window-controls-overlay"]` in `app.json` gives a Mac window the
 platform's tall title row (an empty unified toolbar, about 52 points) while it shows no
 toolbar of its own, whatever `viewport-fit` says, and the area is that row beside the

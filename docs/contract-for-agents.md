@@ -3064,8 +3064,11 @@ is checked against the table, but any other computed string is not checked, so
 always build locations with `path()`. A route's parameter fields are strings, with
 empty strings for absent fields. `select` takes a tab name, not a URL.
 
-`open` replaces one tab's stack and leaves the others as they were. Signing
-out of an app with tabs, `open(nav, "/")` alone keeps the last account's
+`open` replaces the destination tab's stack with its declared route chain, from
+root through destination, and leaves the other tabs as they were. For a direct
+child this is `[root, child]`, so Back returns to the root; deeper destinations
+retain their declared intermediate ancestors. Use `push` to retain the visited
+screens instead. Signing out of an app with tabs, `open(nav, "/")` alone keeps the last account's
 screens in the other tabs: open each tab's root, the tab to land on last,
 nested because an action's writes land when it ends
 (`nav = open(open(nav, "/history"), "/")`).
@@ -5496,9 +5499,15 @@ A box outside every route clears the status bar with
 
 Sizes, padding and radii clamp negative results to zero; margins and insets keep
 them. `env(titlebar-area-x|y|width|height)` is the title bar beside a Mac window's
-traffic lights under `viewport-fit="cover"` (in the tall title row an app without routes
-gets from `"display_override": ["window-controls-overlay"]` in `app.json`) and is undefined
-elsewhere, so give it a fallback (`contract vocab titlebar-area`). Unsupported: `em`, a unitless number where a length goes
+traffic lights under `viewport-fit="cover"`. It is zero in full screen or while the
+session's toolbar fills the title bar. Once navigation history retains a toolbar,
+it stays (LLP 1115.000, retention as built). In a single-location app, a root header
+can bring a toolbar before history retains one; it goes away when that header hides
+or its route says `navigationBar="none"`. Routes that all withhold their bars before
+history retains a toolbar bring none; an authored toolbar or sidebar can still
+supply one. With no toolbar of the session's own, `"display_override": ["window-controls-overlay"]`
+in `app.json` gives the page the platform's tall title row and its title-bar area,
+routes or not. Elsewhere the area is undefined, so give it a fallback (`contract vocab titlebar-area`). Unsupported: `em`, a unitless number where a length goes
 (write `0px`, not `0`), a `var()` naming neither a design token nor one of those four, more than 32 values or 32 levels (LLP 1001 §2,
 "Comparisons").
 
