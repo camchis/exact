@@ -1,6 +1,7 @@
 # Web location watches ignore later readers' options
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** Each set of written `watchPosition` options has its own browser registration and last answer, released by `releaseArgs` when no reader asks with it, so the browser holds every reader to its own accuracy, timeout and cached-fix age.
 **Systems:** @exact/geolocation, web live resources
 **Author:** Codex
 **Date:** 2026-11-12
