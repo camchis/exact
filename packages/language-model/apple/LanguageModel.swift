@@ -51,7 +51,8 @@ final class ModelSession {
     let toolCost: Int
     var overflowed = false
     var window: Int
-    var queue: [(response: ModelResponse?, go: (Double) -> Void)] = []
+    /// The calls waiting their turn: `go` begins one, `cancel` answers one the session's end discards.
+    var queue: [(response: ModelResponse?, go: (Double) -> Void, cancel: () -> Void)] = []
     var responding: ModelResponse?
     var ended: [String] = []
     var count = 0
@@ -305,11 +306,12 @@ public final class LanguageModelModule: ExactPackage {
         disclose()
     }
     /// `work(at)` once the session is free; `r`, the response it begins, holds the session until it ends.
-    func queued(_ s: ModelSession, _ r: ModelResponse?, _ work: @escaping (Double) -> Void) {
+    /// `cancel` answers the call if the session ends first; a response's own end answers its prompt.
+    func queued(_ s: ModelSession, _ r: ModelResponse?, cancel: @escaping () -> Void = {}, _ work: @escaping (Double) -> Void) {
         s.queue.append((r, { at in
             if let r { guard r.state == "generating" else { return }; s.responding = r }
             work(at)
-        }))
+        }, cancel))
         next(s, at: context.now())
     }
 
@@ -490,7 +492,7 @@ public final class LanguageModelModule: ExactPackage {
         case "appendLanguageModel":
             guard let s = session() else { return reply(["error": "InvalidStateError"]) }
             let input = args["input"] as? String ?? ""
-            queued(s, nil) { [weak self] _ in
+            queued(s, nil, cancel: { reply(["error": "AbortError"]) }) { [weak self] _ in
                 guard let self else { return }
                 guard self.fit(s, Self.cost(input)) else { return reply(["error": "QuotaExceededError"]) }
                 s.turns.append(ModelTurn(input: input))
@@ -511,7 +513,7 @@ public final class LanguageModelModule: ExactPackage {
             reply(sessions[id].map(sessionInfo) ?? ["error": "InvalidStateError"])
         case "cloneLanguageModel":
             guard let s = session() else { return reply(["error": "InvalidStateError"]) }
-            queued(s, nil) { [weak self] _ in
+            queued(s, nil, cancel: { reply(["error": "AbortError"]) }) { [weak self] _ in
                 guard let self else { return }
                 self.serial += 1
                 let turns = s.turns.map { t -> ModelTurn in let c = ModelTurn(input: t.input, reply: t.reply); c.calls = t.calls; return c }
@@ -616,10 +618,13 @@ public final class LanguageModelModule: ExactPackage {
     }
 
     func drop(_ s: ModelSession, _ why: String) {
-        for r in Array(responses.values) where r.session === s { abort(r, why); responses[r.id] = nil }
-        s.queue = []
-        s.platform = nil
         sessions[s.id] = nil
+        // The calls waiting are answered first: the active response's end would begin them.
+        let waiting = s.queue
+        s.queue = []
+        waiting.forEach { $0.cancel() }
+        for r in Array(responses.values) where r.session === s { abort(r, why); responses[r.id] = nil }
+        s.platform = nil
         say("\(s.id): \(why)")
         announce(Self.sessionKey)
     }

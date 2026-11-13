@@ -1,6 +1,7 @@
 # Destroying a native model session runs queued work and can create a surviving clone
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** Dropping a native model session answers each call waiting in its queue with AbortError before aborting its responses, so no queued append or clone runs during teardown.
 **Systems:** packages/language-model/apple/LanguageModel.swift, packages/language-model/android/LanguageModel.kt
 **Author:** Codex
 **Date:** 2026-11-12

@@ -50,8 +50,38 @@ private struct SessionTests {
         }
     }
 
+    /// The end of a session (destroyed, its handle dropped, or the module's end) answers each call
+    /// waiting behind its response once, with AbortError, and begins none: no append lands, and no
+    /// clone survives it.
+    static func endedQueue() {
+        let ends: [(String, (LanguageModelModule, ModelSession) -> Void)] = [
+            ("destroy", { m, s in _ = ask(m, "destroyLanguageModel", ["session": s.id]) }),
+            ("dispose", { m, s in m.dispose([s.id]) }),
+            ("module destroy", { m, _ in m.destroy {} }),
+        ]
+        for (how, end) in ends {
+            let m = module(Clock(), replies: [["text": "held", "hold": true]])
+            let s = session(m)
+            _ = ask(m, "promptStreaming", ["session": s.id, "input": "first"])
+            var answers: [String: [[String: Any]]] = [:]
+            for (name, args) in [("prompt", ["input": "queued"]), ("appendLanguageModel", ["input": "appended"]), ("cloneLanguageModel", [:])] {
+                m.later(name, args.merging(["session": s.id]) { $1 }, preferred: nil) { answers[name, default: []].append($0) }
+            }
+            check("\(how): nothing queued has answered", answers.isEmpty, answers)
+            let turns = s.turns.count
+            end(m, s)
+            for name in ["prompt", "appendLanguageModel", "cloneLanguageModel"] {
+                let got = answers[name] ?? []
+                check("\(how): \(name) answered once, aborted", got.count == 1 && got[0]["error"] as? String == "AbortError", got)
+            }
+            check("\(how): no append landed", s.turns.count == turns, s.turns.map(\.input))
+            check("\(how): no session survives", m.sessions.isEmpty, Array(m.sessions.keys))
+        }
+    }
+
     static func main() {
         abortedPlatform()
+        endedQueue()
         for failure in failures { print("FAIL: \(failure)") }
         print("language-model sessions: \(failures.count) failures")
         exit(failures.isEmpty ? 0 : 1)
