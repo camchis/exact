@@ -1,6 +1,7 @@
 # An Android disconnect drops a pad that was already connected
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The Android Gamepad module records the identity of each pad already connected when it starts, so that pad's disconnect names it as one that connected later does.
 **Systems:** packages/gamepad
 **Severity:** P3
 **Author:** Grok 4.7
