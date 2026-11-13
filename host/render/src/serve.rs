@@ -264,10 +264,13 @@ impl Server {
         // Closing a connection waits on its peer: one thread does that for
         // every connection, and no worker or accept loop does (crate::linger).
         let closing = crate::linger::Linger::start()?;
+        let http_cache = exact_executor::SharedHttpCache::new();
         for _ in 0..shared.serve.renders.max(1) {
             let (shared, waiting, stop) = (shared.clone(), waiting.clone(), self.stop.clone());
             let closer = closing.closer();
+            let http_cache = http_cache.clone();
             std::thread::spawn(move || {
+                crate::executor::set_http_cache(http_cache);
                 let (state, ready) = &*waiting;
                 let mut answered = None;
                 // Its first render's realm, before any request.
