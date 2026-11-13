@@ -1,6 +1,7 @@
 # A non-ASCII URL can crash the terminal host during scheme validation
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** open_url compares each allowed scheme against the URL's leading bytes, so a URL whose characters straddle a scheme's length is refused instead of panicking.
 **Systems:** host/terminal
 **Author:** Codex
 **Date:** 2026-11-12
