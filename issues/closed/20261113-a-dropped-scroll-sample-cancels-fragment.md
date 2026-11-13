@@ -1,6 +1,7 @@
 # A dropped scroll sample cancels fragment navigation
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** A reader scroll sample counts as the person's scroll only once it is accepted and moves the scroller, so a dropped sample no longer cancels a fragment scroll (the presenter is now host/painted).
 **Systems:** host/linux
 **Severity:** P2
 **Author:** Grok 4.7
