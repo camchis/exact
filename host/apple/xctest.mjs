@@ -220,16 +220,17 @@ export async function macTests(pkg, scratch, env, canvasGpu, only = null) {
   if (failed.length) throw new Error(`swift tests failed:\n  ${failed.join('\n  ')}`);
 }
 
-/** The iOS tests `build-for-testing` wrote in `products`, run on the simulator `udid` in three
- *  runs that always all run; throws the first that failed. Most run bare in the xctest agent.
+/** The iOS tests `build-for-testing` wrote in `products`, run on the simulator `udid` in separate
+ *  runs that always all run; reports their failures together. Most run bare in the xctest agent.
  *  Those that need what only an app gives (a window scene to present in, UIKit's accessibility
  *  runtime; `hostedTests`) run hosted in an app with one scene (`hostSource`, built here) with the
  *  accessibility runtime on for that run alone. The Canvas 2D GPU module's own run apart with it
  *  loaded (`canvasGpu`): loaded, every canvas draws on the GPU, and the others read the Core
  *  Graphics path a runner without it draws. `runApple` and `run` are build.mjs's: they throw on
  *  failure, and `runApple` refuses a mixed deployment target. `only`, when
- *  given, names the classes to run, and a run with none of them is left out. */
-export function iosTestRuns({ pkg, products, destination, udid, env, canvasGpu, hostSource, triple, runApple, run, only = null }) {
+ *  given, names the classes to run, and a run with none of them is left out. Tests needing
+ *  real touches run without simulator clones, beside the existing XCTest touch runner. */
+export async function iosTestRuns({ pkg, products, destination, udid, env, canvasGpu, hostSource, triple, runApple, run, only = null }) {
   const bare = withoutPerformanceChecker(products), host = resolve(products, 'ExactTestHost.app');
   rmSync(host, { recursive: true, force: true });
   mkdirSync(host, { recursive: true });
@@ -242,34 +243,61 @@ export function iosTestRuns({ pkg, products, destination, udid, env, canvasGpu, 
   const hosted = hostedIn(products, bare, 'ExactTestHost.app');
   run('codesign', ['-s', '-', '--force', '--deep', host], { stdio: 'ignore' });
   const gpuTests = 'ExactKitTests/Canvas2DGpuStressTests', classes = only?.map(c => `ExactKitTests/${c}`);
-  const hostedOnly = hostedTests(resolve(pkg, 'tests/ExactKitTests')).filter(t => !classes || classes.some(c => t.startsWith(`${c}/`)));
-  const testRun = (xctestrun, selection, runEnv) => {
+  const testDir = resolve(pkg, 'tests/ExactKitTests');
+  const selected = t => !classes || classes.some(c => t.startsWith(`${c}/`));
+  const touchOnly = hostedTests(testDir, 'touch').filter(selected);
+  const hostedOnly = hostedTests(testDir).filter(selected).filter(t => !touchOnly.includes(t));
+  const failures = [];
+  const testRun = (xctestrun, selection, runEnv, parallel = true) => {
     try {
       runApple('xcodebuild', ['test-without-building', '-xctestrun', xctestrun, '-destination', destination, '-collect-test-diagnostics', 'never',
-        '-parallel-testing-enabled', 'YES', '-parallel-testing-worker-count', '2', ...selection], { cwd: pkg, stdio: 'inherit', env: runEnv });
-      return null;
-    } catch (e) { return e; }
+        '-parallel-testing-enabled', parallel ? 'YES' : 'NO', ...(parallel ? ['-parallel-testing-worker-count', '2'] : []), ...selection], { cwd: pkg, stdio: 'inherit', env: runEnv });
+    } catch (e) { failures.push(e); }
   };
   const bareClasses = classes?.filter(c => c !== gpuTests);
-  const bareRun = bareClasses?.length === 0 ? null : testRun(bare, [...(bareClasses ?? []).map(c => `-only-testing:${c}`),
-    ...[gpuTests, ...hostedOnly].map(t => `-skip-testing:${t}`)], env);
+  if (bareClasses?.length !== 0) testRun(bare, [...(bareClasses ?? []).map(c => `-only-testing:${c}`),
+    ...[gpuTests, ...hostedOnly, ...touchOnly].map(t => `-skip-testing:${t}`)], env);
   // UIKit loads its accessibility code only for an assistive technology or automation
   // (AgentAccessibility.axRuntimeLoaded): on for the hosted run, then as it was.
-  let hostedRun = null;
   if (hostedOnly.length) {
-    read('xcrun', ['simctl', 'bootstatus', udid, '-b']);
-    const ax = ['com.apple.Accessibility', 'ApplicationAccessibilityEnabled'], before = read('xcrun', ['simctl', 'spawn', udid, 'defaults', 'read', ...ax]);
+    const ax = ['com.apple.Accessibility', 'ApplicationAccessibilityEnabled'];
+    let before;
     try {
+      run('xcrun', ['simctl', 'bootstatus', udid, '-b']);
+      before = read('xcrun', ['simctl', 'spawn', udid, 'defaults', 'read', ...ax]);
       run('xcrun', ['simctl', 'spawn', udid, 'defaults', 'write', ...ax, '-bool', 'true']);
-      hostedRun = testRun(hosted, hostedOnly.map(t => `-only-testing:${t}`), env);
-    } finally {
-      read('xcrun', ['simctl', 'spawn', udid, 'defaults', ...(before.status === 0 ? ['write', ...ax, '-bool', before.stdout.trim() === '1' ? 'true' : 'false'] : ['delete', ...ax])]);
+      testRun(hosted, hostedOnly.map(t => `-only-testing:${t}`), env);
+    } catch (error) { failures.push(error); }
+    finally {
+      if (before) read('xcrun', ['simctl', 'spawn', udid, 'defaults', ...(before.status === 0 ? ['write', ...ax, '-bool', before.stdout.trim() === '1' ? 'true' : 'false'] : ['delete', ...ax])]);
     }
   }
-  const gpuRun = classes && !classes.includes(gpuTests) ? null
-    : testRun(bare, [`-only-testing:${gpuTests}`], { ...env, TEST_RUNNER_EXACT_CANVAS_GPU_DYLIB: canvasGpu });
-  const failed = bareRun ?? hostedRun ?? gpuRun;
-  if (failed) throw failed;
+  if (touchOnly.length) {
+    let touches;
+    try {
+      run('xcrun', ['simctl', 'bootstatus', udid, '-b']);
+      const { openTouches } = await import('./touches.mjs');
+      touches = await openTouches({ udid, appId: 'com.exact.testhost' });
+      const { port, token } = await touches.handoff();
+      testRun(hosted, touchOnly.map(t => `-only-testing:${t}`), {
+        ...env, TEST_RUNNER_EXACT_TOUCH_PORT: String(port), TEST_RUNNER_EXACT_TOUCH_TOKEN: token,
+      }, false);
+    } catch (error) { failures.push(error); }
+    finally {
+      try {
+        if (touches) {
+          if (touches.kept) await touches.close();
+          else {
+            const failed = await touches.end();
+            if (failed) throw failed;
+          }
+        }
+      } catch (error) { failures.push(error); }
+    }
+  }
+  if (!classes || classes.includes(gpuTests)) testRun(bare, [`-only-testing:${gpuTests}`], { ...env, TEST_RUNNER_EXACT_CANVAS_GPU_DYLIB: canvasGpu });
+  if (failures.length === 1) throw failures[0];
+  if (failures.length) throw new AggregateError(failures, `iOS tests failed:\n  ${failures.map(e => e.message).join('\n  ')}`);
 }
 
 /** The newest `.xctestrun` `build-for-testing` wrote in `products`, as
@@ -465,17 +493,19 @@ function declarations(dir, platform) {
 /** The tests in `dir` that need what only an app gives them, `ExactKitTests/<Class>/<test>`:
  *  those that throw `missing("scene", …)` (a presentation completes only in a scene's
  *  window) or `missing("accessibility", …)` (UIKit's accessibility runtime), which run
- *  hosted. Each must say so in the test method itself, so a helper's need is not missed. */
-export function hostedTests(dir) {
+ *  hosted. `missing("touch", …)` selects tests that need the XCTest touch runner too.
+ *  Each must say so in the test method itself, so a helper's need is not missed. */
+export function hostedTests(dir, prerequisite = 'scene|accessibility') {
   const tests = new Set();
+  const requirement = new RegExp(`missing\\("(${prerequisite})"`);
   for (const file of readdirSync(dir).filter(f => f.endsWith('.swift'))) {
     const lines = readFileSync(resolve(dir, file), 'utf8').split('\n');
     let className = null, func = null;
     lines.forEach((line, i) => {
       className = /class (\w+)\s*:\s*(XCTestCase|\w+Fixture)\b/.exec(line)?.[1] ?? className;
       func = /\bfunc (\w+)\s*\(/.exec(line)?.[1] ?? func;
-      if (!/missing\("(scene|accessibility)"/.test(line)) return;
-      if (!className || !func?.startsWith('test')) throw new Error(`${file}:${i + 1}: missing(scene or accessibility) outside a test method (${func ?? 'none'}); say it in the test so the test runs hosted`);
+      if (!requirement.test(line)) return;
+      if (!className || !func?.startsWith('test')) throw new Error(`${file}:${i + 1}: missing(${prerequisite}) outside a test method (${func ?? 'none'}); say it in the test so the test runs hosted`);
       tests.add(`ExactKitTests/${className}/${func}`);
     });
   }

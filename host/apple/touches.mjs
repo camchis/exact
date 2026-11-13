@@ -259,12 +259,13 @@ export async function restoreAccessibility(udid, found, run = simDefaults) {
  * for (its hello, 30 s; xcodebuild's start is most of 5 s). A runner outlives
  * the drive that started it: closing hangs up and the runner waits
  * KEPT_IDLE for the next session. Returns `{ ask(req), close(), pid, started,
- * kept, cloak }`: `ask` sends one line and resolves with its reply, or with an error
+ * kept, cloak, handoff() }`: `ask` sends one line and resolves with its reply, or with an error
  * at `RUNNER_MS`, which also ends the runner (a stalled runner never hangs a
  * drive). `cloak` follows SpringBoard's main transitions and, on a `foldable`
  * simulator (the iPhone Duo), fold cloaks: a real touch waits until both clear
  * (cloak.mjs). The simulator's accessibility keys are on for the session and put back when it
- * ends (`AX_KEYS`).
+ * ends (`AX_KEYS`). `handoff` awaits this connection's close and returns the port and token
+ * for a hosted XCTest to connect; ownership and accessibility stay held until `close` or `end`.
  */
 export async function openTouches({ udid, appId, foldable }) {
   const lockRelease = lock(udid);
@@ -348,9 +349,10 @@ export async function openTouches({ udid, appId, foldable }) {
       child.unref();
     }
     // Teardown runs once; a failure to end the runner is kept for `close()` to report.
-    let closing = null;
+    let closing = null, handedOff = false;
     const end = () => (closing ??= teardown().then(() => null, (e) => e));
     const ask = async (req, ms = RUNNER_MS) => {
+      if (handedOff) return { error: 'the touch connection was handed to the hosted tests' };
       const broken = talk.broken();
       if (broken) return { error: broken };
       return within(talk.request(req), ms, () => {
@@ -366,10 +368,19 @@ export async function openTouches({ udid, appId, foldable }) {
     return {
       ask, pid: kept.pid, started: Date.now() - started, kept: reused, cloak,
       end,
+      async handoff() {
+        if (closing || handedOff || talk.broken()) throw new Error('the touch connection is no longer available for handoff');
+        handedOff = true;
+        // The hosted xcodebuild blocks this event loop, so flush the EOF before it starts.
+        const hungUp = new Promise(r => socket.once('close', () => r(true)));
+        socket.end();
+        if (!(await within(hungUp, 3000, () => false))) throw new Error('the initial touch connection did not close for handoff');
+        return { port: kept.port, token: kept.token };
+      },
       // A session that ends well hangs up and leaves the runner for the next.
       async close() {
         if (closing) { const failed = await closing; if (failed) throw failed; return; }
-        if (talk.broken()) { const failed = await end(); if (failed) throw failed; return; }
+        if (!handedOff && talk.broken()) { const failed = await end(); if (failed) throw failed; return; }
         closing = Promise.resolve(null);
         cloak.close();
         socket.end();
