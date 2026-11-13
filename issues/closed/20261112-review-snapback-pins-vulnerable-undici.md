@@ -1,6 +1,7 @@
 # The Snapback dependency pins undici with published security fixes missing
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The root package.json overrides Snapback 0.4.33's undici with 8.12.2, the version Snapback 0.4.43 ships with the same Node transport, until the client checkout and its Rust revision move to that release.
 **Systems:** package.json, bun.lock, Snapback development tooling
 **Author:** Codex
 **Date:** 2026-11-12

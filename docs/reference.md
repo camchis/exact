@@ -86,7 +86,11 @@ backslash traversal, alternate-stream and reserved-device forms are refused.
 
 Snapback4 consumers use release **0.4.33**: the CLI is pinned in `bun.lock`;
 Cargo pins the device and its client to the matching release source commit
-`3653cae823145170df3e720f5e321bd1b5b4d79d`. `snapback4/` is one client for an
+`3653cae823145170df3e720f5e321bd1b5b4d79d`. The root `package.json` overrides
+the undici 0.4.33 pins with 8.12.2, the version 0.4.43 pins, for the eight
+advisories on 8.11.2 (among them
+[GHSA-qrxm-fqhp-jwvm](https://github.com/nodejs/undici/security/advisories/GHSA-qrxm-fqhp-jwvm));
+a pin at 0.4.43 or later drops the override. `snapback4/` is one client for an
 app's Rust and TypeScript on every host ([its README](../snapback4/README.md)):
 the protocol in Rust without I/O, the native device, the web's wasm, and the
 TypeScript driver an app mounts with `typescript.sources`. The client is its
