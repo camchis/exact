@@ -1,6 +1,7 @@
 # The guide and LLP 1115.000 D7.2 disagree on whether a `select` is a Tab stop with Keyboard Navigation off on the Mac; the code follows the guide
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** With Keyboard Navigation off a `select` is no Tab stop, as `NSPopUpButton` is none: its pop-up and the presenter's loop now ask `tabStop`, as a button does, while date and time inputs stay stops in both modes and an author's `tabindex` still makes any of them one (Charlie, 2026-11-12).
 **Systems:** docs/contract-for-agents.md, host/apple/Sources/ExactKit/Mac/ValueControlsMac.swift, host/apple/Sources/ExactKit/Mac/FocusMac.swift, host/apple/Sources/ExactKit/Mac/KeyViewLoopMac.swift, host/apple/tests/ExactKitTests/KeyboardNavigationMacTests.swift
 **Severity:** P3
 **Author:** Claude (Fable 5.2), from the 2026-11-10 project review

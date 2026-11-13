@@ -2120,11 +2120,13 @@ lists any literal colour, font size or weight an app's `.contract` files still w
 | a route with `navigationBar="none"` | no navigation bar: a full-bleed screen that draws its own way back; the edge swipe still goes back |
 | a route with `navigationPresentation="modal"` | a sheet |
 
-On macOS, date, time, datetime-local and select controls are default Tab stops,
-independent of the system's Keyboard navigation setting. Their native control
-owns focus and editing keys; `focus`/`blur` and cancellable `key` handlers still
-address the Contract node. Disabled, inert and hidden controls stay out of the
-loop; `tabindex=-1` allows explicit focus while excluding sequential focus.
+On macOS, date, time and datetime-local controls are default Tab stops whatever
+the system's Keyboard navigation setting, as `NSDatePicker` is; a select is one
+only with the setting on, as `NSPopUpButton` is. `tabindex=0` makes any of them a
+stop in both modes. Their native control owns focus and editing keys;
+`focus`/`blur` and cancellable `key` handlers still address the Contract node.
+Disabled, inert and hidden controls stay out of the loop; `tabindex=-1` allows
+explicit focus while excluding sequential focus.
 
 `contract vocab <name>` lists each one's props. A route does not scroll by
 itself: its content goes in a `scroll`, `list` or `overflow-y="auto"` box, which is
