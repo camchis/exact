@@ -343,6 +343,24 @@ pub fn emit(plan: &Plan, site_attrs: bool, dev_reload: bool) -> Result<Output, S
             slot.0
         );
         commands::locale_slot(plan, &mut body, slot.0);
+        // The format locale follows the locale slot (LLP 1054.000.003 D6),
+        // made before any initializer, which may format.
+        if let Some(format) = plan.format {
+            let records: Vec<String> = plan
+                .locales
+                .iter()
+                .map(|row| {
+                    serde_json::to_string(&[plan.str(row.name), plan.str(row.format)]).unwrap()
+                })
+                .collect();
+            let _ = write!(
+                body,
+                "$formats([{}]);const s_{}=$formatSlot(s_{});",
+                records.join(","),
+                format.0,
+                slot.0
+            );
+        }
     }
     // Slots, in order: an initializer reads only earlier slots.
     for (i, r) in plan.slots.iter().enumerate() {
@@ -350,8 +368,9 @@ pub fn emit(plan: &Plan, site_attrs: bool, dev_reload: bool) -> Result<Output, S
             || r.late
             || plan.router == Some(exact_plan::SlotsId(i as u32))
             || plan.locale == Some(exact_plan::SlotsId(i as u32))
+            || plan.format == Some(exact_plan::SlotsId(i as u32))
         {
-            continue; // an owned slot lives on its instance; a late one, the router and locale elsewhere
+            continue; // an owned slot lives on its instance; a late one, the router, locale and format elsewhere
         }
         root_slot(plan, i, &top, dev_reload, &mut em.uses, &mut body)?;
     }
@@ -794,6 +813,7 @@ pub fn emit(plan: &Plan, site_attrs: bool, dev_reload: bool) -> Result<Output, S
             (modes.is_some(), "import{modes as $modes,Sx}from\"./modes.js\";"),
             (plan.slots.iter().any(|s| s.persist), "import{stored as $stored,keep as $keep}from\"./persist.js\";"),
             (exact_runner::uses::chooses_locale(plan), "import{localeSlot as $localeSlot,setLocale as $setLocale}from\"./chosen.js\";"),
+            (plan.format.is_some(), "import{formats as $formats,formatSlot as $formatSlot}from\"./format-locale.js\";"),
         ]
         .iter()
         .filter(|(on, _)| *on)
