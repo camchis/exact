@@ -1,6 +1,7 @@
 # Web speech recognition reports local processing when remote processing is allowed
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** A browser recognition's `leavesDevice` is false only when it asked for `processLocally=true`, whatever local recognition the browser supports, since with it false or omitted the browser may use its remote service.
 **Systems:** packages/speech-recognition/web/index.js
 **Author:** Codex
 **Date:** 2026-11-12
