@@ -1,6 +1,7 @@
 # Granting exact-alarm permission restores previously revoked alarms
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The grant broadcast now removes every record but a paused countdown's, as a status read during the revocation would have, and restores nothing; boot restoration is unchanged.
 **Systems:** Alarms package, Android permission lifecycle
 **Author:** Codex
 **Date:** 2026-11-12

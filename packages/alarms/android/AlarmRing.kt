@@ -243,8 +243,10 @@ class AlarmSystemReceiver : BroadcastReceiver() {
             Intent.ACTION_TIME_CHANGED -> AlarmRing.timeSet(c)
             // An epoch instant has no zone: nothing moves, the app reads again.
             Intent.ACTION_TIMEZONE_CHANGED -> AlarmsModule.changed()
+            // Sent at a grant, which follows a revocation that ended every alarm the system held and stopped the app,
+            // perhaps with no status read since: their records go, and granting again brings none back (D7).
             AlarmManager.ACTION_SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED -> {
-                if (c.getSystemService(AlarmManager::class.java).canScheduleExactAlarms()) AlarmRing.restore(c) else AlarmRing.dropHeld(c)
+                AlarmRing.dropHeld(c)
                 AlarmsModule.changed()
             }
         }

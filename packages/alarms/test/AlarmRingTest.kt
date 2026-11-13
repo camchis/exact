@@ -129,4 +129,38 @@ class AlarmRingTest {
                 .edit().clear().commit()
         }
     }
+
+    /** Exact alarms revoked and granted again with the app never opened between: the grant broadcast is the package's
+     * first word of it, and the alarms the revocation ended stay ended; a paused countdown, which held none, stays (D7). */
+    @Test fun aGrantAfterARevocationRestoresNoAlarm() {
+        val app = RuntimeEnvironment.getApplication()
+        val alarms = app.getSystemService(AlarmManager::class.java)
+        ShadowAlarmManager.setCanScheduleExactAlarms(true)
+        Settings.Global.putInt(app.contentResolver, Settings.Global.BOOT_COUNT, 1)
+        val now = System.currentTimeMillis().toDouble()
+        val future = AlarmRecord("future", "Wake", now + 3_600_000.0, null, null, null, "scheduled")
+        val overdue = AlarmRecord("overdue", "Tea", now + 60_000.0, 60_000.0, null, null, "countdown")
+        val paused = AlarmRecord("paused", "Oven", now + 60_000.0, 60_000.0, null, null, "countdown")
+        val records = listOf(future, overdue, paused)
+        try {
+            records.forEach { AlarmRing.set(app, it) }
+            AlarmRing.pause(app, AlarmRecords.get(app, paused.tag)!!)
+            // The revocation: Android stops the app and drops its alarms, and no session reads the status.
+            ShadowAlarmManager.setCanScheduleExactAlarms(false)
+            listOf(future, overdue).forEach { alarms.cancel(AlarmRing.action(app, it, AlarmRing.FIRE)) }
+            ShadowSystemClock.advanceBy(Duration.ofMinutes(2))
+            ShadowAlarmManager.setCanScheduleExactAlarms(true)
+            AlarmSystemReceiver().onReceive(app, Intent(AlarmManager.ACTION_SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED))
+            shadowOf(Looper.getMainLooper()).idle()
+
+            assertEquals(listOf(paused.tag), AlarmRecords.all(app).map { it.tag })
+            assertEquals("paused", AlarmRecords.get(app, paused.tag)!!.state)
+            assertNull("no revoked alarm is set again", alarms.nextAlarmClock)
+            assertNull("no overdue alarm rings", shadowOf(app).nextStartedService)
+        } finally {
+            records.forEach { AlarmRing.cancel(app, it.tag) }
+            app.createDeviceProtectedStorageContext().getSharedPreferences("exact.alarms", Context.MODE_PRIVATE)
+                .edit().clear().commit()
+        }
+    }
 }
