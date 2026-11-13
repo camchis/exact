@@ -1,6 +1,7 @@
 # The agent cannot drag to dismiss the keyboard or film under real timing
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** A real drag under `--touch platform` may end over a visible software keyboard (refused otherwise), iOS `layout` reports a running scroll's presentation offset with its `target`, and film under `--timing platform` samples the wall clock, naming missed samples, with `reproducible: false`.
 **Systems:** `scripts/agent.mjs` on iOS (LLP 1012, LLP 1079)
 **Severity:** P3
 **Author:** Claude (Opus 5.5), from Excord's stage 1 transcript lane (`apps/excord/llp/0001-excord.rfc.md`)
