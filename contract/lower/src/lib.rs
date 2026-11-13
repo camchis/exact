@@ -24,6 +24,7 @@ pub mod anatomy;
 mod atoms;
 mod box_transform;
 mod bundled;
+pub use bundled::image_svg_paths;
 mod buttons;
 mod cells;
 mod class;
@@ -346,9 +347,9 @@ pub fn lower(
     _analysis: &Analysis,
     asset_root: Option<&Path>,
 ) -> Result<Plan, LowerError> {
-    lower_with_sites(checked, _analysis, asset_root, false, Profile::Web, None)
+    lower_all(checked, _analysis, asset_root, false, Profile::Web, None)
         .map(|(plan, _)| plan)
-        .map_err(|all| theme::shown_errors(all).swap_remove(0))
+        .map_err(|mut all| all.swap_remove(0))
 }
 
 /// Lower, reporting every independent refusal: each element and each of its
@@ -371,6 +372,10 @@ pub fn lower_all(
             span: checked.expanded.root.span,
         }]);
     }
+    let (mut asset_errors, asset_warnings) = asset_root
+        .filter(|_| !theme::retained::stops_at_retention())
+        .map(|root| bundled::check(&checked.expanded.root.view, root))
+        .unwrap_or_default();
     let mut text_styles = warnings::TextStyles::new();
     let result = lower_with_sites(
         checked,
@@ -381,8 +386,24 @@ pub fn lower_all(
         warned.as_ref().map(|_| &mut text_styles),
     );
     if let Some(out) = warned {
-        out.extend(warnings::with_text_styles(checked, &text_styles));
+        out.extend(warnings::with_text_styles(
+            checked,
+            &text_styles,
+            asset_warnings,
+        ));
     }
+    let result = match result {
+        Ok(built) if asset_errors.is_empty() => Ok(built),
+        Ok(_) => {
+            asset_errors.truncate(MAX_REFUSALS);
+            Err(asset_errors)
+        }
+        Err(errors) => {
+            asset_errors.extend(errors);
+            asset_errors.truncate(MAX_REFUSALS);
+            Err(asset_errors)
+        }
+    };
     result.map_err(theme::shown_errors)
 }
 
@@ -536,11 +557,6 @@ fn lower_body(
     // The design server's build: what it reads is known (`retention_only`).
     if theme::retained::stops_at_retention() {
         return Err(Vec::new());
-    }
-    // A literal file outside `assets/` would build and not ship
-    // (expo/exact-build#4); only an app's compile knows its folders.
-    if asset_root.is_some() {
-        l.errors.extend(bundled::outside(&root.view));
     }
     l.declare_decorations(file)?;
     l.declare_atoms(file)?;

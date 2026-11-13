@@ -585,14 +585,17 @@ pub fn rerun_if_changed(path: &Path) {
     // A nearer `node_modules` an install could create or fill: installing
     // edits the `package.json` and lockfile beside it, which exist.
     for consulted in graph.consulted.iter().filter(|path| !path.exists()) {
-        // A package's design not there yet (LLP 1121 D11).
-        if consulted.extension().is_some_and(|e| e == "tamber") {
+        // A package design or bundled SVG image not there yet.
+        if consulted
+            .extension()
+            .is_some_and(|e| e == "tamber" || e.eq_ignore_ascii_case("svg"))
+        {
             println!(
                 "cargo:metadata=exact-optional-input={}",
                 consulted.display()
             );
             if !managed {
-                if let Some(dir) = consulted.parent().filter(|dir| dir.is_dir()) {
+                if let Some(dir) = consulted.ancestors().skip(1).find(|dir| dir.is_dir()) {
                     println!("cargo:rerun-if-changed={}", dir.display());
                 }
             }

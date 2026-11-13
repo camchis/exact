@@ -164,6 +164,22 @@ impl<'a> Home<'a> {
         matches!(confined::read(path, root), Err(Unread::Leaves))
     }
 
+    /// Read the asset by the same ownership rule as an icon's SVG.
+    pub(crate) fn read(&self, file: &str) -> Result<Vec<u8>, String> {
+        let root = self.root.ok_or("the asset has no app directory")?;
+        let path = root.join("assets").join(file);
+        match self.package {
+            Some(_) => confined::read(&path, root).map_err(|why| match why {
+                Unread::Leaves => format!(
+                    "{} leaves the package (a link to a file outside its `assets/`): a package's SVG is its own file",
+                    self.shown(file)
+                ),
+                Unread::Missing(e) | Unread::Failed(e) => format!("{}: {e}", self.shown(file)),
+            }),
+            None => std::fs::read(&path).map_err(|e| format!("{}: {e}", self.shown(file))),
+        }
+    }
+
     /// `assets/<file>` as a refusal names it: a package's by its package.
     fn shown(&self, file: &str) -> String {
         match self.package {
@@ -181,28 +197,17 @@ impl<'a> Home<'a> {
 /// Q2: the web, which alone draws an SVG as written, stages the app's
 /// `assets/` only).
 fn svg_of(icon: &tamber::Icon, home: Home) -> Result<Option<crate::icon_svg::Svg>, String> {
-    let (file, root) = match (&icon.svg, home.root) {
+    let file = match (&icon.svg, home.root) {
         (None, _) => return Ok(None),
         (Some(_), None) => return Err(format!("`{}`: an icon's SVG is under the app's `assets/`; compile this source with `compile_path`", icon.name)),
         (Some(file), _) if file.contains('|') => {
             return Err(format!("`{}`: an SVG's path has no `|`", icon.name))
         }
-        (Some(file), Some(root)) => (file, root),
+        (Some(file), Some(_)) => file,
     };
-    let path = root.join("assets").join(file);
-    // A package's read only as its own file, from the file checked (round 3,
-    // R3-4: [`confined::read`]); the app's as it is.
-    let bytes = match home.package {
-        Some(_) => confined::read(&path, root).map_err(|why| match why {
-            Unread::Leaves => format!(
-                "`{}`: {} leaves the package (a link to a file outside its `assets/`): a package's SVG is its own file",
-                icon.name,
-                home.shown(file)
-            ),
-            Unread::Missing(e) | Unread::Failed(e) => format!("`{}`: {}: {e}", icon.name, home.shown(file)),
-        })?,
-        None => std::fs::read(&path).map_err(|e| format!("`{}`: {}: {e}", icon.name, home.shown(file)))?,
-    };
+    let bytes = home
+        .read(file)
+        .map_err(|why| format!("`{}`: {why}", icon.name))?;
     String::from_utf8(bytes)
         .map_err(|e| e.to_string())
         .and_then(|t| Ok((t.len(), crate::icon_svg::read(&t)?)))
@@ -255,7 +260,7 @@ impl Target {
 
 /// The targets an app ships: its manifest's `host`, `deploy.store` and
 /// `deploy.binaries` keys, and its target crates (`android/`, `linux/`,
-/// `web/`). An app with no manifest is checked for none.
+/// `web/`, `windows/`). An app with no manifest is checked for none.
 fn targets(root: Option<&Path>) -> Vec<Target> {
     // A game's resolved manifest first, as the build reads it (`Manifest::read`).
     let read = |file: &str| {
@@ -274,7 +279,7 @@ fn targets(root: Option<&Path>) -> Vec<Target> {
         }),
     };
     // An app's target crate is a target it builds (theme2's ruling).
-    for dir in ["android", "linux", "web"] {
+    for dir in ["android", "linux", "web", "windows"] {
         if root.is_some_and(|r| r.join(dir).join("Cargo.toml").is_file()) {
             add(dir, format!("the `{dir}/` crate"));
         }

@@ -2446,8 +2446,14 @@ sends, follows and accepts is LLP 1011's: macOS and iOS send no cookie and no
 `Referer`, follow redirects to any host (within App Transport Security), take a
 body up to 64 MiB whatever its `Content-Type` and its status, as a browser's `<img>` does
 (a 404 that is an image draws; one that is not is `HTTP 404`), and keep an HTTP cache on disk;
-the web is the browser's `<img>` (its cookies and `Referer` rules, no size cap). SVG
-draws on the web only; on Apple it is an `error`. A tinted remote image on the web
+the web is the browser's `<img>` (its cookies and `Referer` rules, no size cap). Apple
+and Linux also draw SVG images, with scripts, external references and animation dropped.
+The compiler checks literal `assets/…svg` and `deck/…svg` image sources with that parser:
+a dropped construct warns at the source; a refused file fails a build that ships a native
+target. Editing or creating a named file rebuilds the plan. Raster bytes keep their format
+even under an `.svg` name.
+Files unavailable at build, and remote, `app:/` or computed SVG sources, are checked at
+run time. A tinted remote image on the web
 needs CORS headers, or it is an `error` too. A terminal entry reads a PNG from a path
 beneath its own directory, an absolute path or a `data:` URL, a regular file of at most
 64 MiB; it downloads nothing and has no app directories yet, so an `http(s)` or `app:/`
