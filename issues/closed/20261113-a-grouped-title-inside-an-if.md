@@ -1,6 +1,7 @@
 # A grouped title inside an if is not the row's title
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** title_button reads an if by its arms, as leading does: a mark or a title the button chooses with if leaves the button the row's title when every shown arm is texts and symbols and one shows a text.
 **Systems:** contract
 **Severity:** P2
 **Author:** Grok 4.7
