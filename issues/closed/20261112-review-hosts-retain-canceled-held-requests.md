@@ -1,6 +1,7 @@
 # Hosts retain canceled requests that a data source held
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** After each release pass the terminal, Apple, painted (Linux) and web hosts drop every parked request whose ticket the runner no longer holds (`Runner::holds`), so a request the runner let go is not kept, and one it keeps for its effects still runs when released.
 **Systems:** host/terminal, host/apple, host/linux, host/web
 **Author:** Codex
 **Date:** 2026-11-12

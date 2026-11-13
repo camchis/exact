@@ -30,6 +30,11 @@ impl<D: DataSource> Host<D> {
                     self.emit_dispatch(r, dispatch, &mut batch, &mut immediate);
                 }
             }
+            // A request the runner let go (newer arguments, a refresh, a
+            // target answered now) is never released; one it keeps for its
+            // effects is.
+            let runner = &self.runner;
+            self.parked.retain(|_, r| runner.holds(r.ticket));
             // A fetch the app aborted, in these turns or before: its answer
             // resumes now, and the page cancels the request after the batch,
             // whatever its method.
@@ -142,5 +147,75 @@ impl<D: DataSource> Host<D> {
                 },
             )),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::host::Host;
+    use exact_plan::Value;
+    use exact_runner::{Answer, DataError, DataSource, Dispatch, Event, Outcome, Request, Store};
+
+    /// Holds every call it is asked for until `release` names one.
+    #[derive(Default)]
+    struct Holding {
+        asked: u64,
+        release: Option<u64>,
+    }
+
+    impl DataSource for Holding {
+        fn query(&mut self, name: &str, _: &[Value]) -> Result<Value, DataError> {
+            Err(DataError::UnknownSource(name.into()))
+        }
+        fn answer(&mut self, _: &mut Store, _: &str, _: &[Value]) -> Result<Answer, DataError> {
+            self.asked += 1;
+            Ok(Answer::Later(Request::continuation(self.asked)))
+        }
+        fn dispatch(&mut self, _: u64, _: &Store) -> Dispatch {
+            Dispatch::Held
+        }
+        fn release(&mut self, _: &Store) -> Vec<(u64, Dispatch)> {
+            let token = self.release.take();
+            token
+                .map(|t| vec![(t, Dispatch::Again)])
+                .unwrap_or_default()
+        }
+        fn parse(
+            &mut self,
+            _: &mut Store,
+            _: &str,
+            _: &[Value],
+            _: Outcome,
+        ) -> Result<Answer, DataError> {
+            Ok(Answer::Now(Value::Number(1.0)))
+        }
+    }
+
+    /// A held request newer arguments replaced goes with them; the one still
+    /// in flight stays parked, and runs when its source releases it.
+    #[test]
+    fn a_held_request_the_runner_let_go_is_not_kept() {
+        crate::link::link_for_tests();
+        let source = "component App\n  state n = 0\n  state m = 0\n  resource item = item(n) as shape number\n  action bump\n    n = n + 1\n  action nudge\n    m = m + 1\n  view\n    column\n      button press=bump testId=\"bump\"\n        text `${n}`\n      button press=nudge testId=\"nudge\"\n        text `${m}`\n";
+        let plan = contract::compile(source).unwrap().encode();
+        let (mut h, _) = Host::boot(&plan, Holding::default(), Default::default(), "/").unwrap();
+        let press = |h: &mut Host<Holding>, id: &str| {
+            let k = h.runner.kernel();
+            let view = k.node_by_key(k.find_by_test_id(id)[0]).unwrap().id;
+            h.dispatch(view, Event::Press);
+        };
+        assert_eq!(h.parked.len(), 1);
+        for _ in 0..3 {
+            press(&mut h, "bump");
+        }
+        assert_eq!(h.runner.data().asked, 4);
+        let parked: Vec<u64> = h.parked.keys().copied().collect();
+        assert_eq!(parked, [4], "only the request in flight is parked");
+        // A commit that changes nothing it reads keeps it, until released.
+        press(&mut h, "nudge");
+        assert!(h.parked.contains_key(&4));
+        h.runner.data().release = Some(4);
+        press(&mut h, "nudge");
+        assert!(h.parked.is_empty(), "a request released runs");
     }
 }

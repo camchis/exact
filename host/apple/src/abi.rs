@@ -328,6 +328,10 @@ impl<D: DataSource> Bridge<D> {
                     Self::run_dispatch(h, x, parked, r, dispatch);
                 }
             }
+            // A request the runner let go (newer arguments, a refresh, a
+            // target answered now) is never released; one it keeps for its
+            // effects is.
+            parked.retain(|_, r| h.runner().holds(r.ticket));
             // An abort made in this batch's turns is answered at the next pump: wake it.
             if h.runner_mut().collected_aborts() {
                 x.notify();
