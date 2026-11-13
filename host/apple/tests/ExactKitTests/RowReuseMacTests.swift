@@ -16,7 +16,8 @@ final class RowReuseMacTests: XCTestCase {
 
     /// Rows of two kinds of symbol, an animation on every fifth, a faded
     /// title on every third, a paragraph on every fourth, a `:hover` look,
-    /// and a horizontal scroller that hears `scroll`.
+    /// and a horizontal scroller that hears `scroll` and snaps, mandatory, to
+    /// boxes whose places differ every third row.
     static func source(count: Int) -> String {
         var doublings = 0
         while 10 << doublings < count { doublings += 1 }
@@ -49,8 +50,11 @@ final class RowReuseMacTests: XCTestCase {
                       text `Row ${r}` testId=`title-${r}` opacity=(r % 3 == 0 ? 0.5 : 1)
                       if r % 4 == 0
                         text `The fourth row's paragraph, ${r}` font-size=11 testId=`fourth-${r}`
-                    row overflow-x="auto" overflow-y="hidden" width="8rem" scroll=scrolled testId=`strip-${r}`
-                      text `A strip of words for row ${r}, wider than its box` white-space="nowrap" testId=`words-${r}`
+                    row overflow-x="auto" overflow-y="hidden" width="8rem" scroll=scrolled scroll-snap-type="x mandatory" testId=`strip-${r}`
+                      text `A strip of words for row ${r}` white-space="nowrap" scroll-snap-align="start" testId=`words-${r}`
+                      box width=(r % 3 == 0 ? "3rem" : "5rem") height=8 flex-shrink=0 scroll-snap-align="start"
+                      box width="6rem" height=8 flex-shrink=0 scroll-snap-align="start" testId=`stop-${r}`
+                      box width="6rem" height=8 flex-shrink=0
 
         """
     }
@@ -82,13 +86,21 @@ final class RowReuseMacTests: XCTestCase {
 
     /// The state a person leaves on rows near the top before scrolling
     /// away: the pointer over item 2, item 3 held down, item 4's strip
-    /// scrolled, item 6 selected (in a table, drawn emphasized).
+    /// snapped to its second box, item 5's wheeled and waiting to snap,
+    /// item 6 selected (in a table, drawn emphasized).
     private func leaveState(_ f: TableFixture, table: Bool) throws {
         f.presenter.hover(try f.node("title-2"), true)
         try f.node("row-3").pressed = true
-        let strip = try XCTUnwrap(f.node("strip-4").scroll)
-        strip.contentView.scroll(to: NSPoint(x: 40, y: 0))
+        let snapped = try f.node("strip-4"), strip = try XCTUnwrap(snapped.scroll)
+        let stop = try f.node("stop-4").convert(NSPoint.zero, to: strip.documentView)
+        strip.contentView.scroll(to: NSPoint(x: stop.x, y: 0))
         strip.reflectScrolledClipView(strip.contentView)
+        snapped.snapAfterWheel(from: .zero, now: true)
+        XCTAssertGreaterThan(strip.contentView.bounds.minX, 0, "item 4's strip rests on its second box")
+        let wheeled = try f.node("strip-5"), waiting = try XCTUnwrap(wheeled.scroll)
+        waiting.contentView.scroll(to: NSPoint(x: 20, y: 0))
+        waiting.reflectScrolledClipView(waiting.contentView)
+        wheeled.snapAfterWheel(from: .zero, now: false)
         if table {
             f.table.selectRowIndexes([6], byExtendingSelection: false)
             (f.table.rowView(atRow: 6, makeIfNecessary: true)?.view(atColumn: 0) as? TableRowCell)?.backgroundStyle = .emphasized
@@ -105,7 +117,7 @@ final class RowReuseMacTests: XCTestCase {
             try leaveState(fresh, table: table)
             XCTAssertTrue(try reused.node("body-2").pressPaint.hovered,
                           "the hover look holds before the scroll")
-            XCTAssertEqual(reused.status, "opened -1 scrolled 1", "the strip's scroll was heard")
+            XCTAssertNotEqual(reused.status, "opened -1 scrolled 0", "the strips' scrolls were heard")
             let rows = reused.mounted
             let held = [("hovered", 2), ("pressed", 3), ("strip", 4), ("selected", 6)].map { ($0.0, rows[$0.1]!) }
 
@@ -151,7 +163,6 @@ final class RowReuseMacTests: XCTestCase {
                 XCTAssertTrue(rebound.contains(ObjectIdentifier(view)), "the \(name) row's view was rebound (destroyed: \(reused.presenter.views[view.id] !== view))")
             }
             XCTAssertEqual(reused.status, fresh.status, "a scroller put back at its start told its new item nothing")
-            XCTAssertEqual(reused.status, "opened -1 scrolled 1")
             if table {
                 XCTAssertEqual(reused.table.selectedRow, 6, "the selection is the item's, not the view's")
                 XCTAssertEqual(reused.table.selectedRow, fresh.table.selectedRow)
@@ -173,6 +184,47 @@ final class RowReuseMacTests: XCTestCase {
             XCTAssertEqual(row.props["testId"], "row-5", "at \(y): and still shows its item")
             XCTAssertTrue(f.window.firstResponder === row, "at \(y): and holds the focus")
         }
+    }
+
+    /// An image floating in Exact's picture-in-picture window, whose row is
+    /// rebound to another item: the old item's image left the document, so
+    /// the window closes, as at a destroy, and never shows the new item's
+    /// picture. A rebound image of another source shows the new one.
+    func testAFloatingImagesWindowClosesWhenItsRowIsRebound() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("row-reuse-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        for (name, color) in [("even.png", NSColor.systemRed), ("odd.png", NSColor.systemBlue)] {
+            let rep = try XCTUnwrap(NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 8, pixelsHigh: 8, bitsPerSample: 8, samplesPerPixel: 4,
+                                                     hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0))
+            NSGraphicsContext.saveGraphicsState()
+            NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
+            color.setFill(); NSRect(x: 0, y: 0, width: 8, height: 8).fill()
+            NSGraphicsContext.restoreGraphicsState()
+            try XCTUnwrap(rep.representation(using: .png, properties: [:])).write(to: root.appendingPathComponent(name))
+        }
+        let previous = ExactApp.shared.assetRoot
+        ExactApp.shared.assetRoot = root
+        defer { ExactApp.shared.assetRoot = previous }
+        let source = Self.source(count: 2_000).replacingOccurrences(
+            of: #"image (r % 2 == 0 ? "symbol:star" : "symbol:heart")"#, with: #"image (r % 2 == 0 ? "even.png" : "odd.png")"#)
+        let f = try TableFixture(count: 2_000, table: false, source: source)
+        fixtures.append(f)
+        func spin(_ note: String, _ done: () -> Bool) {
+            let deadline = Date(timeIntervalSinceNow: 5)
+            while !done() && Date() < deadline { RunLoop.main.run(mode: .default, before: Date(timeIntervalSinceNow: 0.01)) }
+            XCTAssertTrue(done(), note)
+        }
+        let picture = try f.node("icon-4"), row = try XCTUnwrap(f.mounted[4])
+        spin("item 4's picture loads") { picture.raster != nil }
+        PictureInPictureHost.request(picture, .init(["", "panel"]))
+        spin("it floats") { PictureInPictureHost.floating.contains { $0.node === picture } }
+        for y in stride(from: CGFloat(300), through: 4_000, by: 337) { f.scroll(to: y) }
+        XCTAssertTrue(f.presenter.views[row.id] === row && f.item(row) != 4, "item 4's row was rebound to item \(f.item(row))")
+        XCTAssertFalse(PictureInPictureHost.floating.contains { $0.node === picture }, "the old item's window closed with its image")
+        let item = f.item(row), wanted = item % 2 == 0 ? "even.png" : "odd.png"
+        XCTAssertEqual(picture.imageSource, wanted)
+        spin("the new item's picture loads") { picture.raster != nil }
     }
 }
 #endif

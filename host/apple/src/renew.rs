@@ -31,8 +31,10 @@ impl<D: DataSource> Host<D> {
             let Some(id) = self.keys.get(key).copied() else {
                 continue;
             };
-            self.paint.runs.remove(&id);
-            if self.paint.opacities.remove(&id).is_some() {
+            // A run's moving colour or opacity is its paragraph's paint: the
+            // paragraph is painted again without it.
+            let colored = self.paint.runs.remove(&id).is_some();
+            if self.paint.opacities.remove(&id).is_some() || colored {
                 if let Some((owner, _)) = self.inline_runs.get(&id) {
                     self.dirty_paragraphs.insert(*owner);
                 }

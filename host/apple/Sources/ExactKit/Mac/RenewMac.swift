@@ -17,10 +17,12 @@
 //   item changes, and forgets a moving one and presents it whole, as new;
 // - a nested scroller's offset, back at its start without a `scroll` or
 //   `scrollend` event, and what it kept of a scroll (anchors, a pending
-//   offset, a collapsed one, a smooth scroll);
+//   offset, a collapsed one, a smooth scroll, the snap area it rested on, a
+//   wheel's snap waiting and a snap's ease);
 // - a picture: kept when the new item names the same source (a new view
 //   would find it decoded), else dropped with its natural size the moment
-//   the props name another (`renewSource`), never shown under the new item;
+//   the props name another (`renewSource`), never shown under the new item,
+//   and a picture-in-picture window it floats in (closed, as at a destroy);
 // - an `svg`'s scene and a box's CSS animations (the Rust host sends them
 //   again whole), a flight (landed), a live region's last text;
 // - the text selection's place for its paragraphs, an element hatch (it
@@ -86,6 +88,8 @@ extension Presenter {
         elements.created(view)
         svg.forget(id)
         if let flight = flights[id] { landFlight(flight) }
+        // The old item's image left the document: its floating window closes, as at a destroy.
+        PictureInPictureHost.gone(view)
         if let session, session.viewDark.removeValue(forKey: id) != nil { session.noteAppearance(view) }
         view.renew()
     }
@@ -121,10 +125,20 @@ extension NodeView {
         pendingScrollTop = nil; pendingScrollLeft = nil
         beforeLayoutScroll = nil; hiddenScroll = nil; followedScroll = nil; scrollAnchor = nil
         lastScrollEvent = .zero
-        let clip = sv.contentView
-        guard clip.bounds.origin != .zero else { return }
+        // Its snapping is a new scroller's: rested on no area (a mandatory
+        // one would follow the old item's), no wheel's snap waiting, no ease.
+        sv.snapWheel?.work.cancel(); sv.snapWheel = nil
+        sv.snapRested = [ScrollSnap.Rested(), ScrollSnap.Rested()]
+        sv.snapDropsMomentum = false; sv.wheelAt = 0
+        let clip = sv.contentView, easing = sv.snapSettling
+        sv.snapSettling = false
+        guard clip.bounds.origin != .zero || easing else { return }
         let center = NotificationCenter.default
         center.removeObserver(self, name: NSView.boundsDidChangeNotification, object: clip)
+        if easing {
+            // A snap's ease is an animation of the bounds: one of no length replaces it.
+            NSAnimationContext.runAnimationGroup { context in context.duration = 0; clip.animator().setBoundsOrigin(.zero) }
+        }
         clip.scroll(to: .zero)
         sv.reflectScrolledClipView(clip)
         center.addObserver(self, selector: #selector(clipScrolled), name: NSView.boundsDidChangeNotification, object: clip)

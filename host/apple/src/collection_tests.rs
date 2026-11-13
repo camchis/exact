@@ -638,3 +638,68 @@ fn a_rebound_row_is_renewed_before_its_props_and_never_created() {
         assert!(snapshot(&bridge).rows.iter().any(|row| row.index == 125));
     }
 }
+
+/// A row rebound while the colour its inline text inherits is moving: the
+/// text is the same for the new item, so nothing restates its paragraph but
+/// the renewal, which paints it again in the colour the new row starts at.
+#[test]
+fn a_rebound_paragraph_is_painted_again_without_the_old_rows_moving_colour() {
+    const SOURCE: &str = r##"
+component App
+  state on = false
+  resource rows = rows() as shape number[]
+  action toggle
+    on = not on
+  view
+    column
+      button press=toggle testId="toggle"
+        text "toggle"
+      list virtualized=true height=160 width=240 testId="history"
+        for row in rows key=row
+          column color=(on ? "#ffffff" : "#000000") transition="color 10s linear"
+            text testId="para"
+              text "plain"
+"##;
+    let (mut bridge, _, _) = fixture(SOURCE);
+    bridge.set_row_reuse(true);
+    let host = bridge.host.as_mut().unwrap();
+    let toggle = {
+        let k = host.runner().kernel();
+        k.node_by_key(k.find_by_test_id("toggle")[0]).unwrap().id
+    };
+    host.dispatch_at(toggle, Event::Press, 0.);
+    let mid = host.advance(500.);
+    assert!(
+        mid.contains("\"paragraph\""),
+        "the runs' colour moves: {mid}"
+    );
+    let top = facts(&snapshot(&bridge), 4_000.);
+    let batch = send(&mut bridge, &top, 600.);
+    let v: serde_json::Value = serde_json::from_str(&batch).unwrap();
+    let ops = v["ops"].as_array().unwrap();
+    let kernel = bridge.host.as_ref().unwrap().runner().kernel();
+    let paragraphs: Vec<u64> = ops
+        .iter()
+        .filter(|op| op["op"] == "renew")
+        .filter_map(|op| op["id"].as_u64())
+        .filter(|id| {
+            kernel
+                .node(*id as u32)
+                .and_then(|n| n.props.str(exact_kernel::PropId::TestId).map(str::to_owned))
+                .is_some_and(|t| t == "para")
+        })
+        .collect();
+    assert!(!paragraphs.is_empty(), "rows were rebound: {batch}");
+    for id in paragraphs {
+        let painted = ops
+            .iter()
+            .find(|op| op["op"] == "paragraph" && op["id"].as_u64() == Some(id))
+            .unwrap_or_else(|| panic!("paragraph {id} is painted again: {batch}"));
+        let colour = &painted["runs"][0]["style"]["text_color"];
+        assert_eq!(
+            colour,
+            &serde_json::json!([255, 255, 255, 255]),
+            "{painted}"
+        );
+    }
+}
