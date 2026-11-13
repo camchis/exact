@@ -764,6 +764,7 @@ fn read_result(r: &mut Reader<'_>) -> Result<Result<Answer, DataError>, String> 
 /// terms after its body (LLP 1016.000 D8), a two-way socket's (LLP 1016.003).
 fn read_http(r: &mut Reader<'_>, tag: u8) -> Result<Request, String> {
     let mut request = Request {
+        module: None,
         stream: tag >= 9,
         socket: tag == 11,
         bytes: false,

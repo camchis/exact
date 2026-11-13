@@ -1752,6 +1752,18 @@ an independent reply settles as it arrives. Leave writes, and any read whose
 parse depends on an earlier reply, in the queue. Storage steps and native
 continuations cannot opt out of it.
 
+A Hermes data module has a 64 MiB heap limit by default. With an
+exception-on-OOM engine bundle (v6 or later), terminal heap exhaustion fails
+its outstanding requests and tool invocations with
+`held more than the 64 MiB a data module's heap may hold`. The executor
+destroys that runtime, including its timers, streams and queued storage
+work. The next new request or canvas call loads a fresh runtime; failed
+requests are not retried automatically. Other modules keep running. A native
+storage write already submitted may finish, so an OOM does not establish
+whether it committed. Its completion is discarded, and queued JavaScript
+writes never start. The pinned v5 engine still aborts on heap exhaustion;
+this recovery requires the v6 pin.
+
 On Hermes each turn of an answer has 100 ms of its own time: its call, or its
 resumption after a `fetch`, storage step or yield it awaited, until it awaits
 the next. Its own time is the calling thread's CPU clock where the platform keeps

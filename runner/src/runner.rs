@@ -8,8 +8,10 @@ mod admission;
 mod advance;
 mod capture;
 mod native_timers;
+mod retirement;
 pub use native_timers::NativeTimer;
 use native_timers::Timer;
+pub use retirement::{ModuleIdentity, ModuleInstance};
 mod background;
 mod commit;
 mod control;
@@ -249,6 +251,7 @@ enum Seed<'a> {
 /// answers, and the arguments it was asked with (what `parse` sees).
 #[derive(Clone)]
 struct PendingReq {
+    module: Option<ModuleInstance>,
     inspection_generation: u64,
     refusal: Option<(&'static str, bool)>,
     /// The host refused this ordered request before execution (LLP 1041 §8.4).
@@ -430,6 +433,7 @@ pub struct Runner<D: DataSource> {
     /// for this answer to reject it in a module turn, so a refused aborting
     /// commit still delivers it on the next pump.
     module_aborts: Vec<u64>,
+    failed_tickets: std::collections::BTreeMap<u64, String>,
     /// The tickets answered aborted, until the host cancels their requests
     /// whatever their method ([`Runner::take_explicit_aborts`]).
     explicit_aborts: Vec<u64>,
@@ -890,6 +894,7 @@ impl<D: DataSource> Runner<D> {
             forgot: false,
             heard_aborts: Vec::new(),
             module_aborts: Vec::new(),
+            failed_tickets: Default::default(),
             explicit_aborts: Vec::new(),
             retired_fetches: Vec::new(),
             uploads: Default::default(),

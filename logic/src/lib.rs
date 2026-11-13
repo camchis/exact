@@ -502,6 +502,28 @@ impl<D: DataSource> exact_runner::DataSourceWrapper for Swappable<D> {
             .map(DataSource::take_logs)
             .unwrap_or_default()
     }
+    fn parse_tool(
+        &mut self,
+        fetch: Option<u64>,
+        continuation: Option<u64>,
+        store: &mut Store,
+        source: &str,
+        args: &[Value],
+        outcome: Outcome,
+    ) -> Result<Answer, DataError> {
+        if let Some(source_impl) = &mut self.embedded {
+            source_impl.parse_tool(fetch, continuation, store, source, args, outcome)
+        } else {
+            self.call(store, source, args, Some(&outcome))
+        }
+    }
+
+    fn module_identity(&self, source: &str) -> Option<exact_runner::ModuleIdentity> {
+        self.embedded
+            .as_ref()
+            .and_then(|m| m.module_identity(source))
+    }
+
     fn take_aborted(&mut self) -> Vec<u64> {
         self.embedded
             .as_mut()
