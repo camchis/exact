@@ -1,6 +1,7 @@
 # A paranoid rebuild writes origin marks back into the world's messages
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The paranoid rebuild keeps the pending messages as the world holds them, so only the host-facing take_messages marks them, once.
 **Systems:** game
 **Severity:** P2
 **Author:** Grok 4.7
