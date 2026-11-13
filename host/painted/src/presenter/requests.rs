@@ -847,6 +847,7 @@ impl<D: DataSource> Presenter<D> {
         (self.requests.back, self.requests.back_epoch) = (None, None);
         self.requests.keyboard = None;
         (self.requests.wakelock, self.requests.wakelock_epoch) = (None, None);
+        (self.requests.orientation, self.requests.orientation_epoch) = (None, None);
         self.requests.pad_input = None;
         let waiting: Vec<u32> = (self.requests.waiting.iter())
             .filter(|(_, w)| !matches!(w, Waiting::Pick(_) | Waiting::Auth { opened: true, .. }))

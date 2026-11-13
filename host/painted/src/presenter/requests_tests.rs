@@ -339,6 +339,36 @@ fn the_shell_is_told_when_back_has_somewhere_to_go_and_a_field_holds_the_focus()
     assert_eq!(told(&mut p), [(5, 0), (6, 1), (14, 0)]);
 }
 
+/// The orientation lock is told when it changes, and anew to a shell made
+/// again: the new activity starts at the manifest's orientation, whatever
+/// the last one was told.
+#[test]
+fn a_shell_made_again_is_told_the_orientation_lock_anew() {
+    let plan = crate::test_plan(
+        "component App\n  view\n    main orientationlock=\"landscape\"\n      text \"Wide\"\n",
+    );
+    let (mut p, error) = Presenter::boot_with(
+        &plan,
+        Nothing,
+        (400., 800.),
+        1.,
+        PathBuf::new(),
+        PainterChoice::Cpu,
+    )
+    .unwrap();
+    assert!(error.is_none(), "{error:?}");
+    p.serve_requests();
+    let locks = |p: &mut Presenter<Nothing>| {
+        p.tell_shell();
+        let asked = decode(p.take_requests());
+        asked.into_iter().filter(|r| r.0 == 13).count()
+    };
+    assert_eq!(locks(&mut p), 1);
+    assert_eq!(locks(&mut p), 0, "a lock is told when it changes");
+    p.reader_replaced(Box::new(crate::raster::Raster::new()));
+    assert_eq!(locks(&mut p), 1, "a reader made again is told anew");
+}
+
 /// A date control and a time control, bound.
 const DATES: &str = r##"component App
   state day = "2026-10-16"

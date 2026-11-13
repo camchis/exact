@@ -1,6 +1,7 @@
 # A replaced Android activity is not told its orientation lock
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** A reader made again forgets the orientation lock it was told and the epoch it was read at, as it forgets the wake lock, so the next tell sends the lock to the new activity.
 **Systems:** host/android, host/linux
 **Severity:** P1
 **Author:** Grok 4.7
