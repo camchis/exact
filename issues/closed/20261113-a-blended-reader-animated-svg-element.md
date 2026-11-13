@@ -1,6 +1,7 @@
 # A blended reader-animated SVG element never closes its layer
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The reader no longer plays a blended SVG element, so the engine samples its animation and its island blends onto the frame; the blend path also closes any layer opened for the element before it draws the island.
 **Systems:** host/linux
 **Severity:** P1
 **Author:** Grok 4.7
