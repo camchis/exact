@@ -1,6 +1,7 @@
 # Change-cycle analysis treats clearing a mutation as sending it
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The change-cycle check follows a mutation's refreshes and `then` only from a send of it; assigning its result slot writes that slot and nothing more.
 **Systems:** contract/analyze/src/gates.rs
 **Author:** Codex
 **Date:** 2026-11-12

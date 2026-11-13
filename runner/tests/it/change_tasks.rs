@@ -161,6 +161,7 @@ fn change_tasks_require_keys_and_reject_direct_and_indirect_cycles() {
         SOURCE.replace("key=input", "key=value").replace("seen = input", "input = input + 1").replace("  view\n", "  resource value = read(input) as shape number\n  view\n"),
         SOURCE.replace("key=input", "key=pending(saved)").replace("seen = input", "send saved = save()").replace("  view\n", "  mutation saved as shape number\n  view\n"),
         SOURCE.replace("seen = input", "send saved = save()").replace("  view\n", "  mutation saved as shape number then back\n  action back\n    input = input + 1\n  view\n"),
+        SOURCE.replace("key=input", "key=pending(saved)").replace("seen = input", "saved = none").replace("  view\n", "  mutation saved as shape number\n  view\n"),
         SOURCE.replace("seen = input", "mutate()").replace(
             "  view\n",
             "  action mutate\n    input = input + 1\n  view\n",
@@ -171,4 +172,17 @@ fn change_tasks_require_keys_and_reject_direct_and_indirect_cycles() {
             .to_string()
             .contains("analyze-change-cycle"));
     }
+}
+
+#[test]
+fn clearing_a_mutation_result_does_not_follow_its_then_action() {
+    let source = SOURCE.replace("seen = input", "saved = none").replace(
+        "  view\n",
+        "  mutation saved as shape number then back\n  action back\n    input = input + 1\n  view\n",
+    );
+    let mut r = boot(&source);
+    assert_eq!(r.land_then().receipts.len(), 1);
+    assert_eq!(r.slot("input"), Some(&Value::Number(1.0)));
+    assert_eq!(r.slot("fired"), Some(&Value::Number(1.0)));
+    assert_eq!(r.timer_due_ms(), None);
 }
