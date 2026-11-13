@@ -114,5 +114,45 @@ final class ContentIndexTests: XCTestCase {
         NotificationCenter.default.post(name: Notification.Name("exact.tools.call"), object: body)
         wait(for: [refused], timeout: 5)
     }
+
+    /// Call B waits in the runner behind call A when its task is cancelled,
+    /// and A ends before B's next poll. The cancellation reaches the runner
+    /// as the notification is handled, so B is dropped, not dispatched as A
+    /// ends. The runner here is a stand-in that keeps B waiting until A ends
+    /// and then dispatches it unless it was told to cancel it first.
+    func testACallCancelledWhileItWaitsInTheRunnerIsDroppedBeforeTheCallAheadEnds() {
+        var aRunning = true, bCancelled = false, bDispatched = false, ops: [String] = []
+        let agent = { (text: String) -> String in
+            let request = (try? JSONSerialization.jsonObject(with: Data(text.utf8))) as? [String: Any] ?? [:]
+            let op = request["op"] as? String ?? ""
+            ops.append(op)
+            if op == "cancel" {
+                if aRunning { bCancelled = true }
+                return #"{"call":2,"state":"ended"}"#
+            }
+            if aRunning { return #"{"call":2,"state":"waiting"}"# }
+            if bCancelled { return #"{"outcome":"refused","certainty":"none","reason":"cancelled","message":"Its caller cancelled it before it ran."}"# }
+            bDispatched = true
+            return #"{"outcome":"ok","certainty":"applied","reason":""}"#
+        }
+        let cancellation = ExactTools.Cancellation()
+        let body = NSMutableDictionary(dictionary: ["cancellation": cancellation])
+        let answered = expectation(description: "B is answered")
+        ExactTools.follow(2, agent: agent, cancellation: cancellation) { answer in
+            XCTAssertEqual(answer["reason"] as? String, "cancelled")
+            answered.fulfill()
+        }
+        XCTAssertEqual(ops, ["called"])
+        let handled = expectation(description: "the cancellation is handled on the main thread")
+        DispatchQueue.global().async {
+            NotificationCenter.default.post(name: Notification.Name("exact.tools.cancel"), object: body)
+            DispatchQueue.main.async { handled.fulfill() }
+        }
+        wait(for: [handled], timeout: 5)
+        XCTAssertEqual(ops.last, "cancel", "told as the notification is handled, not at the next poll")
+        aRunning = false
+        wait(for: [answered], timeout: 5)
+        XCTAssertFalse(bDispatched)
+    }
 }
 #endif
