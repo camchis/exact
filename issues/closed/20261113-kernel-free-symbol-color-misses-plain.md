@@ -1,6 +1,7 @@
 # Kernel-free symbol color misses plain dialog and raised popover starts
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The kernel-free document's symbol colour walk now also stops at a neutral plain dialog and a default-surface popover that is no menu, the starts that set color in the kernel, so data-symbol-color agrees with the kernel's.
 **Systems:** runner, kernel
 **Severity:** P3
 **Author:** Grok 4.7
