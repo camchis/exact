@@ -444,6 +444,11 @@ export function installedModules(modules = resolve(root, 'node_modules'), lock =
   const marker = resolve(modules, '.exact-install');
   const whole = () => existsSync(modules) && !existsSync(marker);
   if (whole() && !lockMismatches(dirname(modules)).length) return;
+  // The process that installs node_modules started without it, and in our Bun 1.4.2 runs went on resolving bare
+  // imports from Bun's global cache: its later `import('rolldown')` loaded 1.3.2 while node_modules held the lock's
+  // 1.2.9, and failed in its native binding (agent-launch.mjs loads playwright-core by path for the same reason).
+  // So that process stops once the install is done, and says to run the command again, which imports what is installed.
+  const started = existsSync(modules);
   withInstallLock(lock, () => {
     if (!whole()) {
       if (!existsSync(modules)) {
@@ -464,6 +469,7 @@ export function installedModules(modules = resolve(root, 'node_modules'), lock =
     const left = lockMismatches(dirname(modules));
     if (left.length) throw new Error(`${dirname(modules)}: node_modules still differs from bun.lock: ${left.join('; ')}`);
   });
+  if (!started) throw new Error(`${resolve(root)}: installed node_modules from bun.lock; this call began without it, and Bun can keep resolving packages from its global cache after installation, so run the same command again`);
 }
 
 /** Each package `dir/bun.lock` pins at the top of its `node_modules` that is installed at another version,
