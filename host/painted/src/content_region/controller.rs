@@ -313,6 +313,7 @@ fn same_request(a: &RegionTextRequest, b: &RegionTextRequest) -> bool {
         && a.catalog() == b.catalog()
         && a.stamp() == b.stamp()
         && a.offer() == b.offer()
+        && a.exclusions() == b.exclusions()
         && Arc::ptr_eq(a.source(), b.source())
 }
 #[cfg(test)]

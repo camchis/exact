@@ -304,7 +304,7 @@ pub struct Paragraph {
     /// The width to break again for `record`; `None` when it is always kept
     /// (flowed, clamped, ellipsized and adopted widths).
     remake: Option<Option<f32>>,
-    flow: Option<flow::FlowLayout>,
+    flow: Option<Arc<flow::FlowLayout>>,
     #[cfg(test)]
     layout_lifetime: Arc<()>,
     /// Points, rounded up.
