@@ -228,7 +228,7 @@ let watching = null, page = null, load = null;
 // D4, the runner's `changed`).
 const changed = (r, topic) => {
   const t = r.ticket;
-  if (!t || t.stream || t.req?.stream) return R(r);
+  if (!t || t.stream || t.req?.stream) return R(r, true);
   if (!t.again) journal.push(`t=${clock.now} changed ${topic}: ticket ${t.id} (${r.name}) lands first, then it is asked again`);
   t.again = true;
 };

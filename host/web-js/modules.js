@@ -77,7 +77,7 @@ export function modules(rows, bound = {}, views = {}, events = {}) {
   // made is still in flight (`deviceBase`, the in-flight count before it): the least privileged origin.
   let origin = "app", deviceBase = null, wk = null;
   // A tool call's (calls.js, LLP 1133.023 D7) stands below the app's.
-  const originNow = () => deviceBase !== null ? "device" : wk?.active() ? "wake" : origin === "app" ? Origin.call?.() ?? origin : origin;
+  const originNow = () => Origin.ask ?? (deviceBase !== null ? "device" : wk?.active() ? "wake" : origin === "app" ? Origin.call?.() ?? origin : origin);
   Origin.now = originNow;
   // What a commit of a wake's origin may not run (LLP 1133.017 D6): journaled, never run; a call's, calls.js says.
   Origin.refused = (name, from) => from === "tool" ? !!Origin.callRefuses?.(name) : from === "wake" && REFUSED.has(name) && (say(`${name}: refused: during a wake`), true);
@@ -371,7 +371,7 @@ export function modules(rows, bound = {}, views = {}, events = {}) {
   Clocked.push(() => paySheets.deadlines());
   After.push(() => paySheets.letGo());
   const reask = keys => {
-    commit(() => { const sources = new Set([...keys].map(k => byKey.get(k).source)); for (const r of Resources) if (sources.has(r.source)) R(r); }, "module");
+    commit(() => { const sources = new Set([...keys].map(k => byKey.get(k).source)); for (const r of Resources) if (sources.has(r.source)) R(r, true); }, "module");
     for (const key of keys) globalThis.exact?.announceModule?.(key); // data code's readers
   };
   // Serial ports, HID and USB devices (LLP 1133.037 §11): `devices.js`, its readers polled as a sampled source's are.

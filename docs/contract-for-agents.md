@@ -1792,6 +1792,11 @@ last twenty with their `door`:
 - `value` is what `returns` reads (null when refused), and `message` a
   sentence for the caller. The record adds `cancelled`.
 
+A refresh does not make a call `busy`: `returns` and `fails when` read a
+resource's standing value (its last answer, its placeholder, a family's
+gathered list), and `pending`, `failed`, `failure` and `current` answer at
+once.
+
 **A cancelled call.** A browser's agent aborting `execute`, or the system
 cancelling an intent's task, cancels the call (the door sends
 `{"op":"cancel","id":<call>}`). One still waiting never runs: `refused`,
