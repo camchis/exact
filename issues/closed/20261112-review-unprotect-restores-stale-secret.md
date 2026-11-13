@@ -1,6 +1,7 @@
 # Unprotect can restore an older secret and discard the latest value on reboot
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** Unprotect deletes every locked generation of the name, waiting and retrying while any delete fails, before it answers, so no boot can prefer an older generation over the plain copy.
 **Systems:** runner/src/presence.rs, native presence secret storage
 **Author:** Codex
 **Date:** 2026-11-12
