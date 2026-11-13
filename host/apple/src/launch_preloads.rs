@@ -108,7 +108,7 @@ impl LaunchPreloads {
         let previous = self
             .0
             .phase
-            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |phase| {
+            .try_update(Ordering::AcqRel, Ordering::Acquire, |phase| {
                 (phase & BEGUN == 0)
                     .then_some(phase | BEGUN | if prewarm { PREWARM } else { LAUNCHED })
             });

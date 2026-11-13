@@ -410,7 +410,7 @@ impl Core {
         };
         let budget = budget.live();
         let reserved = budget
-            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |n| {
+            .try_update(Ordering::AcqRel, Ordering::Acquire, |n| {
                 (n + count <= MAX_WORKERS).then_some(n + count)
             })
             .is_ok();
