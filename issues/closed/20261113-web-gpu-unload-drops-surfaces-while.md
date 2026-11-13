@@ -1,6 +1,7 @@
 # Web gpu_unload drops surfaces while a frame still holds their drawables
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** Web `unload` drops the module as native unload does, the open frame's drawables before their surfaces, and destroys the device after.
 **Systems:** gpu
 **Severity:** P2
 **Author:** Grok 4.7
