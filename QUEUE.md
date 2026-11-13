@@ -1155,6 +1155,7 @@ sits on that list carries the trade it would take.
 
 ## Cheap, any time
 
+- **Video Player's dark-chrome test fails on main** (2026-11-13, at 094c929de and before it): `apps/video-player`'s "the player and its controls stay dark under light preference" reports the scheme `dark` where it expects `light` (`bun host/web/build.mjs video-player-web`, then `bun test --isolate` on the app's test).
 - **Drive iOS scroll drags with a real touch** (2026-11-10): `SwipeScrollDragTests` passes on a simulator, but no `--touch platform` drive has flicked a scroller with `scrolldragstart` and `scrolldragend`. Check that a flick fires one start and one end with UIKit's velocity and target.
 
 
