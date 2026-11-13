@@ -1,6 +1,7 @@
 # Dismissing New Message leaves the next send opening a message id as a thread
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** `command("new")` answers its own `created` mutation, and the frame task opens a thread only for an id that mutation returned, so neither a dismissed New Message nor any other change can open a message id as a thread.
 **Systems:** apps/messages
 **Severity:** P1
 **Author:** Grok 4.7
