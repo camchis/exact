@@ -5,7 +5,7 @@ import { implementation } from '../web/index.js';
 const implementations = [];
 afterEach(() => { for (const impl of implementations.splice(0)) impl.destroy(); });
 
-function browser(promptStreaming, invoke = async () => ({ text: 'null' }), beforeCreate = () => {}) {
+function browser(promptStreaming, invoke = async () => ({ text: 'null' }), beforeCreate = () => {}, append = async () => {}) {
   const created = [], prompts = [], destroyed = [];
   const previous = Object.getOwnPropertyDescriptor(globalThis, 'LanguageModel');
   globalThis.LanguageModel = class {
@@ -16,6 +16,7 @@ function browser(promptStreaming, invoke = async () => ({ text: 'null' }), befor
       return {
         contextWindow: 4096,
         promptStreaming(input, options) { prompts.push({ id, input }); return promptStreaming(input, options); },
+        append(messages) { return append(id, messages); },
         destroy() { destroyed.push(id); },
       };
     }
@@ -337,3 +338,48 @@ test('an uninterrupted browser reply runs every tool and prompts with their resu
   })) }]);
   expect(created).toHaveLength(1);
 });
+
+for (const ending of ['resolves', 'rejects', 'destroy-session']) {
+  test(`an append whose browser call ${ending === 'destroy-session' ? 'is held while its session is destroyed' : ending} holds the session until it settles`, async () => {
+    const order = [], entered = Promise.withResolvers(), held = Promise.withResolvers();
+    const { impl, created } = browser(async function* (input) { order.push(`prompt ${input}`); yield 'A reply.'; }, undefined, undefined,
+      async (_, [{ content }]) => {
+        order.push(`append ${content}`);
+        if (content === 'First') {
+          entered.resolve();
+          await held.promise;
+          if (ending === 'rejects') throw new DOMException('busy', 'InvalidStateError');
+        }
+        order.push(`appended ${content}`);
+      });
+    const { id: session } = await impl.createLanguageModel({}, { origin: 'app' });
+    const first = impl.appendLanguageModel({ session, input: 'First' });
+    await entered.promise;
+    const reply = impl.prompt({ session, input: 'A question' });
+    const clone = impl.cloneLanguageModel({ session });
+    const second = impl.appendLanguageModel({ session, input: 'Second' });
+    await new Promise(setImmediate);
+    expect(order).toEqual(['append First']);
+
+    if (ending === 'destroy-session') {
+      await impl.destroyLanguageModel({ session });
+      held.resolve();
+      expect(await reply).toEqual({ error: 'AbortError' });
+      expect([await clone, await second]).toEqual([{ error: 'AbortError' }, { error: 'AbortError' }]);
+      await first;
+      expect(order).toEqual(['append First', 'appended First']);
+      return;
+    }
+    held.resolve();
+    expect(await first).toMatchObject({ id: session });
+    expect(await reply).toMatchObject({ text: 'A reply.' });
+    const copy = await clone;
+    expect(await second).toMatchObject({ id: session });
+    // A failed append leaves the browser session stale: the prompt rebuilds it with the appended input.
+    expect(order).toEqual(ending === 'resolves'
+      ? ['append First', 'appended First', 'prompt A question', 'append Second', 'appended Second']
+      : ['append First', 'prompt A question', 'append Second', 'appended Second']);
+    expect(created.map(c => c.initialPrompts)).toEqual(ending === 'resolves' ? [[]] : [[], [{ role: 'user', content: 'First' }]]);
+    expect(impl.state().sessions.find(s => s.id === copy.id).turns).toBe(2);
+  });
+}

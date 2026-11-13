@@ -1,6 +1,7 @@
 # A web language-model prompt can start before an earlier append finishes
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** Queued work that answers a promise, an append's, holds its session until that promise settles, so the next prompt, clone or append waits for it.
 **Systems:** packages/language-model/web/index.js
 **Author:** Codex
 **Date:** 2026-11-12

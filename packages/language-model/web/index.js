@@ -212,14 +212,24 @@ export function implementation({ changed, agent, now, foreground, log, invoke })
   }
   /** The calls waiting on `s`, begun in order until one generates (D6: one generation a session). */
   function nextIn(s, at) {
-    while (!s.responding && s.queue.length) s.queue.shift().go(at);
+    while (!s.responding && !s.busy && s.queue.length) s.queue.shift().go(at);
   }
-  /** `work(at)` once the session is free; `r`, the response it begins, holds the session until it ends. */
+  /** `work(at)` once the session is free; `r`, the response it begins, holds the session until it ends, and other
+   * work holds it until the promise it answers settles (an append awaits the browser's). */
   function queued(s, work, r = null) {
     return new Promise(resolve => {
       s.queue.push({
         r, cancel: () => resolve({ error: 'AbortError' }),
-        go: at => { if (r?.state === 'generating') s.responding = r; else if (r) return resolve(); resolve(work(at)); },
+        go: at => {
+          if (r?.state === 'generating') s.responding = r; else if (r) return resolve();
+          const result = work(at);
+          if (!r && typeof result?.then === 'function') {
+            s.busy = true;
+            const release = () => { s.busy = false; nextIn(s, now()); };
+            result.then(release, release);
+          }
+          resolve(result);
+        },
       });
       nextIn(s, now());
     });
