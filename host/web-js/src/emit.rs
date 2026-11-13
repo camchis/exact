@@ -343,24 +343,7 @@ pub fn emit(plan: &Plan, site_attrs: bool, dev_reload: bool) -> Result<Output, S
             slot.0
         );
         commands::locale_slot(plan, &mut body, slot.0);
-        // The format locale follows the locale slot (LLP 1054.000.003 D6),
-        // made before any initializer, which may format.
-        if let Some(format) = plan.format {
-            let records: Vec<String> = plan
-                .locales
-                .iter()
-                .map(|row| {
-                    serde_json::to_string(&[plan.str(row.name), plan.str(row.format)]).unwrap()
-                })
-                .collect();
-            let _ = write!(
-                body,
-                "$formats([{}]);const s_{}=$formatSlot(s_{});",
-                records.join(","),
-                format.0,
-                slot.0
-            );
-        }
+        commands::format_slot(plan, &mut body, slot.0);
     }
     // Slots, in order: an initializer reads only earlier slots.
     for (i, r) in plan.slots.iter().enumerate() {
