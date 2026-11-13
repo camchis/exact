@@ -138,7 +138,11 @@ export function tools(table) {
     look();
     // Each look until the dispatch commit returns takes what it issued.
     current.own = { tickets: new Set(), mutations: new Set(Mutations), adopting: true };
-    try { action()(...values); } catch { end("failed", "uncertain", "refused-commit"); return; }
+    // A refused commit puts everything back and answers false (rt.js `commit`); one whose tree update a view
+    // transition defers has already landed its writes and answers true.
+    let landed;
+    try { landed = action()(...values); } catch { landed = false; }
+    if (landed === false) { end("failed", "uncertain", "refused-commit"); return; }
     look();
     current.own.adopting = false;
   };

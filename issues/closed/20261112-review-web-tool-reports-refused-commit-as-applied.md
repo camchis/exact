@@ -1,6 +1,7 @@
 # JavaScript tools report a refused action as successfully applied
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** A tool call reads its action's commit result and ends `failed` `uncertain` `refused-commit`, as the runner does, when the commit was refused.
 **Systems:** host/web-js/calls.js, host/web-js/rt.js
 **Author:** Codex
 **Date:** 2026-11-12
