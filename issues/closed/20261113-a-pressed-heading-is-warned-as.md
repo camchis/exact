@@ -1,6 +1,7 @@
 # A pressed heading is warned as no iOS bar
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The header-bar walk classifies text role=heading as the heading even when it presses, as the kernel's bar does, so one pressed heading is the title and two are warned as two headings.
 **Systems:** contract
 **Severity:** P3
 **Author:** Grok 4.7
