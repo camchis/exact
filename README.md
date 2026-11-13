@@ -723,9 +723,10 @@ else here was admitted because a real app needed it.
   types, and share.
 - **Camera.** [`@exact/camera`](packages/camera/exact.json) shows a live viewfinder
   (`exact-camera srcObject=`) and takes still photos (`takePhoto`) on the web, iOS,
-  macOS, and Android, behind the `device.camera` grant (LLP 1133.008). It does not
-  record video from the camera or hand its frames to code, and it has no Windows,
-  Linux, tvOS, or watchOS implementation.
+  macOS, and Android, behind the `device.camera` grant (LLP 1133.008). On Android,
+  `takePhotoWithCameraApp` takes one in the phone's own camera app, which needs no
+  grant. It does not record video from the camera or hand its frames to code, and it
+  has no Windows, Linux, tvOS, or watchOS implementation.
 - **Data.** TypeScript or Rust sources, optionally on a worker. Grant-checked `fetch` and
   streams, files and SQLite (native and in the browser), Keychain secrets, and OAuth
   sign-in. A router keeps a stack per tab (LLP 1038).

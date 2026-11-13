@@ -140,6 +140,9 @@ for (const engine of engines) {
     await tap(page, 'keep');
     const kept = await until(page, 'shot', t => t.startsWith('app:/data/kept.'), 15000);
     check(engine, 'a written path gets its extension', /^app:\/data\/kept\.(jpg|png|webp) /.test(kept), kept);
+    await tap(page, 'camera-app');
+    const noApp = await until(page, 'shot-error', t => t === 'NotSupportedError');
+    check(engine, 'takePhotoWithCameraApp is NotSupportedError on the web', noApp === 'NotSupportedError', noApp);
 
     // Another camera under the same id (D1): the browser's track replaced, the app's id kept.
     // A camera that already faces the person (WebKit's mock) stays as it is.

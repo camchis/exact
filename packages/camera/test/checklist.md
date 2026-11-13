@@ -53,3 +53,10 @@ and look. Each step says what to run and what you should see.
   return, since Android may still ask, and `denied` once Open's ask was
   refused without a dialog. Tap and pinch do nothing on Android yet (hosted views take a click
   only).
+- Android, the camera app (`takePhotoWithCameraApp`), with `--bind camera`: Camera app
+  opens the phone's camera app (the fixture declares CAMERA, so while it is not
+  allowed the dialog shows first, and allowing it opens the camera app by itself);
+  take and keep a photo: the shot line names `app:/tmp/camera/N.jpg` with its size,
+  upright. Open it again and close the camera app: the shot error reads `AbortError`.
+  Deny the dialog: `NotAllowedError`, and no camera app. An app with no `device.camera`
+  line asks nothing: its manifest names no CAMERA.
