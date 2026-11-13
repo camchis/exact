@@ -1,6 +1,7 @@
 # Apple reads an exclusive-midnight all-day end as one extra day
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** Not a defect: EventKit's endDate setter stores an all-day event's end as the last second of the day containing it (an exclusive next midnight becomes 23:59:59 of that next day), so instants never reads a midnight end and a one-day event answers P1D.
 **Systems:** packages/calendar
 **Severity:** P2
 **Author:** Grok 4.7
