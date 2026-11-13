@@ -47,7 +47,7 @@ pub mod picker;
 mod resolve;
 mod retained;
 mod shape_schema;
-pub use retained::{retention_build, Kept, Retained};
+pub use retained::{check_path_reusing, retention_build, Check, Kept, Retained, Stop};
 mod properties;
 mod reach;
 mod rust;
@@ -1090,7 +1090,6 @@ fn compile_file_warned(
             fresh
         }
     };
-    retained::keep(file, &held, mapped, &checked.types, &checked.expanded);
     let analysis = contract_analyze::check_all(&checked);
     let mut lower_warnings = Vec::new();
     let result = match analysis {
@@ -1122,6 +1121,7 @@ fn compile_file_warned(
     if let Some(warned) = warned {
         warned.extend(lower_warnings.into_iter().map(CompileError::warning));
     }
+    retained::keep(file, &held, mapped, checked);
     result
 }
 

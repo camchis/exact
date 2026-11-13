@@ -164,7 +164,10 @@ pub fn package_unband(message: &str) -> String {
     theme::packages::unband(message)
 }
 /// What a design is checked against (LLP 1121 D2): the schema's roles.
-pub use theme::retained::retention_only;
+pub use theme::retained::{
+    before_view, first_refusal, offer_design_scan, retention_only, take_design_scan,
+    with_design_scan, DesignScan,
+};
 pub use theme::rows;
 pub use theme::{retention, synthetic_candidates};
 pub use warnings::{warnings, MAX_WARNINGS};
@@ -558,6 +561,9 @@ fn lower_body(
     if theme::retained::stops_at_retention() {
         return Err(Vec::new());
     }
+    if theme::retained::stops_at_refusal() && !l.errors.is_empty() {
+        return Err(Vec::new());
+    }
     l.declare_decorations(file)?;
     l.declare_atoms(file)?;
     // Styles: rows only, literal only (the parser holds the second), by name.
@@ -811,6 +817,9 @@ fn lower_body(
             view[0].span(),
         ));
     }
+    if theme::retained::stops_before_view() {
+        return Err(Vec::new());
+    }
     l.host_transforms = tags::host_transform_recipients(l, view);
     l.nodes(view, None, None, &scope, 0, None)?;
     if !l.errors.is_empty() {
@@ -952,6 +961,9 @@ impl<'a> Lowerer<'a> {
         parent_tag: Option<&str>,
     ) -> Result<(), LowerError> {
         for (order, n) in nodes.iter().enumerate() {
+            if theme::retained::stops_at_refusal() && !self.errors.is_empty() {
+                break;
+            }
             if let Err(e) = self.node(n, parent, arm, order as u32, scope, locals, parent_tag) {
                 self.errors.push(e);
             }

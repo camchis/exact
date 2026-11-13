@@ -26,7 +26,6 @@ use contract_syntax::{Attr, Component, Expr, File, Span};
 use exact_kernel::style::{roles, theme};
 use exact_kernel::{Color, ColorValue};
 use exact_tamber as tamber;
-use scan::Said;
 pub(crate) use scan::{literal_leaves, words};
 
 /// One resolved entry: the names it answers to and the colour text it
@@ -323,9 +322,7 @@ impl Lowerer<'_> {
             self.declared_fonts.clone(),
             self.font_files.clone(),
         ));
-        let mut said = Said::of(file, root, &design, &declared, &typing);
-        // The rows a design server's write check reads again (`rows`).
-        rows::note(std::mem::take(&mut said.rows));
+        let mut said = retained::scan(file, root, &design, &declared, &typing);
         // D7's retention, left for the design server before the design is
         // folded, as it does not depend on the fold.
         // A component that isn't Contract reads its params outside the views:
