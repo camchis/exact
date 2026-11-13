@@ -1,6 +1,7 @@
 # Boot-page events can replay on unrelated settled controls
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The boot swap moves a queued press, edit or focus only to the settled element of the same view, which the server names in the swap script's `data-to`, and drops it when that view is gone or hears other events.
 **Systems:** document activation, host/render/src/direct.rs, host/web-js/rt.js
 **Author:** Codex
 **Date:** 2026-11-12
