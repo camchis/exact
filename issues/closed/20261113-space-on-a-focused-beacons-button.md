@@ -1,6 +1,7 @@
 # Space on a focused Beacons button does not activate it
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** Keyup no longer prevents the default of a key whose target is a button, so Space on the focused Play, Pause or Play Again button clicks it; the proof now starts the game with Space.
 **Systems:** game
 **Severity:** P2
 **Author:** Grok 4.7
