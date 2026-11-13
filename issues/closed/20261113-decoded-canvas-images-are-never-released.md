@@ -1,6 +1,7 @@
 # Decoded canvas images are never released
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The runner's image table forgets a handle the host releases (exact_canvas_image_released), and the Apple host lets decoded canvas images go past 32 MiB, least recently drawn first, decoding again one a draw in flight still used.
 **Systems:** host/apple, canvas, runner
 **Severity:** P2
 **Author:** Claude Opus 5.5
