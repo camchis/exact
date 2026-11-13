@@ -1,6 +1,7 @@
 # Finishing one update check deletes another check's downloaded entry
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** A finishing check collects unreferenced entries and blobs only when no other check of the client is outstanding, so an older check finished first no longer deletes a newer check's verified download.
 **Systems:** update/src/client.rs, update/src/store.rs
 **Author:** Codex
 **Date:** 2026-11-12
