@@ -1,6 +1,7 @@
 # An ATX heading that ends in # drops those characters
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** An ATX heading drops a closing run of # only when a space or tab separates it from the text (CommonMark 0.31.2 §4.2), so `# C#` is the heading `C#`.
 **Systems:** apps/markdown parser
 **Severity:** P2
 **Author:** Grok 4.7
