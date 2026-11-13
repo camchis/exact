@@ -1,4 +1,6 @@
-//! Nonblocking timestamp readback, only while a canvas's perf is armed.
+//! Nonblocking timestamp readback, only while a canvas's perf is armed or a
+//! plan reads its performance snapshot (`gpuMs`). The snapshot needs only
+//! each frame's envelope, so unarmed timing keeps no samples and no trace.
 //!
 //! Each sampled frame is read back and published on its own once the GPU has
 //! run it; the gap between frames needs two consecutive rendered frames, and
@@ -56,6 +58,11 @@ pub(crate) struct GpuTiming {
     period: f64,
     error: Option<String>,
     trace: std::collections::VecDeque<(u64, usize, f64, f64)>,
+    /// The agent's perf is armed: keep samples for percentiles and the trace.
+    armed: bool,
+    /// Frame envelopes since the snapshot last took them: milliseconds
+    /// summed, how many, and the longest.
+    window: (f64, u32, f64),
 }
 
 fn ring() -> Ring {
@@ -68,7 +75,7 @@ impl GpuTiming {
     /// GPU buffers an armed canvas allocates for its timings.
     pub const BUFFERS: u64 = SLOTS as u64 + 1;
 
-    pub fn new(device: &wgpu::Device, queue: &wgpu::Queue) -> Option<Self> {
+    pub fn new(device: &wgpu::Device, queue: &wgpu::Queue, armed: bool) -> Option<Self> {
         let features = device.features();
         if !features.contains(wgpu::Features::TIMESTAMP_QUERY) {
             return None;
@@ -97,6 +104,7 @@ impl GpuTiming {
             frame: 0,
             generation: 0,
         });
+        let ring = || if armed { ring() } else { Ring::default() };
         Some(Self {
             slots,
             resolve: buffer(
@@ -113,7 +121,13 @@ impl GpuTiming {
             bloom: ring(),
             period: f64::from(queue.get_timestamp_period()) / 1_000_000.,
             error: None,
-            trace: std::collections::VecDeque::with_capacity(65536),
+            trace: if armed {
+                std::collections::VecDeque::with_capacity(65536)
+            } else {
+                Default::default()
+            },
+            armed,
+            window: Default::default(),
         })
     }
     /// Forget every sample; frames still in flight are read and discarded.
@@ -127,6 +141,7 @@ impl GpuTiming {
         self.generation += 1;
         self.previous = None;
         self.trace.clear();
+        self.window = Default::default();
     }
     pub fn poll(&mut self, device: &wgpu::Device, queue: &wgpu::Queue) {
         #[cfg(not(target_arch = "wasm32"))]
@@ -197,15 +212,18 @@ impl GpuTiming {
             let b = u64::from_ne_bytes(data[at + 8..at + 16].try_into().unwrap());
             if a > 0 && b >= a {
                 self.rings[pair].push((b - a) as f64 * self.period);
-                if self.trace.len() == 65536 {
-                    self.trace.pop_front();
+                // The snapshot reads only the envelope, below.
+                if self.armed {
+                    if self.trace.len() == 65536 {
+                        self.trace.pop_front();
+                    }
+                    self.trace.push_back((
+                        slot.frame,
+                        pair,
+                        a as f64 * self.period * 1000.,
+                        (b - a) as f64 * self.period * 1000.,
+                    ));
                 }
-                self.trace.push_back((
-                    slot.frame,
-                    pair,
-                    a as f64 * self.period * 1000.,
-                    (b - a) as f64 * self.period * 1000.,
-                ));
                 if (4..=14).contains(&pair) {
                     let s = bloom.get_or_insert((a, b));
                     *s = (s.0.min(a), s.1.max(b));
@@ -218,7 +236,12 @@ impl GpuTiming {
             self.bloom.push((b - a) as f64 * self.period);
         }
         if let Some((first, last)) = span {
-            self.envelope.push((last - first) as f64 * self.period);
+            let ms = (last - first) as f64 * self.period;
+            self.envelope.push(ms);
+            let (sum, count, max) = &mut self.window;
+            *sum += ms;
+            *count += 1;
+            *max = max.max(ms);
             // Their pass boundaries share the GPU clock; overlapping frames have zero idle.
             if let Some((frame, end)) = self.previous {
                 if frame + 1 == slot.frame {
@@ -228,6 +251,17 @@ impl GpuTiming {
             }
             self.previous = Some((slot.frame, last));
         }
+    }
+    /// Whether this timing keeps the agent's samples and trace.
+    pub fn armed(&self) -> bool {
+        self.armed
+    }
+    /// The mean and longest frame envelope read back since the last call:
+    /// how long the GPU ran each sampled frame, first pass start to last
+    /// pass end. `None` without a sample.
+    pub fn take_window(&mut self) -> Option<(f64, f64)> {
+        let (sum, count, max) = std::mem::take(&mut self.window);
+        (count > 0).then(|| (sum / f64::from(count), max))
     }
     pub fn query(&self) -> Option<&wgpu::QuerySet> {
         if self.error.is_some() {

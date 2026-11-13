@@ -690,6 +690,7 @@ impl<G: Game, P: Executor, const ASSETS: bool, H: crate::Hooks> Surface
             audio: performance::audio(self.presentation.audio_state(), self.interrupted),
             memory: (self.render.as_ref())
                 .map(|(renderer, _)| (renderer.texture_bytes(), renderer.mesh_buffer_bytes())),
+            gpu: self.gpu_timing.as_mut().and_then(|t| t.take_window()),
         };
         let report = self.perf.reporting.as_mut()?;
         report.clock(self.seekable);

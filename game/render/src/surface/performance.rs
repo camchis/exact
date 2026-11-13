@@ -27,6 +27,9 @@ pub(crate) struct Live {
     /// Device bytes of the resident delivered textures and of the shared
     /// vertex and index buffers, once the renderer exists.
     pub memory: Option<(u64, u64)>,
+    /// The mean and longest GPU execution of the frames read back since the
+    /// last snapshot, where the device has timestamp queries.
+    pub gpu: Option<(f64, f64)>,
 }
 
 /// The output's `state` as a snapshot names it: a suspension the host's
@@ -168,6 +171,9 @@ impl Report {
         if let Some(state) = live.audio {
             write!(out, ",\"audioState\":\"{state}\"").unwrap();
         }
+        if let Some((mean, max)) = live.gpu {
+            write!(out, ",\"gpuMs\":{mean},\"gpuMaxMs\":{max}").unwrap();
+        }
         if let Some((textures, geometry)) = live.memory {
             write!(
                 out,
@@ -235,6 +241,7 @@ mod tests {
             "idle",
             "textureMemoryBytes",
             "audioState",
+            "gpuMs",
         ] {
             assert!(value.get(absent).is_none(), "{absent}");
         }
@@ -246,6 +253,7 @@ mod tests {
             idle: true,
             audio: Some("running"),
             memory: Some((4096, 1024)),
+            gpu: Some((1.5, 3.)),
         };
         let value: serde_json::Value =
             serde_json::from_str(&report.take(0., &live).unwrap()).unwrap();
@@ -274,6 +282,10 @@ mod tests {
         assert_eq!(value["audioState"], "running");
         assert_eq!(value["textureMemoryBytes"], 4096);
         assert_eq!(value["geometryMemoryBytes"], 1024);
+        assert_eq!(
+            (value["gpuMs"].as_f64(), value["gpuMaxMs"].as_f64()),
+            (Some(1.5), Some(3.))
+        );
     }
 
     #[test]

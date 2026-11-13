@@ -4209,8 +4209,17 @@ Apple, Windows): `running`, `suspended` (hidden, or waiting for a gesture),
 `interrupted` (suspended by the host's interruption: a call or alarm on iOS,
 the window losing focus on Windows) or `closed` (no device: under the
 agent's virtual clock, or not yet opened); `none` on the Linux family and for
-a game without audio. `gpuMs`, `gpuMaxMs`, `cpuSubmitMs` and
-`cpuSubmitMaxMs` are not measured on any host yet and stay `none`. The 16 KiB snapshot limit is separate from the public surface
+a game without audio. `gpuMs` and `gpuMaxMs` are the mean and longest GPU
+execution of the window's frames, from the first pass's start to the last
+pass's end by GPU timestamps, read back a frame or two late: on Metal natively
+(macOS, iOS, tvOS), on the web only where the browser grants
+`timestamp-query`, and on the Linux family and Windows where the adapter has
+timestamp queries; `none` elsewhere and for a window with no sample. The
+timestamps are written only while a plan reads the resource. `cpuSubmitMs` and
+`cpuSubmitMaxMs` are the mean and longest wall time of the queue submission of
+the frames the canvas drew in the window, on every host (on Apple the
+submission also schedules the frame's presentation); a frame shared by several
+canvases is one submission, which each of them reports. The 16 KiB snapshot limit is separate from the public surface
 record's limit.
 
 A GPU HUD can show its last successful publication while its world loads:
