@@ -295,6 +295,7 @@ final class Canvas2DHost: Canvas2DEnv {
         if let g = gpus[id], g.lifetime == job.lifetime, g.generation == job.generation {
             var fonts = k.tracker.resolvedFonts
             fonts.merge(job.fonts) { _, new in new }
+            let before = k.tracker.snapshot()
             k.tracker.env = env
             for data in lists { k.tracker.trackFonts(data) }
             k.tracker.env = nil
@@ -303,17 +304,35 @@ final class Canvas2DHost: Canvas2DEnv {
             let (surface, bad) = g.replay(lists, env: gpuEnv)
             let ms = (CFAbsoluteTimeGetCurrent() - t0) * 1000
             if bad { unreadable += 1 }
-            if surface == nil { gpus[id] = nil; Canvas2DGpuModule.log("canvas gpu: canvas \(id) failed; Core Graphics draws its next bitmap") }
+            var contents: Any? = surface
+            if surface == nil {
+                // Core Graphics continues from the GPU's last pixels: the kept
+                // lists do not hold them, so they start again at a cover.
+                // The GPU keeps its own drawing state; what the tracker
+                // follows (fonts and saved levels) carries over.
+                gpus[id] = nil
+                Canvas2DGpuModule.log("canvas gpu: canvas \(id) failed; Core Graphics continues from its last pixels")
+                let r = Canvas2DReplayer(width: job.w, height: job.h, scale: job.scale, lifetime: job.lifetime, generation: job.generation, space: job.space)
+                r.continue(from: g.pixels(), state: before)
+                r.env = gpuEnv
+                for data in lists where !r.apply(data) { unreadable += 1 }
+                r.env = nil
+                withExtendedLifetime(gpuEnv) {}
+                replayers[id] = r
+                k.drop()
+                k.recording = false
+                contents = r.image()
+            }
             DispatchQueue.main.async { [weak self] in
                 guard let self else { return }
                 self.pending -= 1
                 for _ in 0..<unreadable { self.errors.append("canvas \(id): unreadable list") }
-                guard let surface, self.sequence[id] != nil, job.seq >= self.born[id] ?? .max, job.seq > self.shown[id] ?? 0,
+                guard let contents, self.sequence[id] != nil, job.seq >= self.born[id] ?? .max, job.seq > self.shown[id] ?? 0,
                       let layer = self.layers[id] else { return }
                 self.shown[id] = job.seq
-                layer.contents = surface
+                layer.contents = contents
                 self.recorders[id]?.hide()
-                Canvas2DStats.shown(gpu: true, recorded: false, ms: ms)
+                Canvas2DStats.shown(gpu: surface != nil, recorded: false, ms: ms)
             }
             return
         }
