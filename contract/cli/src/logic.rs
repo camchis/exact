@@ -97,7 +97,7 @@ pub fn native_storage_constructor(
 }
 
 /// A Linux app's whole `entry.rs`: [`rust_entry`], its `launch_parts()`, its
-/// `hatches` and a `main` that runs the parts before `host` (`exact_linux` or
+/// `hatches` and a `main` that runs the parts before `host` (`exact_painted` or
 /// `exact_linux_update`) starts with `run` (both from
 /// `native::rust_hatch_entry`). Run from the app's Linux build script.
 pub fn linux_entry(
@@ -166,14 +166,14 @@ fn launch_parts() -> Result<String, String> {
             file.canonicalize().map_err(|e| e.to_string())?
         ));
         calls.push_str(&format!(
-            "    {ident}::launch(exact_linux::journal::LaunchContext::new({name:?}, {config:?}, {app:?}, COMPAT));\n"
+            "    {ident}::launch(exact_painted::journal::LaunchContext::new({name:?}, {config:?}, {app:?}, COMPAT));\n"
         ));
     }
     if calls.is_empty() {
         return Ok("fn launch_parts() {}\n".into());
     }
     Ok(format!(
-        "{mods}fn launch_parts() {{\n    let started = std::time::Instant::now();\n{calls}    exact_linux::journal::launch_parts_ran(started.elapsed());\n}}\n"
+        "{mods}fn launch_parts() {{\n    let started = std::time::Instant::now();\n{calls}    exact_painted::journal::launch_parts_ran(started.elapsed());\n}}\n"
     ))
 }
 

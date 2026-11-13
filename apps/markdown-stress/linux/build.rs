@@ -30,7 +30,7 @@ fn main() {
         .unwrap_or_else(|e| panic!("compatibility id: {e}"));
     std::fs::write(out_dir.join("compat.json"), compat.to_json()).unwrap();
     let host = if compat.inputs["store"]["L"] == "0" {
-        "exact_linux"
+        "exact_painted"
     } else {
         "exact_linux_update"
     };
@@ -51,11 +51,11 @@ fn main() {
                 std::process::exit(2);
             }}
         }};
-        let region = exact_linux::content_region::ContentRegionRegistration {{
+        let region = exact_painted::content_region::ContentRegionRegistration {{
             activate: Some(activate), owner: \"markdown-region-owner\",
             content: \"markdown-region-content\", pending: \"markdown-region-pending\",
         }};
-        std::process::exit(exact_linux::app::run_with_content_region::<markdown_stress_data::NativeMarkdownStress>(PLAN, COMPAT, region));
+        std::process::exit(exact_painted::app::run_with_content_region::<markdown_stress_data::NativeMarkdownStress>(PLAN, COMPAT, region));
     }}
     std::process::exit({host}::{run});
 }}\n",

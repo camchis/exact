@@ -10,5 +10,5 @@ fn embedded_data() -> ExactEmbeddedData {
 }
 include!(concat!(env!("OUT_DIR"), "/logic.rs"));
 fn main() {
-    std::process::exit(exact_linux::run::<AppData>(PLAN, COMPAT));
+    std::process::exit(exact_painted::run::<AppData>(PLAN, COMPAT));
 }

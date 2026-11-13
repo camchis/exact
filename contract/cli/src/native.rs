@@ -132,10 +132,10 @@ pub fn write_desktop_hatches(
     let app_root =
         std::fs::canonicalize(app_root).map_err(|e| format!("{}: {e}", app_root.display()))?;
     let manifest = Manifest::read(&app_root)?;
-    let install = "Option<::exact_linux::hatches::Install>";
+    let install = "Option<::exact_painted::hatches::Install>";
     let text = match watched_rust_hatches(&app_root, &manifest, hatch_platform(target))? {
         Some(rust) => format!(
-            "{rust}fn exact_hatches() -> {install} {{\n    Some(::exact_linux::hatches::install::<hatches::ExactHatches>(HatchKey::WORDS))\n}}\n"
+            "{rust}fn exact_hatches() -> {install} {{\n    Some(::exact_painted::hatches::install::<hatches::ExactHatches>(HatchKey::WORDS))\n}}\n"
         ),
         None => format!("fn exact_hatches() -> {install} {{\n    None\n}}\n"),
     };
@@ -186,10 +186,10 @@ pub fn android_entry(
     plan: &exact_plan::Plan,
     out_dir: &Path,
 ) -> Result<(), String> {
-    let install = "Option<::exact_linux::hatches::Install>";
+    let install = "Option<::exact_painted::hatches::Install>";
     let text = match watched_rust_hatches(app_root, manifest, "android")? {
         Some(rust) => format!(
-            "{rust}fn exact_hatches() -> {install} {{\n    Some(::exact_linux::hatches::install_with_reader::<hatches::ExactHatches>(HatchKey::WORDS))\n}}\n"
+            "{rust}fn exact_hatches() -> {install} {{\n    Some(::exact_painted::hatches::install_with_reader::<hatches::ExactHatches>(HatchKey::WORDS))\n}}\n"
         ),
         None => {
             let words = hatches_on(manifest, "android")?;
@@ -197,7 +197,7 @@ pub fn android_entry(
                 format!("fn exact_hatches() -> {install} {{\n    None\n}}\n")
             } else {
                 format!(
-                    "fn exact_hatches() -> {install} {{\n    Some(::exact_linux::hatches::install_with_reader::<()>(&{words:?}))\n}}\n"
+                    "fn exact_hatches() -> {install} {{\n    Some(::exact_painted::hatches::install_with_reader::<()>(&{words:?}))\n}}\n"
                 )
             }
         }

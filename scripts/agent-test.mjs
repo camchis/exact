@@ -159,7 +159,7 @@ export const pickHint = (host) => host === 'web'
   ? '; first tap the visible file input or a button whose action calls showPicker("<input id>")'
   : '; first tap a button whose action calls showPicker("<input id>"); the file input needs id as well as testId';
 
-/** Where a native host keeps a drive's scratch stores (host/apple and host/linux `configure_storage`), or
+/** Where a native host keeps a drive's scratch stores (host/apple and host/painted `configure_storage`), or
  * null where the driver cannot reach them: an iOS simulator's are in its app container and go with the app. */
 export function storeBase(appId, host, env = process.env, home = homedir()) {
   if (host === 'macos' || host === 'mac') return resolve(home, 'Library/Caches/exact', appId, 'agent');

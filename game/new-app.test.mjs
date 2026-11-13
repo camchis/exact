@@ -662,7 +662,7 @@ test('a new app refuses a name no host crate can carry, and a directory that is 
   try {
     assert.throws(() => createApp(resolve(parent, 'Field_Log')), /lowercase-hyphenated/);
     assert.throws(() => createApp(resolve(parent, 'field-web')), /no host suffix/);
-    // A folder named after the SDK would write exact-apple, exact-linux and exact-web beside exact2's own.
+    // A folder named after the SDK would write exact-apple, exact-painted and exact-web beside exact2's own.
     assert.throws(() => createApp(resolve(parent, 'exact')), {
       message: `exact new ${resolve(parent, 'exact')}: the folder's name exact would make the crate exact-apple, which is one of exact2's own; name the app directory something else, e.g. exact new ${resolve(parent, 'exact-app')}`,
     });
@@ -731,7 +731,7 @@ test('a sibling app\'s generated workspace resolves every host dependency from e
     if (result.status !== 0) return assert.deepEqual(readFileSync(resolve(workspace, 'Cargo.lock')), readFileSync(resolve(root, 'Cargo.lock')));
     const packages = JSON.parse(result.stdout).packages;
     assert.deepEqual(packages.map(p => p.name).sort(), [`${basename(dir)}-apple`, `${basename(dir)}-linux`, `${basename(dir)}-web`]);
-    const paths = { 'ibex2-sqlite': 'vendor/ibex/crates/ibex2-sqlite', 'exact-logic': 'logic', 'exact-apple': 'host/apple', 'exact-apple-update': 'host/apple-update', 'exact-linux': 'host/linux', 'exact-web': 'host/web', 'exact-web-capabilities': 'host/web-capabilities', 'exact-js': 'js', 'exact-js-web': 'js/web', 'exact-js-bake': 'js/bake' };
+    const paths = { 'ibex2-sqlite': 'vendor/ibex/crates/ibex2-sqlite', 'exact-logic': 'logic', 'exact-apple': 'host/apple', 'exact-apple-update': 'host/apple-update', 'exact-painted': 'host/painted', 'exact-web': 'host/web', 'exact-web-capabilities': 'host/web-capabilities', 'exact-js': 'js', 'exact-js-web': 'js/web', 'exact-js-bake': 'js/bake' };
     for (const pkg of packages) for (const dep of pkg.dependencies) {
       assert.equal(realpathSync(dep.path), realpathSync(resolve(root, paths[dep.name])), `${pkg.name}: ${dep.name}`);
     }
@@ -843,7 +843,7 @@ test('a native verb names its platform, and the generated workspace follows app.
     assert.match(android, /^crate-type = \["cdylib"\]$/m);
     assert.match(android, /^\[target\.'cfg\(target_os = "android"\)'\.dependencies\]\nibex2-sqlite = [^\n]+\nexact-logic = /m);
     assert.match(readFileSync(resolve(first.workspace, 'android/build.rs'), 'utf8'), /exact_js_bake::build_android\(std::path::Path::new\("\.\.\/\.\.\/\.\."\)\)/);
-    assert.match(readFileSync(resolve(first.workspace, 'android/src/lib.rs'), 'utf8'), /exact_linux::canvas_jni!\(super::AppData, hatches = crate::android::exact_hatches\(\)\);/);
+    assert.match(readFileSync(resolve(first.workspace, 'android/src/lib.rs'), 'utf8'), /exact_painted::canvas_jni!\(super::AppData, hatches = crate::android::exact_hatches\(\)\);/);
     assert.ok(!existsSync(resolve(dir, 'Cargo.toml')) && !existsSync(resolve(dir, 'linux')), 'nothing Rust in the author\'s tree');
     // resolveApp takes the generated workspace, with the target at the app, when nothing authored one (and no
     // CARGO_TARGET_DIR names another, as a run with its own target directory does).
@@ -904,7 +904,7 @@ test('an authored app gains a Linux crate on update and loses it with --without 
     assert.equal(members(readFileSync(manifest, 'utf8')), members(copied));
     const linux = readFileSync(resolve(dir, 'linux/Cargo.toml'), 'utf8');
     assert.match(linux, /^name = "field-log-linux"$/m);
-    assert.match(linux, /^exact-linux = \{ path = "[^"]*host\/linux" \}$/m);
+    assert.match(linux, /^exact-painted = \{ path = "[^"]*host\/painted" \}$/m);
     assert.match(readFileSync(resolve(dir, 'linux/build.rs'), 'utf8'), /Path::new\("\.\."\)/);
     assert.match(readFileSync(manifest, 'utf8'), /^members = \["apple", "linux", "web"\]$/m);
     assert.doesNotMatch(createApp(dir, { update: true }), /linux\/ host crate/, 'a second update leaves it');

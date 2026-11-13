@@ -1,12 +1,12 @@
 // The Android carrier (LLP 1107): an app's Linux host built for a phone's ABI
 // (`aarch64-linux-android`, the host's Android-gated code, bionic, the phone's
 // own fonts) and run headless under `adb shell`, where the agent protocol is
-// the Linux host's own (LLP 1012 over stdio, `host/linux/src/agent.rs`). It
+// the Linux host's own (LLP 1012 over stdio, `host/painted/src/agent.rs`). It
 // drives the app's runner, kernel and painter on Android; it is not the Canvas
 // reader (LLP 1076 §3.3, `host/android`), which paints through its own Kotlin
 // view. `--reader` drives that one instead (LLP 1107 D1): the APK, installed
 // and launched, answering the same protocol in its own process
-// (`host/linux/src/canvas/agent.rs`) over a socket adb forwards.
+// (`host/painted/src/canvas/agent.rs`) over a socket adb forwards.
 //
 //   bun scripts/agent-android.mjs build <app>              build the app's Linux crate for Android
 //   bun scripts/agent.mjs android --app <app> …            drive it on the first adb device or emulator
@@ -197,7 +197,7 @@ export function androidDeploy(app, bin, env) {
   if (existsSync(resolve(app.dir, 'assets'))) run(['push', resolve(app.dir, 'assets'), `${dir}/`], 'push the assets');
   const vars = Object.fromEntries(Object.entries(env).filter(([k]) => k.startsWith('EXACT_')));
   // A local plan (`--plan`) is read on the device: copied there with the replacement Rust module the host
-  // reads beside it (`rust/`, host/linux/src/delivery.rs), or the baked plan or logic would run instead.
+  // reads beside it (`rust/`, host/painted/src/delivery.rs), or the baked plan or logic would run instead.
   if (vars.EXACT_PLAN && existsSync(vars.EXACT_PLAN)) {
     const plan = resolve(vars.EXACT_PLAN), rust = resolve(dirname(plan), 'rust');
     run(['push', plan, `${dir}/${basename(plan)}`], 'push the plan');
@@ -903,7 +903,7 @@ export function stageGpuLibraries(libraries, jniLibs) {
   return libraries.length ? [`-PgpuModules=${libraries.map((library) => basename(library)).join(',')}`] : [];
 }
 
-/** The app on the Canvas reader, as an APK: its `android/` crate (a cdylib over `exact_linux::canvas_jni!`; a game's
+/** The app on the Canvas reader, as an APK: its `android/` crate (a cdylib over `exact_painted::canvas_jni!`; a game's
  * is generated under `.shells/`) built for the phone's ABI and put, with the app's assets and its icon and banner
  * (`androidIcons`), where the Gradle shell packages them (host/android/app), then `:app:assembleRelease`. An app with
  * GPU modules (LLP 1009) is built as a Linux bake is (`buildBake`): the modules first, then the library with their
