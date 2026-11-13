@@ -1,6 +1,7 @@
 # Concurrent harness queue pumps can start two workers for one turn
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The pump checks that no turn runs, takes the next prompt and installs its turn under one lock, and hands that turn to its worker, so racing pumps start each prompt once and in queue order.
 **Systems:** harness agent, prompt queue, turn ownership
 **Author:** Codex
 **Date:** 2026-11-12
