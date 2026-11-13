@@ -1,6 +1,7 @@
 # A web speech cancel starts the next utterance in the same turn
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** When an utterance ends (its `end`, its `error`, or a drop that cancels it), the next one is given to `speechSynthesis.speak` on a later turn, and only if it is still the one speaking then.
 **Systems:** packages/speech-synthesis
 **Severity:** P1
 **Author:** Grok 4.7
