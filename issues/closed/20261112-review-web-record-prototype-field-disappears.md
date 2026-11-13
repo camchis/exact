@@ -1,6 +1,7 @@
 # JavaScript type descriptors lose a record field named __proto__
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** A record field named `__proto__` is emitted as a computed key, so every JavaScript type descriptor holds it as an own field.
 **Systems:** host/web-js/src/type_descriptors.rs, host/web-js/src/emit.rs, host/web-js/ts-data.js
 **Author:** Codex
 **Date:** 2026-11-12

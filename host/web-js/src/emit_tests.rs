@@ -1442,3 +1442,30 @@ fn delivery_version_fields_are_emitted_for_baked_and_unbaked_plans() {
         assert!(js.contains(r#"["version","buildNumber"]"#), "{js}");
     }
 }
+
+#[test]
+fn a_record_field_named_proto_is_an_own_descriptor_field() {
+    let mut b = exact_plan::builder::PlanBuilder::new(0, 0);
+    let s = b.primitive(exact_plan::TypeKind::String);
+    let inner = b.record("Inner", &[("__proto__", s)]);
+    let record = b.record("Row", &[("__proto__", s), ("label", s), ("inner", inner)]);
+    let plan = b.finish().unwrap();
+    for descriptor in [
+        crate::emit::type_json(&plan, record),
+        crate::emit::surface_type_json(&plan, record),
+    ] {
+        let script = format!(
+            "const t={descriptor},keys=JSON.stringify([Object.keys(t),Object.keys(t.inner)]);
+             if(keys!=='[[\"__proto__\",\"label\",\"inner\"],[\"__proto__\"]]')throw Error(keys);"
+        );
+        let out = std::process::Command::new("bun")
+            .args(["--eval", &script])
+            .output()
+            .unwrap();
+        assert!(
+            out.status.success(),
+            "{}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+    }
+}
