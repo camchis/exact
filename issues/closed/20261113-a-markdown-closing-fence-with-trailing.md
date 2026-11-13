@@ -1,6 +1,7 @@
 # A Markdown closing fence with trailing space stays open
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** A line closes a fenced code block when it is the fence marker at least as long as the opener followed only by spaces or tabs (CommonMark 0.31.2 §4.5).
 **Systems:** apps/markdown parser
 **Severity:** P2
 **Author:** Grok 4.7

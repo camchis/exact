@@ -482,9 +482,10 @@ fn code_block(
         }
         let line = lines[i];
         let trimmed = line.trim_start();
-        if trimmed.chars().take_while(|&c| c == marker).count() >= width
-            && trimmed.trim_end_matches(marker).is_empty()
-        {
+        // The marker at least as long as the opener's, then only spaces or
+        // tabs (CommonMark 0.31.2 §4.5).
+        let run = trimmed.chars().take_while(|&c| c == marker).count();
+        if run >= width && trimmed[run..].trim_matches([' ', '\t']).is_empty() {
             i += 1;
             break;
         }

@@ -520,6 +520,23 @@ fn fenced_code_keeps_its_text_and_never_parses_it() {
     );
 }
 
+/// CommonMark 0.31.2 §4.5: a closing fence "may be followed only by spaces or
+/// tabs, which are ignored".
+#[test]
+fn a_closing_fence_may_end_in_spaces_or_tabs() {
+    for source in ["```\ncode\n``` \nnext\n", "~~~~\ncode\n~~~~~\t \nnext\n"] {
+        let doc = here(source);
+        assert_eq!(doc.blocks.len(), 2, "{source:?}");
+        assert_eq!(doc.blocks[0].kind, Kind::Code, "{source:?}");
+        assert_eq!(doc.blocks[0].text, "code", "{source:?}");
+        assert_eq!(plain(&doc.blocks[1].runs), "next", "{source:?}");
+    }
+    // Anything else after the marker leaves the line inside the block.
+    let doc = here("```\ncode\n``` x\n```\n");
+    assert_eq!(doc.blocks.len(), 1);
+    assert_eq!(doc.blocks[0].text, "code\n``` x");
+}
+
 /// A fence's indentation is spaces and tabs, removed from each line up to
 /// its width; leading Unicode spaces are the code's own.
 #[test]
