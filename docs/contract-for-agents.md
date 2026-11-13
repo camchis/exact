@@ -3217,7 +3217,8 @@ main navigationKey=`${top(nav).id}` navigationBack="back" navigate=follow displa
   panel's `for e in t.stack` like the others, and is presented over the tabs; with
   tabs the root's own children are no routes, and one with a `navigationKey` is refused.
 - On iOS the panels become a `UITabBarController`: a tab of one symbol over its label
-  is its bar item, a filled box holding a text is the item's badge, and the
+  is its bar item, a filled box holding a text is the item's badge (the tab stays the
+  platform's tab; the web draws the box as a badge on the symbol), and the
   tablist's `accent-color` (inherited, as in CSS) tints the selected item; `tap tab-…`
   works on every host. An app's `bun exact.mjs agent ios` and `test ios` drive what a
   person sees (`--chrome platform`; `--chrome agent` paints the authored tablist and
