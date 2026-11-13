@@ -13,8 +13,11 @@ final class ButtonMeasureCache: @unchecked Sendable {
     private let lock = NSLock()
     private var appearance = NSAppearance(named: .aqua)!
     private var traits = FieldChromeCache.Traits(appearance: NSAppearance.Name.aqua.rawValue, scale: 1)
-    private var entries: [Key: ExactButtonMeasure] = [:]
+    /// Each title, offer and kind at the current traits, within a budget: a
+    /// session's history of faces is not kept.
+    private var entries = RecentMeasures<Key, ExactButtonMeasure>(entries: 256, bytes: 128 << 10) { key, _ in key.face.count }
     private(set) var misses = 0
+    var retained: (entries: Int, bytes: Int) { lock.lock(); defer { lock.unlock() }; return entries.retained }
     @discardableResult
     func configure(_ next: NSAppearance, scale: CGFloat) -> Bool {
         precondition(Thread.isMainThread)
@@ -22,19 +25,21 @@ final class ButtonMeasureCache: @unchecked Sendable {
         lock.lock(); defer { lock.unlock() }
         let changed = traits != nextTraits
         appearance = next; traits = nextTraits
+        // Measurements at the old traits answer no key from now on.
+        if changed { entries.removeAll() }
         return changed
     }
     func answer(face data: Data, widthKind: UInt8, width: Float) -> ExactButtonMeasure {
         lock.lock()
         let current = appearance, currentTraits = traits
         let key = Key(face: data, widthKind: widthKind, width: width, traits: currentTraits)
-        if let exact = entries[key] { lock.unlock(); return exact }
+        if let exact = entries.value(key) { lock.unlock(); return exact }
         misses += 1
         lock.unlock()
         let measured = Owner.shared.callMain {
             self.measure(ButtonFace(json: data), widthKind: widthKind, width: CGFloat(width), appearance: current, scale: currentTraits.scale)
         }
-        lock.lock(); entries[key] = measured; lock.unlock()
+        lock.lock(); entries.insert(key, measured); lock.unlock()
         var provisional = measured; provisional.provisional = 1
         return provisional
     }

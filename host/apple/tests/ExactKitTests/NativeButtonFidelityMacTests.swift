@@ -312,6 +312,28 @@ final class NativeButtonFidelityMacTests: XCTestCase {
             XCTAssertEqual(cache.answer(face: plain, widthKind: 0, width: 100).provisional, 0)
         }
     }
+    /// Titles and widths a session has stopped asking for are released; a
+    /// face its layouts keep asking for stays measured.
+    func testTheCacheKeepsRecentFacesWithinItsBudget() throws {
+        let cache = ButtonMeasureCache()
+        cache.configure(NSAppearance(named: .aqua)!, scale: 1)
+        let live = try data(title: "Live")
+        func ask(_ face: Data, _ width: Float, step: Int) {
+            _ = cache.answer(face: face, widthKind: 0, width: width)
+            guard step % 50 == 0 else { return }
+            let misses = cache.misses
+            _ = cache.answer(face: live, widthKind: 0, width: 100)
+            if step > 0 { XCTAssertEqual(cache.misses, misses, "the live face at step \(step)") }
+        }
+        for n in 0..<1_000 { ask(try data(title: "Title \(n)"), 100, step: n) }
+        for n in 0..<1_000 { ask(try data(title: "Title"), 100 + Float(n), step: n) }
+        let face = try data(title: "Title 1000").count
+        let (entries, bytes) = cache.retained
+        XCTAssertLessThanOrEqual(entries, 2 * 257, "two generations of 256, and the one that passed it")
+        XCTAssertLessThanOrEqual(bytes, entries * face)
+        XCTAssertTrue(cache.configure(NSAppearance(named: .darkAqua)!, scale: 1))
+        XCTAssertEqual(cache.retained.entries, 0, "a change of traits releases the old measurements")
+    }
     func testColdLaunchAndNewFaceAfterLaunchPublishOnlyExactGeometry() throws {
         let win = makeWindow(), session = ExactApp.shared.makeSession(label: "new-button-measure")
         defer { session.destroy() }

@@ -1,6 +1,7 @@
 # Apple button measurement caches retain every face and width for the session
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** Both Apple button measurement caches keep two bounded generations of recent answers, release them on a change of traits, and no longer store each count's derived answer.
 **Systems:** host/apple
 **Author:** Codex
 **Date:** 2026-11-12
