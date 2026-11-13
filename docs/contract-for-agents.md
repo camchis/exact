@@ -2205,10 +2205,13 @@ forward"`, the default, `"back"`, `"forward"` or `"none"`): on the Mac a way wit
 no swipe, menu item or mouse button (`contract vocab navigationHistory`). A route whose scroller opens
 with a full-bleed picture says `navigationBar="transparent"`: iOS draws its bar clear at
 the scroller's top and insets nothing, so the picture sits under the bar as under a fixed
-transparent header on the web, and the bar's material comes as the content scrolls. A route
-that does not scroll (a game's canvas at `inset=0`, `width="100%" height="100%"`) is
+transparent header on the web, and the bar's material comes as the content scrolls.
+Place foreground controls below it with `top="var(--exact-safe-area-inset-top)"`
+or that value as padding on the hero's content. This reads the route's safe area,
+including its bar; `env(safe-area-inset-top)` stays 0 under `viewport-fit="auto"`.
+A route that does not scroll (a game's canvas at `inset=0`, `width="100%" height="100%"`) is
 likewise drawn from the screen's top edge, its bar items floating over it. On a pushed iOS
-route under the platform bar, that control's text becomes the bar's back button title
+route under the platform bar, the declared Back control's text becomes the bar's back button title
 beside the bar's own chevron (no text shows the chevron alone), so label it `Recipes`,
 not `‹ Recipes`. With no such control the back button is UIKit's default, which since
 iOS 26 is the chevron alone, the previous title unshown, as in a hand-built app; a title
