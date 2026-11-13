@@ -1,6 +1,7 @@
 # Cancel during camera open leaves the photo session running
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** show stops a stream that arrives after the camera route is gone instead of holding it, and flip changes facing only in the then of its own applyConstraints, from the facing the track reports.
 **Systems:** apps/photo-editor
 **Severity:** P2
 **Author:** Grok 4.7
