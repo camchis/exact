@@ -1,6 +1,7 @@
 # A shorter param name is blamed for a longer one's use
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** `reached` matches whole param tokens, as `unused` does, and reports each param whose token occurs.
 **Systems:** contract
 **Severity:** P2
 **Author:** Grok 4.7
