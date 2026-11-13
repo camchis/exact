@@ -1,6 +1,7 @@
 # Android biometric Cancel leaves authentication pending
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The negative button's listener answers USER_CANCEL and drops the prompt's signal, through one guard shared with success, error and refusal so each prompt answers once.
 **Systems:** Local authentication Android implementation
 **Author:** Codex
 **Date:** 2026-11-12
