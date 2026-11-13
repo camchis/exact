@@ -77,6 +77,8 @@ fn a_runs_edges_take_room_beside_its_text() {
     // with none before it, is the line's start.
     let started = glyphs(&mut e, &spec(&[("1", 0.0, 0.0), ("The", 3.0, 0.0)]), None);
     assert!((x(&started, 0, 1) - x(&a, 0, 1) - 3.0).abs() < 0.05);
+    // The glyphs after it move by the room once, not again.
+    assert!((x(&started, 0, 2) - x(&a, 0, 2) - 3.0).abs() < 0.05);
     let first = glyphs(&mut e, &spec(&[("1", 6.0, 0.0), ("The", 0.0, 0.0)]), None);
     assert!((x(&first, 0, 0) - x(&a, 0, 0) - 6.0).abs() < 0.05);
 }
@@ -112,4 +114,32 @@ fn a_start_at_a_break_starts_the_next_line() {
         .measure(&spec(&[("bbbb", 0.0, 0.0)]), AxisOffer::MaxContent)
         .width;
     assert!((min - (word + 20.0)).abs() < 0.05, "{min} {word}");
+}
+
+/// Between two CJK characters, where a line can break with no space before
+/// the run, the room still goes to the next line with the run's text, as in
+/// Chrome 154: `中文<span style="padding-left:20px">中文</span>` at 2.5em
+/// puts "中文" on the first line and the span's text 20 px into the second.
+#[test]
+fn a_start_after_a_character_that_is_no_space_moves_with_its_text() {
+    let mut e = engine();
+    let pair = e
+        .measure(&spec(&[("中文", 0.0, 0.0)]), AxisOffer::MaxContent)
+        .width;
+    let padded = spec(&[("中文", 0.0, 0.0), ("中文", 20.0, 0.0)]);
+    let g = glyphs(&mut e, &padded, Some(pair + 4.0));
+    assert_eq!(
+        g.iter().filter(|g| g.0 == 0).map(|g| g.1).max(),
+        Some(3),
+        "the first line keeps both of its characters: {g:?}"
+    );
+    let bare = glyphs(
+        &mut e,
+        &spec(&[("中文", 0.0, 0.0), ("中文", 0.0, 0.0)]),
+        Some(pair + 4.0),
+    );
+    assert!(
+        (x(&g, 1, 6) - x(&bare, 1, 6) - 20.0).abs() < 0.05,
+        "{g:?} {bare:?}"
+    );
 }

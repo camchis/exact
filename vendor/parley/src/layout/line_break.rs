@@ -969,21 +969,11 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             is_scope_line ^ self.layout.data.indent_options.hanging
         };
 
-        let amount = if should_indent {
+        if should_indent {
             self.layout.data.indent_amount
         } else {
             0.0
-        };
-        // Patch 18: a line that starts where an inline box's padding goes.
-        if self.layout.data.line_starts.is_empty() {
-            return amount;
         }
-        let start = self
-            .layout
-            .data
-            .cluster_text_start(self.state.line.clusters.start)
-            .unwrap_or(0);
-        amount + self.layout.data.line_start(start)
     }
 
     /// UAX #9 rule L1: whitespace at the end of a line takes the paragraph's

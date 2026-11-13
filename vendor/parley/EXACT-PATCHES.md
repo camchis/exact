@@ -124,12 +124,15 @@ named here pass.
     beside its text (expo/exact#389). `Layout::add_advance_after` adds
     advance to the cluster holding a text index and its last glyph, as
     letter spacing does, without splitting the shaping run.
-    `Layout::set_line_starts` indents a line that starts at a given text
-    index (`resolve_indent`), and `calculate_content_widths` starts a
-    segment there with it: a span's start padding after a space goes to
-    the next line with its text when the line breaks before it, as in
-    Chrome. `Line::indent` reads a line's indent. Nothing changes for a
-    layout that calls neither.
+    `Layout::add_lead` adds advance to the cluster holding a text index and
+    none to its glyphs, which the host draws past it: line breaking and
+    `calculate_content_widths` then keep a span's start room with its first
+    cluster, so it goes to the next line with its text wherever the line
+    breaks before it, after a space or between two CJK characters, as in
+    Chrome. `RangedBuilder::push_shaping_break` starts a new shaping run at
+    a text index (`shape_text`), so a ligature or kerning pair never joins
+    characters a box's room separates. Nothing changes for a layout that
+    calls none of the three.
 
 `Cargo.toml` also carries the empty `[workspace]` boundary described below;
 retain it when updating. All remaining archive files are byte-for-byte upstream.

@@ -175,18 +175,20 @@ impl<B: Brush> Layout<B> {
     }
 
     /// Exact patch 18: `amount` more advance after the cluster holding text
-    /// byte `index` (an inline box's padding beside its text). Call before
+    /// byte `index` (an inline box's end padding after its text). Call before
     /// breaking lines; a new layout starts without it.
     pub fn add_advance_after(&mut self, index: usize, amount: f32) {
         self.data.add_advance_after(index, amount);
     }
 
-    /// Exact patch 18: a line that starts at text byte `index` is indented
-    /// `amount` more, for each pair (sorted by index): an inline box's start
-    /// padding before its text, where a line breaks before the box. Call
-    /// before breaking lines.
-    pub fn set_line_starts(&mut self, starts: Vec<(usize, f32)>) {
-        self.data.line_starts = starts;
+    /// Exact patch 18: `amount` more advance before the cluster holding text
+    /// byte `index` (an inline box's start padding before its text), kept
+    /// with that cluster where a line breaks, as Chrome keeps a `<span>`'s
+    /// padding with its text. It is the cluster's, not its glyphs': a host
+    /// placing glyphs itself draws them that much on. Call before breaking
+    /// lines.
+    pub fn add_lead(&mut self, index: usize, amount: f32) {
+        self.data.add_lead(index, amount);
     }
 
     /// Returns line breaker to compute lines for the layout.
