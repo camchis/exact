@@ -37,7 +37,7 @@ import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { pageAim, pagePoint, pageOutside } from './agent-aim.mjs';
-import { fileDrag, driverFiles } from './agent-drag.mjs';
+import { fileDrag, driverFiles, pageContact } from './agent-drag.mjs';
 import {
   MalformedOperation,
   cdpKey,
@@ -732,6 +732,7 @@ async function openWebUnlocked({
             // runner's clock makes the DOM event's timeStamp that clock,
             // independent of how long the carrier took between operations.
             const t = ((await evaluate('performance.timeOrigin')) + (await ask({ op: 'tags' })).clock) / 1000;
+            if (!mouse) await evaluate(`(${pageContact})('start', ${JSON.stringify({ x: px, y: py })})`);
             if (mouse) {
               await button('mouseMoved', { x: px, y: py }, t, 0);
               await button('mousePressed', { x: px, y: py }, t, 1);
@@ -776,7 +777,8 @@ async function openWebUnlocked({
           const at = [contact.x, contact.y];
           contact = null;
           await frame();
-          return { phase: kind, at, delivery: 'platform' };
+          const note = mouse ? null : await evaluate(`(${pageContact})('finish')`);
+          return { phase: kind, at, delivery: 'platform', ...(note ? { note } : {}) };
         }
         if (kind === 'pinch') {
           // two fingers spread from d to d·scale about the middle (LLP 1057.001 §5)
