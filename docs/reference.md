@@ -2001,7 +2001,9 @@ logic ABI refuse a request that has it, by name.
 A stream's request is never sent at build, so an option the host refuses on one
 (`exactTimeout` on a stream, `exactIdleTimeout` out of range) does not
 fail a native build: the resource shows its placeholder and fails at launch
-with that error, as on the web. An error the source throws itself still
+with that error, as on the web. The native build warns once per resource and
+refusal, naming the rejected option. Valid streams and ordinary storage or native
+module deferrals produce no warning. An error the source throws itself still
 fails the build.
 
 A long poll, a request the server holds until something changes, says so with

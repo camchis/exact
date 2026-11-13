@@ -1086,11 +1086,20 @@ impl<D: DataSource> Runner<D> {
                             self.resources[i].watching = self.store.take_topics();
                             match answer {
                                 Err(RunnerError::Data {
-                                    error: DataError::DeferredAtBake(_),
-                                    ..
+                                    resource,
+                                    error: DataError::DeferredAtBake { message, warning },
                                 }) => {
-                                    // Storage belongs to the launched app. A bake has no
-                                    // request to dispatch: activation asks this source again.
+                                    if warning {
+                                        let warning = format!(
+                                            "warning [deferred-at-bake] resource `{resource}`: {message}; \
+                                             keeping its placeholder until launch, where this option is refused"
+                                        );
+                                        if !self.bake_warnings.contains(&warning) {
+                                            self.bake_warnings.push(warning);
+                                        }
+                                    }
+                                    // A bake has no request to dispatch: activation
+                                    // asks this source again, including refused options.
                                     let Some(value) = self.placeholder(i, &row, &resources) else {
                                         return Err(self.unanswerable(i));
                                     };

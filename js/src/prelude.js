@@ -582,7 +582,7 @@
     // A stream's own options, refused (LLP 1016.000 D11): at bake marked as storage's refusal is, so a source that lets it through keeps its placeholder.
     // (The door throws its refusal as a string: marked, it is an Error.)
     var streamOption = init ? init.exactStream : undefined, marks = streamOption !== undefined && !listen && !own && !child;
-    function mark(e) { if (marks && host(12, "bake", "") === "1") { if (!e || typeof e !== "object") e = new Error(String(e)); e.kind = "Unavailable"; e.code = "bake"; } return e; } function optionRefused(e) { return Promise.reject(mark(e)); }
+    function mark(e) { if (marks && host(12, "bake", "") === "1") { if (!e || typeof e !== "object") e = new Error(String(e)); e.kind = "Unavailable"; e.code = "bake"; e.bakeWarning = true; } return e; } function optionRefused(e) { return Promise.reject(mark(e)); }
     if (call.socketConflict || (call.socketOps && call.socketOps.length)) { call.socketConflict = true; return Promise.reject(new Error(SOCKET_AND_FETCH)); }
     var method = init && init.method ? String(init.method).toUpperCase() : "GET";
     var headers = new global.Headers(init && init.headers);
@@ -1051,7 +1051,7 @@
     var message = e && typeof e === "object" && e.message !== undefined ? e.message : e;
     // `reason`: what `failure(x).reason` reads, a string the error carries (the snapback4 driver's refusal code).
     var reason = e && typeof e === "object" && typeof e.reason === "string" ? e.reason : "";
-    return JSON.stringify({ tag: 2, kind: kind, code: e && e.code, failure: failureCode(e), reason: reason, message: String(message) });
+    return JSON.stringify({ tag: 2, kind: kind, code: e && e.code, bakeWarning: e && e.bakeWarning === true, failure: failureCode(e), reason: reason, message: String(message) });
   }
   // A fetch with no live owner is claimed by one waiter (LLP 1162 D2).
   var moduleWide = bytesDoor !== undefined;
