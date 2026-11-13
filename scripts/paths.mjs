@@ -18,3 +18,6 @@ export function within(dir, file, path = nodePath) {
 /** `path.relative(from, to)` with `/` between its names, the form the name
  * rules (`^assets/`, `app.json`'s paths) are written in. */
 export const slashRelative = (from, to, path = nodePath) => path.relative(from, to).split(path.sep).join('/');
+
+/** A Cargo binary's file name: `.exe` on Windows. */
+export const EXE = process.platform === 'win32' ? '.exe' : '';

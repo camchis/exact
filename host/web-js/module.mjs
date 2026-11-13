@@ -18,6 +18,8 @@ import { withHostDeployment } from '../../scripts/filesystem.mjs';
 import { replaceBuild } from '../web/serve.mjs';
 import { proofInputs } from '../../game/inputs.mjs';
 import { keptProducts } from '../../scripts/kept.mjs';
+import { EXE } from '../../scripts/paths.mjs';
+export { EXE };
 import { BINARYEN_DOWNLOAD } from '../web/stages.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -100,8 +102,6 @@ const cargoWasmArgs = (manifest) => [`+${WEB}`, 'build', '--release', '--target'
 function cargoWasm(manifest) {
   return spawnSync('cargo', cargoWasmArgs(manifest), { stdio: ['ignore', 'inherit', 'inherit'], env: { ...process.env, CARGO_TARGET_DIR: TARGET } });
 }
-/** A Cargo binary's file name: `.exe` on Windows. */
-export const EXE = process.platform === 'win32' ? '.exe' : '';
 /** The dep-info Cargo writes beside binary `product`: `<name>.d`, beside
  * `<name>` or `<name>.exe` alike. */
 export const depInfoOf = (product) => product.replace(/\.exe$/i, '') + '.d';
