@@ -331,6 +331,9 @@ class ExtensionContext internal constructor(val application: Context, private va
      * `NotFoundError` when no app handles [intent], `NotAllowedError` when the platform refused the start (a
      * `SecurityException`: `ACTION_IMAGE_CAPTURE` from an app that declares CAMERA and does not hold it), and
      * `UnknownError` for any other refusal.
+     *
+     * The function returned withdraws a start still waiting for the resume, answering neither [failed] nor [done], and
+     * says whether it did: a call let go ([ExactExtension.cancel]) withdraws its start so that no sheet opens for it.
      */
     fun startActivityForResult(intent: android.content.Intent, failed: (String) -> Unit, done: (Int, android.content.Intent?) -> Unit) =
         Extensions.start(intent, failed, done)
@@ -666,10 +669,12 @@ internal object Extensions {
     fun start(sender: android.content.IntentSender, failed: (String) -> Unit, done: (Int, android.content.Intent?) -> Unit) =
         start(Start({ activity, code -> activity.startIntentSenderForResult(sender, code, null, 0, 0, 0) }, failed, done))
 
-    private fun start(start: Start) {
-        if (front() == null || !visible) return start.failed("InvalidStateError")
-        if (!foreground) { waiting += start; return }
+    /** Made or refused now, or waiting for the resume; the function returned withdraws a waiting one. */
+    private fun start(start: Start): () -> Boolean {
+        if (front() == null || !visible) { start.failed("InvalidStateError"); return { false } }
+        if (!foreground) { waiting += start; return { waiting.remove(start) } }
         launch(start)
+        return { false }
     }
 
     private fun launch(start: Start) {
