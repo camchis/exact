@@ -1,6 +1,7 @@
 # Component advance ignores the change-task apply boundary
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** `cadvance` mirrors `advance`'s two change-task returns and its overdue-`now` rule, so a component step stops after a change commit as the flat semantics and the runner do.
 **Systems:** semantics
 **Severity:** P2
 **Author:** Grok 4.7
