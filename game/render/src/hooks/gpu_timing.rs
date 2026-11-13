@@ -37,6 +37,8 @@ struct Slot {
     frame: u64,
     /// The [`GpuTiming::reset`] it was sampled after.
     generation: u64,
+    /// The snapshot window it was sampled in ([`GpuTiming::restart_window`]).
+    window: u64,
 }
 
 pub(crate) struct GpuTiming {
@@ -63,6 +65,8 @@ pub(crate) struct GpuTiming {
     /// Frame envelopes since the snapshot last took them: milliseconds
     /// summed, how many, and the longest.
     window: (f64, u32, f64),
+    /// Which snapshot window frames now submitted belong to.
+    window_generation: u64,
 }
 
 fn ring() -> Ring {
@@ -103,6 +107,7 @@ impl GpuTiming {
             mask: 0,
             frame: 0,
             generation: 0,
+            window: 0,
         });
         let ring = || if armed { ring() } else { Ring::default() };
         Some(Self {
@@ -128,6 +133,7 @@ impl GpuTiming {
             },
             armed,
             window: Default::default(),
+            window_generation: 0,
         })
     }
     /// Forget every sample; frames still in flight are read and discarded.
@@ -238,10 +244,12 @@ impl GpuTiming {
         if let Some((first, last)) = span {
             let ms = (last - first) as f64 * self.period;
             self.envelope.push(ms);
-            let (sum, count, max) = &mut self.window;
-            *sum += ms;
-            *count += 1;
-            *max = max.max(ms);
+            if slot.window == self.window_generation {
+                let (sum, count, max) = &mut self.window;
+                *sum += ms;
+                *count += 1;
+                *max = max.max(ms);
+            }
             // Their pass boundaries share the GPU clock; overlapping frames have zero idle.
             if let Some((frame, end)) = self.previous {
                 if frame + 1 == slot.frame {
@@ -259,6 +267,12 @@ impl GpuTiming {
     /// The mean and longest frame envelope read back since the last call:
     /// how long the GPU ran each sampled frame, first pass start to last
     /// pass end. `None` without a sample.
+    /// Start a new snapshot window: frames submitted before it, read back
+    /// or not, stay out of it.
+    pub fn restart_window(&mut self) {
+        self.window = Default::default();
+        self.window_generation += 1;
+    }
     pub fn take_window(&mut self) -> Option<(f64, f64)> {
         let (sum, count, max) = std::mem::take(&mut self.window);
         (count > 0).then(|| (sum / f64::from(count), max))
@@ -289,6 +303,7 @@ impl GpuTiming {
         slot.mask = timed;
         slot.frame = self.frames;
         slot.generation = self.generation;
+        slot.window = self.window_generation;
         slot.stage = Stage::Rendered;
         let done = slot.done.clone();
         queue.on_submitted_work_done(move || *done.lock().unwrap() = Some(Ok(())));

@@ -354,7 +354,7 @@ impl<G: Game, P: Executor, const ASSETS: bool, H: crate::Hooks> Surface
         self.seekable = seekable;
         if let Some(report) = &mut self.perf.reporting {
             if report.clock(seekable) {
-                let _ = self.gpu_timing.as_mut().map(|t| t.take_window());
+                self.gpu_timing.iter_mut().for_each(|t| t.restart_window());
             }
         }
         self.resting = false;
@@ -677,7 +677,7 @@ impl<G: Game, P: Executor, const ASSETS: bool, H: crate::Hooks> Surface
         if !enabled && !self.perf.armed() {
             self.gpu_timing = None;
         }
-        let _ = self.gpu_timing.as_mut().map(|t| t.take_window());
+        self.gpu_timing.iter_mut().for_each(|t| t.restart_window());
         if enabled {
             self.perf
                 .reporting
@@ -688,8 +688,9 @@ impl<G: Game, P: Executor, const ASSETS: bool, H: crate::Hooks> Surface
         }
     }
     fn take_performance(&mut self, now_ms: f64) -> Option<String> {
-        // A clock-mode change starts a fresh window, GPU samples included.
-        let fresh = self.perf.reporting.as_mut()?.clock(self.seekable);
+        if self.perf.reporting.as_mut()?.clock(self.seekable) {
+            self.gpu_timing.iter_mut().for_each(|t| t.restart_window());
+        }
         let gpu = match (&mut self.gpu_timing, &self.render) {
             (Some(timing), Some((r, _))) => timing.snapshot(&r.device, &r.queue),
             _ => None,
@@ -702,7 +703,7 @@ impl<G: Game, P: Executor, const ASSETS: bool, H: crate::Hooks> Surface
             audio: performance::audio(self.presentation.audio_state(), self.interrupted),
             memory: (self.render.as_ref())
                 .map(|(renderer, _)| (renderer.texture_bytes(), renderer.mesh_buffer_bytes())),
-            gpu: gpu.filter(|_| !fresh),
+            gpu,
         };
         self.perf.reporting.as_mut()?.take(now_ms, &live)
     }
