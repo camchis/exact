@@ -338,23 +338,12 @@ export function css(e, prop, unit, v, rendered) {
     if (t == null ? !now : same(now) === (normal(prop, t) || 'unset')) return;
   }
   if (t == null) return e.style.removeProperty(prop);
-  // A value the browser took before (`Normal`, read back after its first write) is written once; one it refused falls
-  // to `unset` at once. Only a value not yet seen pays the remove before the write that lets the read-back tell a
-  // refusal from an earlier value (LLP 1071.001 A8). Every property takes `unset`: one that reads back empty is a
-  // property this browser does not have (Chrome's `-moz-osx-font-smoothing`), not a refusal.
-  const k = prop + '\0' + t,
-    known = prop.startsWith('--') || t === 'unset' || Normal.get(k);
-  if (known) return e.style.setProperty(prop, t);
-  if (known === undefined) {
-    e.style.removeProperty(prop);
-    e.style.setProperty(prop, t);
-    const got = same(e.style.getPropertyValue(prop));
-    Normal.set(k, got);
-    if (Normal.size > 4096) Normal.clear();
-    if (got) return;
-  }
-  e.style.setProperty(prop, 'unset');
-  say(`unset ${prop}: ${JSON.stringify(v)} is not a value it takes`);
+  // A value not yet seen is probed on the detached style `normal` keeps, so the live node gets only the final write
+  // (LLP 1071.001 A8). Every property takes `unset`: one that reads back empty is a property this browser does not
+  // have (Chrome's `-moz-osx-font-smoothing`), not a refusal.
+  const valid = prop.startsWith('--') || t === 'unset' || normal(prop, t);
+  e.style.setProperty(prop, valid ? t : 'unset');
+  if (!valid) say(`unset ${prop}: ${JSON.stringify(v)} is not a value it takes`);
 }
 /** `S` for a row that can reference an element (`url(#…)`): an authored id
  * names the node the kernel's `resolve_id` would, the nearest in the tree
