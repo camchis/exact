@@ -171,8 +171,25 @@ fn retain(root: &Directory, input: &Value) -> io::Result<Value> {
             .ok_or_else(|| refuse("retained size overflow"))?;
         candidate.push((!blob && name == "exact.json", path, body));
     }
-    if total > quota {
+    // `reserve` is the bytes the publication's later requests carry. Admitting the
+    // whole publication here means a refusal comes before its first blob is written.
+    let reserve = input["reserve"].as_u64().unwrap_or(0);
+    if total.checked_add(reserve).is_none_or(|all| all > quota) {
         return Err(refuse("retained generation cache quota exceeded"));
+    }
+    // A blob can be released between the request that kept it and its envelope.
+    let index = format!("{prefix}/assets.json");
+    if let Some((_, _, index)) = candidate.iter().find(|(_, path, _)| *path == index) {
+        for digest in indexed_blobs(index)? {
+            let kept = blobs.contains_key(&digest)
+                || root
+                    .parent(&format!("blobs/{digest}"), false)
+                    .and_then(|(dir, leaf)| dir.kind(&leaf))
+                    .is_ok();
+            if !kept {
+                return Err(refuse("a retained generation names a missing blob"));
+            }
+        }
     }
     // This is a development cache, not a durable publication stream. Complete
     // immutable payloads precede the envelope; disk flushes are not on the edit
@@ -199,6 +216,71 @@ fn names_stream_file(root: &Directory, dir: &Directory, leaf: &str, parts: &[&st
             .any(|guarded| same(dir.kind(leaf), dir.kind(guarded)))
 }
 
+fn digest_name(value: &str) -> bool {
+    value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
+}
+
+fn indexed_blobs(index: &[u8]) -> io::Result<Vec<String>> {
+    let unreadable = || refuse("unreadable retained asset index");
+    let index: Value = serde_json::from_slice(index).map_err(|_| unreadable())?;
+    let assets = index["assets"].as_array().ok_or_else(unreadable)?;
+    assets
+        .iter()
+        .map(|asset| {
+            asset["sha256"]
+                .as_str()
+                .filter(|digest| digest_name(digest))
+                .map(str::to_owned)
+                .ok_or_else(unreadable)
+        })
+        .collect()
+}
+
+// A publication refused after some of its blobs were kept releases them: each
+// named blob that no published generation's index names is removed, so an
+// abandoned publication is not charged against the quota.
+fn release(root: &Directory, input: &Value) -> io::Result<Value> {
+    let _lock = Lock::acquire(root, ".retained/.lock", field(input, "token")?)?;
+    let mut named = std::collections::HashSet::new();
+    for epoch in root.names()? {
+        if epoch.len() != 32 || !epoch.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+            continue;
+        }
+        let epoch = root.child(&epoch, false)?;
+        for seq in epoch.names()? {
+            let generation = epoch.child(&seq, false)?;
+            if generation.kind("exact.json").is_err() {
+                continue;
+            }
+            match generation.read("assets.json") {
+                Ok(index) => named.extend(indexed_blobs(&index)?),
+                Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+                Err(error) => return Err(error),
+            }
+        }
+    }
+    let candidates = input["blobs"]
+        .as_array()
+        .ok_or_else(|| refuse("missing blobs"))?;
+    let mut released = 0;
+    for digest in candidates {
+        let digest = digest
+            .as_str()
+            .filter(|digest| digest_name(digest))
+            .ok_or_else(|| refuse("invalid blob name"))?;
+        if named.contains(digest) {
+            continue;
+        }
+        let (dir, leaf) = root.parent(&format!("blobs/{digest}"), false)?;
+        match dir.unlink(&leaf) {
+            Ok(()) => released += 1,
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+            Err(error) => return Err(error),
+        }
+    }
+    Ok(json!(released))
+}
+
 fn operate(root: &Directory, input: &Value, locked: Option<&Lock>) -> io::Result<Value> {
     if let Some(lock) = locked {
         lock.verify(root)?;
@@ -212,6 +294,9 @@ fn operate(root: &Directory, input: &Value, locked: Option<&Lock>) -> io::Result
     }
     if op == "retain" {
         return retain(root, input);
+    }
+    if op == "release" {
+        return release(root, input);
     }
     if op == "inventory" {
         let mut entries = serde_json::Map::new();

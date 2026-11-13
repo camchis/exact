@@ -228,6 +228,52 @@ fn retained_blobs_are_stored_once_and_named_by_their_digest() {
 }
 
 #[test]
+fn a_publication_is_admitted_whole_and_releases_the_blobs_it_abandons() {
+    let fixture = Fixture::new();
+    let root = fixture.dir("cache");
+    let retain = |seq, extra: Value| {
+        let mut input = json!({"op":"retain", "path":format!("{}/{seq}", "f".repeat(32)),
+            "quota":400, "token":TOKEN});
+        for (key, value) in extra.as_object().unwrap() {
+            input[key] = value.clone();
+        }
+        operate(&root, &input, None)
+    };
+    let (a, b) = (
+        format!("{:x}", Sha256::digest("aaaa")),
+        format!("{:x}", Sha256::digest("bbbb")),
+    );
+    let blob = |digest: &str| fixture.path(&format!("cache/blobs/{digest}"));
+    let generation = |digest: &str| {
+        let index = json!({"assets":[{"sha256":digest}]}).to_string();
+        json!({"assets.json":STANDARD.encode(index), "exact.json":STANDARD.encode("envelope")})
+    };
+    // The first batch fits alone, not with the bytes still to come: nothing is written.
+    let first = json!({"blobs":{ a.as_str(): STANDARD.encode("aaaa") }, "reserve":400});
+    assert!(retain(1, first)
+        .unwrap_err()
+        .to_string()
+        .contains("quota exceeded"));
+    assert!(!blob(&a).exists());
+    let published =
+        json!({"blobs":{ a.as_str(): STANDARD.encode("aaaa") }, "files":generation(&a)});
+    retain(1, published).unwrap();
+    retain(2, json!({"blobs":{ b.as_str(): STANDARD.encode("bbbb") }})).unwrap();
+    // Only the blob no published generation names is released.
+    let release = json!({"op":"release", "token":TOKEN, "blobs":[a, b]});
+    assert_eq!(operate(&root, &release, None).unwrap(), json!(1));
+    assert!(blob(&a).exists() && !blob(&b).exists());
+    // An envelope whose index names a released blob is refused.
+    assert!(retain(2, json!({"files":generation(&b)}))
+        .unwrap_err()
+        .to_string()
+        .contains("missing blob"));
+    assert!(!fixture
+        .path(&format!("cache/{}/2/exact.json", "f".repeat(32)))
+        .exists());
+}
+
+#[test]
 fn a_tree_page_reads_to_its_limit_and_names_the_rest() {
     let fixture = Fixture::new();
     let root = fixture.dir("tree");

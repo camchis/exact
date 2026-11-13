@@ -434,6 +434,36 @@ for (const [name, html, files, expectCode, expect] of [
     captured.size === 3 && first.bytes > 3 * size && second.bytes - first.bytes < 4096 && stored === 3 && read?.equals(captured.get('assets/2.bin')),
     JSON.stringify({ captured: captured.size, first: first.bytes, second: second.bytes, stored, read: read?.length }));
 }
+// A publication the quota cannot hold is refused before its first batch is kept,
+// and one refused after its batches releases them, so a smaller one then fits.
+{
+  const dir = mkdtempSync(join(tmpdir(), 'exact-dev-refused-')), cache = join(dir, 'cache'), epoch = 'f'.repeat(32), quota = 4500, batch = 1000;
+  const card = (body) => ({ bytes: body.length, sha256: sha256(body) }), plan = Buffer.from('plan');
+  const files = (seq, count) => {
+    const assets = Array.from({ length: count }, (_, i) => [`assets/${i}.bin`, Buffer.alloc(batch, seq * 16 + i)]);
+    const index = Buffer.from(JSON.stringify({ assets: assets.map(([name, body]) => ({ name, url: `./${name}`, ...card(body) })) }));
+    return new Map([['app.plan', plan], ...assets, ['assets.json', index], ['exact.json', Buffer.from(JSON.stringify({
+      exact: 1, dev: { epoch, seq }, plan: card(plan), assets: { url: 'assets.json', ...card(index), count },
+    }))]]);
+  };
+  const blobs = () => readdirSync(join(cache, 'blobs')).length;
+  retainDevGeneration(cache, epoch, 1, files(1, 1), quota, null, batch);
+  const whole = await rejects(() => retainDevGeneration(cache, epoch, 2, files(2, 3), quota, null, batch), (error) => error.message.includes('close all pages'));
+  const afterWhole = blobs();
+  // A conflicting payload refuses the envelope's request after two batches were kept.
+  mkdirSync(join(cache, epoch, '3'), { recursive: true });
+  writeFileSync(join(cache, epoch, '3', 'app.plan'), 'other');
+  const late = await rejects(() => retainDevGeneration(cache, epoch, 3, files(3, 2), quota, null, batch), (error) => error.message.includes('immutable'));
+  const afterLate = blobs();
+  const smaller = files(4, 1);
+  let fits = true;
+  try { retainDevGeneration(cache, epoch, 4, smaller, quota, null, batch); } catch { fits = false; }
+  const read = readDevGeneration(cache, `/__dev/generation/${epoch}/4/assets/0.bin`)?.body;
+  const detail = JSON.stringify({ whole, afterWhole, late, afterLate, fits, after: blobs() });
+  rmSync(dir, { recursive: true, force: true });
+  result('a refused dev publication leaves no blob charged, and a smaller one then fits',
+    whole && afterWhole === 1 && late && afterLate === 1 && fits && read?.equals(smaller.get('assets/0.bin')), detail);
+}
 // Independent dev payloads share a bounded queue; integrity still gates return.
 {
   const origin = 'http://exact.test/', body = Buffer.from('payload');

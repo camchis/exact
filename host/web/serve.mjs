@@ -114,23 +114,22 @@ export function moduleCards(files, appId) {
     return [key, { bytes: bytes.length, sha256: sha256(bytes) }];
   }));
 }
-export function retainDevGeneration(cache, epoch, seq, files, quota = DEV_GENERATION_CACHE_BYTES, previousToken = null) {
+export function retainDevGeneration(cache, epoch, seq, files, quota = DEV_GENERATION_CACHE_BYTES, previousToken = null, batch = 64 * 1024 * 1024) {
   if (!/^[0-9a-f]{32}$/.test(epoch) || !Number.isSafeInteger(seq) || seq < 0) throw new Error('invalid dev generation identity');
+  // The assets the index names are kept once, by digest, for every generation. One request cannot hold a large
+  // generation: batches of new assets go first, each admitted with the bytes still to come (`reserve`).
+  const root = resolve(cache), index = files.get('assets.json'), own = {}, fresh = new Map(), sent = [], kept = new Set(filesystem({ op: 'list', root, path: 'blobs' }) ?? []);
+  const digests = new Map(index ? JSON.parse(index).assets.map((asset) => [asset.name, asset.sha256]) : []);
+  for (const [name, bytes] of files) { const digest = digests.get(name); if (!digest) own[staticRelative(name)] = bytes; else if (!kept.has(digest)) fresh.set(digest, bytes); }
+  let reserve = [...Object.values(own), ...fresh.values()].reduce((sum, bytes) => sum + bytes.length, 0), blobs = {}, pending = 0, result;
+  const send = (more) => { reserve -= pending; result = filesystem({ op: 'retain', root, path: `${epoch}/${seq}`, quota, previousToken, blobs, reserve: more ? 0 : reserve, ...more }); previousToken = result.token; sent.push(...Object.keys(blobs)); blobs = {}; pending = 0; };
   try {
-    // The assets the index names are kept once, by digest, for every generation.
-    // One request cannot hold a large generation: full batches of new assets go first.
-    const root = resolve(cache), index = files.get('assets.json'), own = {}, kept = new Set(filesystem({ op: 'list', root, path: 'blobs' }) ?? []);
-    const digests = new Map(index ? JSON.parse(index).assets.map((asset) => [asset.name, asset.sha256]) : []);
-    let blobs = {}, pending = 0, result;
-    const send = (more) => { result = filesystem({ op: 'retain', root, path: `${epoch}/${seq}`, quota, previousToken, blobs, ...more }); previousToken = result.token; blobs = {}; pending = 0; };
-    for (const [name, bytes] of files) {
-      const digest = digests.get(name), encoded = Buffer.from(bytes).toString('base64');
-      if (!digest) own[staticRelative(name)] = encoded;
-      else if (!kept.has(digest)) { kept.add(digest); blobs[digest] = encoded; if ((pending += bytes.length) >= 64 * 1024 * 1024) send(); }
-    }
-    send({ files: own });
+    for (const [digest, bytes] of fresh) { blobs[digest] = Buffer.from(bytes).toString('base64'); if ((pending += bytes.length) >= batch) send(); }
+    send({ files: Object.fromEntries(Object.entries(own).map(([name, bytes]) => [name, Buffer.from(bytes).toString('base64')])) });
     return result;
   } catch (error) {
+    // A refused publication's blobs that no published generation names are not left charged against the quota.
+    if (sent.length) try { filesystem({ op: 'release', root, blobs: sent }); } catch (release) { error.message += `; its kept assets were not released: ${release.message}`; }
     if (error.message.includes('cache quota exceeded')) throw new Error(`dev generation cache is full: ${resolve(cache)}; close all pages and native dev connections before manually removing this cache, then restart the dev server`);
     throw error;
   }
