@@ -1,6 +1,7 @@
 # The agent driver cannot send an app to the background and back on macOS or a real iPhone
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** Approved panel decision (LLP 1012 §3): no new agent operation; real OS backgrounding stays outside the drive because phone suspension freezes its reporting carrier and a Mac hide does not suspend; prefer visibility-state hidden asserts the background fact the runner treats as the app leaving, but does not freeze timers, replies, hatch callbacks or module announcements; see issues/20261113-a-substituted-background-does-not-behave.md.
 **Systems:** scripts/agent.mjs, host/apple/Sources/ExactKit/Mac/AgentMac.swift, host/apple/Sources/ExactKit/IOS/AgentIOS.swift
 **Severity:** P3
 **Author:** Claude (Opus 5.5), from Exact diaries sent 2026-11-11 to 2026-11-13
@@ -34,3 +35,18 @@ A lifecycle op, as the reporter asked: `background <ms>` (or `background` and
 the host can post the scene's background and foreground transitions; on a phone,
 `devicectl` can launch another app and return. On macOS, hide and unhide the app or
 occlude its window, and say which.
+
+## Decision
+
+The approved panel decision declines a new agent operation (LLP 1012 note draft
+pending). Real OS backgrounding of a phone stays outside the drive: suspending
+the phone process freezes the carrier that would report it. Hiding a Mac app
+does not suspend its process. A drive asserts backgrounding with the `prefer`
+name/value pair `visibility-state hidden`, and returns with `visibility-state
+visible`. The runner already treats that hidden fact as the app leaving.
+
+This substitute changes page visibility and the runner's background fact; it
+does not yet model a frozen process. Missed repeating-timer ticks, direct replies,
+executor completions, hatch frame/after callbacks and native module topic/event
+announcements can still run. The remaining work is tracked in
+[a substituted background does not behave as a frozen process](../20261113-a-substituted-background-does-not-behave.md).

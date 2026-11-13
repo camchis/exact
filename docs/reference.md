@@ -1565,6 +1565,14 @@ none set, `formatLocale` is the locale),
 normalizes POSIX names to BCP 47 (`C`/`POSIX` use `en-US`), and reads the zone from
 `TZ` when it names a zoneinfo entry, otherwise the system's IANA zone (UTC fallback).
 
+A drive asserts backgrounding with the `prefer` name/value pair `visibility-state hidden`
+(`"prefer visibility-state hidden"`), and returns with `"prefer visibility-state visible"`.
+This changes page visibility and the runner's background fact, which it already treats as
+the app leaving. Real OS backgrounding stays outside the drive: suspending a phone freezes
+its reporting carrier, and hiding a Mac app does not suspend it. A substituted background
+is not yet a frozen process: timers, replies, hatch callbacks and module announcements
+can still run ([open issue](../issues/20261113-a-substituted-background-does-not-behave.md)).
+
 `bun scripts/agent.mjs trace --pid <pid> --out snapshot.json` asks a running development
 Mac or simulator app to save its trace without taking ownership of the process.
 The file includes `tree`, `state`, `layout` and `observation`. Tree and state read the
