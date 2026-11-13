@@ -1,6 +1,7 @@
 # The iOS agent check squares each view's opacity
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The coverage walk and the composited backing multiply each view's alpha once, since alpha is its layer's opacity.
 **Systems:** host/apple
 **Severity:** P2
 **Author:** Grok 4.7
