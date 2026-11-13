@@ -1,6 +1,7 @@
 # Saving a harness key discards the other keys when the file cannot be read
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** Saving a key treats only a missing keys file as empty; any other read error is returned before the file is opened for writing, so its bytes are kept and the key stays for this session only.
 **Systems:** harness provider configuration, credential persistence
 **Author:** Codex
 **Date:** 2026-11-12
