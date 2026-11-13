@@ -1,13 +1,12 @@
 # Recipe: tools an agent or the system calls
 
 A `tool` line offers a root action to callers other than the person: Siri and Shortcuts (App
-Intents), Android (AppFunctions) and a browser's agent
-([WebMCP](https://webmachinelearning.github.io/webmcp/)). Only a tool with a face in `app.json`
-is offered to them.
+Intents) and a browser's agent ([WebMCP](https://webmachinelearning.github.io/webmcp/)), if it
+has a face in `app.json`.
 
 ```contract
 routes nav
-  home "/" render=build activate=idle
+  home "/" render=build
 
 component App
   state items: string[] = []
@@ -45,17 +44,21 @@ component App
 ```
 
 - **After the name:** `reads`, `writes` or `destroys`; then `additive` (after `writes`: adds,
-  never overwrites), `idempotent` (a repeat changes nothing more), `closed` (touches only
-  the app's data). The caller reads the description and passes the action's parameters.
+  never overwrites), `idempotent` (a repeat changes nothing), `closed` (touches only
+  the app's data).
 - **Clauses**, in this order: `returns` (a faced tool's is a string, number or bool, else
-  `intents-face-type`), `fails when` (true after the action: the call's `outcome` is `failed`), `available when`
-  (withdrawn while false, offered again when true). An `enum` value outside the list is
-  refused before the action runs (`reason: arguments`).
+  `intents-face-type`), `fails when` (true after the action: `outcome: failed`), `available when`
+  (false: a call is refused, `reason: unavailable`; WebMCP also withdraws the tool, an App
+  Intent does not). An `enum` outside its list: `reason: arguments`.
 - **The face:** a parameter's `entity` names a kind of `intents.entities`. `doors` defaults
-  to `apple`, `android` and `web`; a `destroys` tool's is `apple` alone.
-- **On the web** a page registers its faced tools with `document.modelContext` when its
-  script activates; a `render=build` route activates when the person uses a control, so say
-  `activate=idle` for tools at load. Chrome: `chrome://flags/#enable-webmcp-testing`, or
+  to `apple`, `android` (AppFunctions: not built yet) and `web`; a `destroys` tool's is
+  `apple` alone.
+- **On the web** a page registers its faced tools with `document.modelContext` once its script
+  runs. A route with no `activate=` that would otherwise wait for the reader is `idle` in an app
+  with a faced tool on the web door, so the tools are registered after load; a route that says
+  `activate=interaction` registers them only when its script starts (the pitfall's triggers).
+  `document.modelContext` exists only in a secure context: `https`, `localhost` or `127.0.0.1`,
+  not a LAN address over `http`. Chrome: `chrome://flags/#enable-webmcp-testing`, or
   `--enable-features=WebMCPTesting`; without it the page runs as before.
 - **Drive:** `bun exact.mjs agent web 'call addItem {"name":"Milk","aisle":"dairy","quantity":2}'
   state`; `state.intents` lists the tools and each call's `outcome`. `call` is not a test step.
