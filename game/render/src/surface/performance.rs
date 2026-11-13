@@ -153,7 +153,9 @@ impl Report {
                 .unwrap();
             }
         }
-        if let Some(state) = live.thermal.keyword() {
+        // The host's state arrives with each drawn frame; with none in the
+        // window it may be stale.
+        if let Some(state) = live.thermal.keyword().filter(|_| self.frames > 0) {
             write!(out, ",\"thermalState\":\"{state}\"").unwrap();
         }
         if let Some(rung) = live.quality {
@@ -247,6 +249,24 @@ mod tests {
         };
         let value: serde_json::Value =
             serde_json::from_str(&report.take(0., &live).unwrap()).unwrap();
+        assert!(
+            value.get("thermalState").is_none(),
+            "no frame in the window carried the host's state"
+        );
+        report.encoded(
+            &Frame {
+                seekable: false,
+                ..frame
+            },
+            &FrameTiming::default(),
+            1.,
+            1,
+            Stats::default(),
+            0,
+        );
+        report.submitted();
+        let value: serde_json::Value =
+            serde_json::from_str(&report.take(1000., &live).unwrap()).unwrap();
         assert_eq!(value["thermalState"], "fair");
         assert_eq!(value["quality"], "mid");
         assert_eq!(value["maxFps"], 5, "caps below 5 Hz draw at 5 Hz");

@@ -577,7 +577,9 @@ impl<G: Game, P: Executor, const ASSETS: bool, H: crate::Hooks> Surface
         self.perf.live = !frame.seekable;
         self.perf.rendering = true;
         let wants = self.render_frame(frame, device, queue, encoder, target, format);
-        self.still = !wants;
+        // Natively the module draws an incomplete frame again (gpu/src/frame.rs);
+        // the web's host draws only what the surface asks for.
+        self.still = !wants && (cfg!(target_arch = "wasm32") || self.frame_ready);
         self.perf.rendering = false;
         if self.encoded.is_some() && self.perf.reporting.is_some() {
             let scale = self.raster_scale();
@@ -681,12 +683,7 @@ impl<G: Game, P: Executor, const ASSETS: bool, H: crate::Hooks> Surface
     fn take_performance(&mut self, now_ms: f64) -> Option<String> {
         self.perf.reporting.as_ref()?;
         let live = performance::Live {
-            // A resting canvas gets no frame timing, so its last would be stale.
-            thermal: if self.still {
-                Default::default()
-            } else {
-                self.timing.thermal_state
-            },
+            thermal: self.timing.thermal_state,
             quality: self.rung.map(|rung| rung.level.keyword()),
             max_fps: self.max_fps(),
             idle: self.still,

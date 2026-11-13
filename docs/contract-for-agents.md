@@ -4171,8 +4171,8 @@ force, `none` when the canvas draws at the display's rate; and `idle`, true
 while the canvas asks for no frames until something changes (a world at rest
 or paused; `none` under the agent's virtual clock). `thermalState` is
 `nominal`, `fair`, `serious` or `critical` as of the canvas's last drawn frame
-where the host reads the device's (Apple); `none` elsewhere and while the
-canvas is idle, when no frame has read it. Memory, in bytes:
+where the host reads the device's (Apple); `none` elsewhere and for a window
+in which no frame was drawn. Memory, in bytes:
 `processMemoryBytes` is the process's footprint (`phys_footprint` on Apple, the
 resident set on Linux and Android), `none` on the web and Windows;
 `gameHeapBytes` is the GPU module's linear memory on the web, the simulation's
