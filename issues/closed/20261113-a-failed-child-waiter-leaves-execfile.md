@@ -1,6 +1,7 @@
 # A failed child waiter leaves execFile without an exit
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** When a child's waiter, pipe reader or stdin writer cannot start, spawn kills and reaps the child and fails the call instead of leaving it waiting forever.
 **Systems:** host
 **Severity:** P2
 **Author:** Grok 4.7

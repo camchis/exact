@@ -718,3 +718,29 @@ fn writes_to_a_child_that_closed_its_stdin_are_dropped_and_drain() {
     core.forget(|_| false);
     until_gone(leader, "the group outlived its release");
 }
+
+/// A child whose waiter, a pipe's reader or its stdin writer cannot start
+/// fails its call: nothing would reap it or end its output, so the call
+/// would never answer. The child is ended rather than left to run.
+#[test]
+fn a_child_whose_thread_cannot_start_fails_its_call() {
+    let (core, woke, dir) = core("process.spawn /bin/sh");
+    for (ticket, role) in [(1, "pipe"), (2, "stdin"), (3, "wait")] {
+        let mark = dir.join(format!("ran-{role}"));
+        let script = format!("sleep 0.2; touch {}", mark.display());
+        let call = serde_json::json!({ "kind": "execFile", "program": "/bin/sh",
+            "args": ["-c", script], "input": exact_runner::agent::base64(b"in"),
+            "env": [["PATH", "/usr/bin:/bin"], ["EXACT_TEST_FAIL_THREAD", role]] });
+        core.run(request(ticket, call, false), None).unwrap();
+        let out = collect(&core, &woke, |o| !o.is_empty());
+        let Outcome::Failed { message, .. } = &out[0] else {
+            panic!("{role}: {out:?}")
+        };
+        assert!(
+            message.contains("cannot start its thread"),
+            "{role}: {message}"
+        );
+        std::thread::sleep(Duration::from_millis(400));
+        assert!(!mark.exists(), "{role}: the child ran on");
+    }
+}
