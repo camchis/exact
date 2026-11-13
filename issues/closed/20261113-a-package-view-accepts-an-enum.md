@@ -1,6 +1,7 @@
 # A package view accepts an enum whose cases are not the ones it declares
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** A typed prop takes an enum only when the declaration names every case it can take, and an event handler only when its parameter holds every case the event carries, under `option` and `list` too.
 **Systems:** contract lower, package views
 **Severity:** P2
 **Author:** Grok 4.7
