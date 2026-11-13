@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { brotliCompressSync, brotliDecompressSync, constants } from 'node:zlib';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { buildModule, moduleGrants, webCompiler, fresh, freshCompiler } from './module.mjs';
+import { bakedRustSource, buildModule, moduleGrants, webCompiler, fresh, freshCompiler } from './module.mjs';
 import { spawnOwned } from '../../scripts/test-children.mjs';
 import { open } from '../../scripts/agent.mjs';
 import { suiteBrowser } from '../../scripts/agent-launch.mjs';
@@ -1300,6 +1300,28 @@ test('a web build.rs whose data source the module cannot copy is named, with the
       script(text);
       expect(fails()).toContain('its web build bakes with no Rust data source');
     }
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('a mixed bake selects its Rust source without copying the TypeScript composer', () => {
+  const dir = mkdtempSync(resolve(tmpdir(), 'exact-mixed-module-source-'));
+  try {
+    mkdirSync(resolve(dir, 'web'));
+    writeFileSync(resolve(dir, 'app.json'), '{}');
+    for (const expr of ['notes_data::Backup', 'notes_data::Backup::default()', 'notes_data::Backup::new()']) {
+      writeFileSync(resolve(dir, 'web/build.rs'), `fn main() {
+        // exact_js_bake::build_mixed_with(app, "web", &wrong::Source, names, compose);
+        exact_js_bake::build_mixed_with(
+          std::path::Path::new("../a,b"), "web", &${expr}, notes_data::RUST_SOURCES,
+          |javascript| Box::new(notes_data::mixed(javascript, notes_data::Placement::Main)),
+        ).unwrap();
+      }`);
+      expect(bakedRustSource(dir)).toEqual({ call: 'exact_js_bake::build_mixed_with', expr });
+    }
+    writeFileSync(resolve(dir, 'web/build.rs'), 'fn main() { exact_js_bake::build_mixed_with(app, "web", &notes_data::Backup::new(true), names, compose); }');
+    expect(() => buildModule('notes', resolve(dir, 'out'), false, dir)).toThrow('passes exact_js_bake::build_mixed_with a Rust source the web build cannot copy');
+    writeFileSync(resolve(dir, 'web/build.rs'), 'fn main() { let example = "exact_js_bake::build_mixed_with("; }');
+    expect(bakedRustSource(dir)).toBeNull();
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 

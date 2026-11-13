@@ -3790,7 +3790,11 @@ checkout by name, and any other path only through that placeholder. The web buil
 `web/build.rs` passes to `contract::bake(plan, …)` into a module of its own, where build.rs's `use`s and
 locals are not: write it as a path from the data crate (`my_app_data::MyApp`), or that path's `::default()`
 or `::new()` with no arguments, with no comma after it (rustfmt adds one when it breaks the call across
-lines). A source built with arguments is exported by a crate of the app's own
+lines). For a mixed app, the build copies the third argument to
+`exact_js_bake::build_mixed_with`: a reference to the same data-crate value or constructor,
+with no constructor arguments. TypeScript answers the other sources. A declared
+`rust.module.package` supplies the module instead of a generated one.
+A source built with arguments is exported by a crate of the app's own
 instead, named in app.json's `rust.module.package` (Update Lab's `logic/`).
 
 A source that wraps another implements `exact_runner::DataSourceWrapper`.

@@ -1,7 +1,7 @@
 // An app's Rust data source as a standalone logic module (LLP 1029.000,
 // ABI 8) for the JS runtime, when the app declares none of its own: a
 // generated crate exporting the same DataSource the web build bakes with
-// (`apps/<app>/web/build.rs`'s `contract::bake(plan, <expr>)`).
+// (`contract::bake` or `exact_js_bake::build_mixed_with` in web/build.rs).
 // usage: bun host/web-js/module.mjs <app> [--out <dir>] → <dir>/app.module.wasm
 //        bun host/web-js/module.mjs --prebuild: what every app's web build
 //        shares (the compiler, the leaf modules), compiled and kept for the
@@ -149,15 +149,41 @@ function module(manifest, name, out, label) {
   return done;
 }
 
+/** The Rust source selected by a web bake, before generating its ABI crate. */
+export function bakedRustSource(dir) {
+  const path = resolve(dir, 'web/build.rs');
+  if (!existsSync(path)) return null;
+  const build = readFileSync(path, 'utf8').replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*|"(?:\\.|[^"\\])*"/g, m => m.startsWith('"') ? m : ' ');
+  const code = build.replace(/"(?:\\.|[^"\\])*"/g, m => ' '.repeat(m.length));
+  const mixed = /exact_js_bake::build_mixed_with\s*\(/.exec(code);
+  if (!mixed) return code.includes('contract::bake(')
+    ? { call: 'contract::bake', expr: /contract::bake\(\s*plan,\s*([\w:]+(?:::(?:default|new)\(\))?)\s*\)/.exec(build)?.[1] }
+    : null;
+  // Split only top-level arguments: the app path and source constructor may contain calls and strings.
+  const start = mixed.index + mixed[0].length;
+  let depth = 0, argument = 0, from = start, source;
+  for (const token of build.slice(start).matchAll(/"(?:\\.|[^"\\])*"|[()[\]{},]/g)) {
+    const c = token[0], at = start + token.index;
+    if (c.startsWith('"')) continue;
+    if ((c === ',' || c === ')') && depth === 0) {
+      if (argument++ === 2) { source = build.slice(from, at).trim(); break; }
+      from = at + 1;
+      if (c === ')') break;
+    } else if ('([{'.includes(c)) depth++;
+    else if (')]}'.includes(c)) depth--;
+  }
+  return { call: 'exact_js_bake::build_mixed_with', expr: /^&\s*([\w:]+(?:::(?:default|new)\(\))?)$/.exec(source ?? '')?.[1] };
+}
+
 export function buildModule(app, out = resolve(MODULES, app), draw = false, dir = resolve(root, 'apps', app)) {
-  const build = readFileSync(resolve(dir, 'web/build.rs'), 'utf8');
-  const expr = /contract::bake\(\s*plan,\s*([\w:]+(?:::(?:default|new)\(\))?)\s*\)/.exec(build)?.[1];
+  if (JSON.parse(readFileSync(resolve(dir, 'app.json'), 'utf8')).rust?.module?.package) return ownModule(app, out, dir);
+  const source = bakedRustSource(dir), expr = source?.expr;
   // The source is copied as written into a generated crate whose one dependency is the data crate, where build.rs's
   // `use`s and locals are not. A call it cannot copy, outside comments and strings, is named rather than taken for none.
-  const code = build.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*|"(?:\\.|[^"\\])*"/g, (m) => m.startsWith('"') ? '""' : ' ');
-  if (!expr && code.includes('contract::bake(') && !JSON.parse(readFileSync(resolve(dir, 'app.json'), 'utf8')).rust?.module?.package) {
+  if (!expr && source?.call === 'contract::bake') {
     throw new Error(`${app}: ${resolve(dir, 'web/build.rs')} passes contract::bake a source the web build does not copy into the module it generates. It copies \`contract::bake(plan, <data crate>::<Type>)\`, \`<data crate>::<Type>::default()\` or \`<data crate>::<Type>::new()\` with no arguments, written with no comma after the source (rustfmt adds one when it breaks the call across lines). For anything else, write a crate that exports the source (\`exact_logic_abi::export!(<Type>, <constructor>)\`, as apps/update-lab/logic does) and name it in app.json's rust.module.package`);
   }
+  if (!expr && source) throw new Error(`${app}: ${resolve(dir, 'web/build.rs')} passes ${source.call} a Rust source the web build cannot copy. Use a data-crate type's value, ::default() or ::new() with no arguments, or export it in app.json's rust.module.package`);
   if (!expr) return ownModule(app, out, dir);
   const ty = expr.replace(/::(default|new)\(\)$/, '');
   const dataToml = readFileSync(resolve(dir, 'data/Cargo.toml'), 'utf8');
@@ -192,10 +218,8 @@ ${patch}
   return module(resolve(crate, 'Cargo.toml'), `exact_js_module_${app.replaceAll('-', '_')}`, out, `${app}: the module`);
 }
 
-/** The app's own logic module (`rust.module.package` in app.json, LLP
- * 1029.000), for an app whose web build bakes with no single Rust source (a
- * TypeScript and a Rust source composed, LLP 1027.002): its crate already
- * exports the ABI, built as the generated one is. */
+/** The app's explicit logic module (`rust.module.package`, LLP 1029.000):
+ * its crate already exports the ABI, built as the generated one is. */
 function ownModule(app, out, dir) {
   const pkg = JSON.parse(readFileSync(resolve(dir, 'app.json'), 'utf8')).rust?.module?.package;
   if (!pkg) throw new Error(`${app}: its web build bakes with no Rust data source, and app.json names no rust.module.package`);
