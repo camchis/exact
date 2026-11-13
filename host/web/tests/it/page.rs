@@ -59,7 +59,91 @@ component A
 }
 
 #[test]
-fn without_a_head_the_title_is_the_apps_and_nothing_else_is_claimed() {
+fn a_rendered_title_uses_the_selected_route_before_the_app_name() {
+    exact_web::link(exact_web_capabilities::ALL);
+    let src = r#"routes nav
+  home "/"
+    item "/item"
+    explicit "/explicit"
+    empty "/empty"
+    bare "/bare"
+    formatted "/formatted"
+
+component A
+  view
+    main navigationKey=`${top(nav).id}` navigationBack="back"
+      for e in stack(nav) key=e.id
+        column navigationKey=`${e.id}`
+          if e.name != "bare"
+            header
+              if e.name == "formatted"
+                text "**Inbox** & [Archive](/archive)" markup="markdown" role="heading" aria-level=1
+              else
+                text (e.name == "home" ? "Home" : "Item & <Detail>") role="heading" aria-level=1
+          if e.name == "explicit"
+            head title="Authored"
+          if e.name == "empty"
+            head title=""
+"#;
+    for (location, title) in [
+        ("/", "Home"),
+        ("/item", "Item &amp; &lt;Detail&gt;"),
+        ("/explicit", "Authored"),
+        ("/empty", ""),
+        ("/bare", "Site &amp; Co"),
+        ("/formatted", "Inbox &amp; Archive"),
+    ] {
+        let host = host(src, Says(""), location);
+        let head = host
+            .document()
+            .unwrap()
+            .page_head(host.runner().plan(), &SITE, location)
+            .unwrap();
+        for want in [
+            format!("<title>{title}</title>"),
+            format!("<meta property=\"og:title\" content=\"{title}\">"),
+            format!("<meta name=\"twitter:title\" content=\"{title}\">"),
+        ] {
+            assert!(head.contains(&want), "{location}: {want}\n{head}");
+        }
+    }
+}
+
+#[test]
+fn a_route_title_uses_the_panel_named_by_the_roots_tabs() {
+    exact_web::link(exact_web_capabilities::ALL);
+    let host = host(
+        r#"component App
+  view
+    main navigationBack="back" navigationKey="selected"
+      row role="tablist"
+        button role="tab" aria-controls="first"
+          text "First"
+        button role="tab" aria-controls="second"
+          text "Second"
+      column role="tabpanel" id="first"
+        column navigationKey="other"
+          header
+            text "Covered" role="heading" aria-level=1
+      column role="tabpanel" id="second"
+        column navigationKey="selected"
+          header
+            column
+              text "  Selected  " role="heading" aria-level=1
+"#,
+        Says(""),
+        "/",
+    );
+    let head = host
+        .document()
+        .unwrap()
+        .page_head(host.runner().plan(), &SITE, "/")
+        .unwrap();
+    assert!(head.starts_with("<title>Selected</title>"), "{head}");
+}
+
+#[test]
+fn without_a_head_or_route_heading_the_title_is_the_apps() {
     let plain = host(
         "component A\n  view\n    column viewport-fit=\"cover\" interactive-widget=\"resizes-content\"\n      text \"a\"\n",
         Says(""),

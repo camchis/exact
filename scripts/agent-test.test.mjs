@@ -167,6 +167,21 @@ test('a pick with no picker held names the step that holds one on its host', () 
   }
 });
 
+test('modal ancestors remain structural while exposed siblings are findings', () => {
+  const elements = [
+    { i: 0, parent: null, id: 10, via: 'self', role: 'main', name: '' },
+    { i: 1, parent: 0, id: 11, via: 'self', role: 'group', name: '' },
+    { i: 2, parent: 1, id: 12, via: 'self', role: 'dialog', name: 'Setup' },
+    { i: 3, parent: 2, id: 13, via: 'self', role: 'button', name: 'Save' },
+    { i: 4, parent: 1, id: 14, via: 'self', role: 'button', name: 'Behind' },
+    { i: 5, parent: 0, id: 15, via: 'self', role: 'group', name: 'Sidebar' },
+  ];
+  for (const source of ['chrome-cdp', 'appkit']) {
+    const ax = { source, elements, modal: { present: true, element: 2 } };
+    expect(axFindings({ ax }).filter(f => f.kind === 'outside-modal').map(f => f.id)).toEqual([14, 15]);
+  }
+});
+
 test('a presented popover belongs to its AppKit modal for outside-modal findings', () => {
   const elements = [
     { i: 0, parent: null, id: null, via: 'none', role: 'scrollarea', name: '' },

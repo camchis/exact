@@ -4,21 +4,22 @@
 //! @ref LLP 1048.000 D3 (the head), D6 (the checkpoint, 1a's form), D7
 //! (`dist/`)
 //!
-//! The head is the active `head` element's fields (LLP 1048.003 D1) with the
-//! app's name as the title when no head sets one, the viewport meta the glue
-//! would write (`syncViewportFit`), and the plan's fonts as `@font-face` rules
+//! The active `head` supplies the metadata (LLP 1048.003 D1). Its title falls
+//! back to the route heading, then the app's name (LLP 1115.000 D4.1). The
+//! viewport meta is what the glue would write (`syncViewportFit`), and the
+//! plan's fonts are `@font-face` rules
 //! with their preloads — so a reader without JavaScript sees the page's own
 //! faces. URLs a crawler reads (canonical, image) are made absolute against
 //! the manifest's origin, never a request's. Nothing preloads the glue or the
 //! wasm (D3).
 
-use super::{escape, navigable, Document, DocumentError, Json};
+use super::{escape, navigable, Document, DocumentError, Json, Source};
+use exact_kernel::{PropId, ViewId};
 use exact_plan::{Plan, RenderPolicy, Value};
 use exact_runner::{Checkpoint, DataSource, Runner};
 use std::fmt::Write as _;
 
-/// What the page knows of the app beyond its plan: the manifest's name, the
-/// title when no head sets one, and its production origin.
+/// The manifest's name and production origin.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Site<'a> {
     /// The manifest's name.
@@ -40,7 +41,11 @@ impl Document {
     ) -> Result<String, DocumentError> {
         let head = &self.head;
         let mut out = String::new();
-        let title = head.title.as_deref().unwrap_or(site.name);
+        let title = head
+            .title
+            .as_deref()
+            .or(self.route_title.as_deref())
+            .unwrap_or(site.name);
         out.push_str("<title>");
         escape(&mut out, title, false).map_err(|reason| DocumentError {
             view: 0,
@@ -121,6 +126,74 @@ impl Document {
         }
         Ok(out)
     }
+}
+
+/// The first navigation root's selected route heading, as `navigation.js`'s `routeTitle` reads it.
+pub fn route_title(src: &impl Source, roots: &[ViewId]) -> Option<String> {
+    let descendants = |roots: &[ViewId], predicate: &dyn Fn(ViewId) -> bool| {
+        let mut pending: Vec<_> = roots.iter().rev().copied().collect();
+        while let Some(id) = pending.pop() {
+            if predicate(id) {
+                return Some(id);
+            }
+            pending.extend(src.children(id).iter().rev());
+        }
+        None
+    };
+    let nav = descendants(roots, &|id| {
+        src.facts(id)
+            .is_some_and(|n| n.props.str(PropId::NavigationBack).is_some())
+    })?;
+    let node = src.facts(nav)?;
+    let key = node.props.str(PropId::NavigationKey)?;
+    let children = src.children(nav);
+    let candidates = match crate::link::linked().tabs {
+        Some(tabs) => tabs(src, &children, Some(key))
+            .into_iter()
+            .map(|(id, _, _)| id)
+            .collect::<Vec<_>>(),
+        None => children.into_owned(),
+    };
+    let route = candidates.into_iter().find(|&id| {
+        src.facts(id)
+            .is_some_and(|n| n.props.str(PropId::NavigationKey) == Some(key))
+    })?;
+    let header = src.children(route).iter().copied().find(|&id| {
+        src.facts(id)
+            .is_some_and(|n| super::tag_of(&n, false) == "header")
+    })?;
+    let heading = descendants(&src.children(header), &|id| {
+        src.facts(id).is_some_and(|n| {
+            n.props.str(PropId::AccessibilityRole) == Some("heading")
+                || matches!(
+                    super::tag_of(&n, false),
+                    "h1" | "h2" | "h3" | "h4" | "h5" | "h6"
+                )
+        })
+    })?;
+    let mut text = String::new();
+    let mut pending = vec![heading];
+    while let Some(id) = pending.pop() {
+        if let Some(node) = src.facts(id) {
+            let props = super::props_of(&node);
+            let children = src.children(id);
+            if let Some(json) = props.get("markupPieces").filter(|_| children.is_empty()) {
+                for piece in super::markup_pieces(json).ok()? {
+                    // Markdown line breaks are `<br>`s, which add no textContent.
+                    if piece.flags & 32 != 0 {
+                        text.push_str(&piece.text);
+                    } else {
+                        text.extend(piece.text.chars().filter(|&c| c != '\n'));
+                    }
+                }
+            } else {
+                text.push_str(props.get("text").map_or("", String::as_str));
+                pending.extend(children.iter().rev());
+            }
+        }
+    }
+    let title = text.trim();
+    (!title.is_empty()).then(|| title.to_owned())
 }
 
 /// ` name="value"`, escaped for an attribute.
