@@ -3079,7 +3079,12 @@ file paths stay 404, even with `notfound`.
 A route literal may hold Unicode and spaces as they are (`"/item/café"`) or escaped, but spells
 an escape as a browser sends it: the router matches a path only as written, while a host serves
 every spelling from one file. An escape of a character a URL carries as itself (`%41` for `A`)
-or one in lower case (`%c3`) is refused (`route-pattern`), naming the spelling to write.
+or one in lower case (`%c3`) is refused (`route-pattern`), naming the spelling to write. A
+`render=build` page is written at its path decoded (`/item/caf%C3%A9` to
+`item/café/index.html`), but for what no file name may hold on every system, which stays escaped:
+a separator, `%`, `<>:"|?*`, a control character, a trailing dot or space, and a Windows device
+name's first letter (`/docs/con` to `docs/%63on/index.html`). `serve` looks pages up by that
+name; two pages that would share a file are refused.
 
 **A built site, hosted.** `bun exact.mjs web-build --out dist` writes the site to `dist/`, a
 release build as deploy makes one (no agent mode): a page for each `render=build` route

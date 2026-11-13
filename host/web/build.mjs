@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-import { writeCrawlerFiles } from './crawl.mjs';
+import { buildPageFiles, writeCrawlerFiles } from './crawl.mjs';
 import { warmGameInputs, warmGameEnvironment, publishWarmGame } from '../web-js/module.mjs';
 import { generatedInputFiles } from '../../game/inputs.mjs';
 // Build the web app (LLP 1071): the JS target, `host/web-js/build.mjs`, the
@@ -648,15 +648,15 @@ if (buildLocations.length && renderAt) {
   const shell = readFileSync(resolve(stage, 'index.html'), 'utf8');
   const pages = rendered.stdout.split('\n').filter(Boolean).map((line) => JSON.parse(line));
   if (pages.length) writeFileSync(resolve(stage, 'shell.html'), shell);
-  for (const doc of pages) {
-    if (doc.error) throw new Error(`${renderBin} ${doc.location}: ${doc.error}`);
-    const html = doc.page;
-    const file = doc.notfound ? '404.html' : `${decodeURIComponent(doc.location).replace(/^\/|\/$/g, '')}/index.html`.replace(/^\//, '');
-    if (resolve(stage, file) === stage || !within(stage, resolve(stage, file))) throw new Error(`${renderBin}: location ${doc.location} leaves dist`);
+  for (const doc of pages) if (doc.error) throw new Error(`${renderBin} ${doc.location}: ${doc.error}`);
+  // Each page's file as the JS target's writers choose it and the servers look it up (crawl.mjs `buildPageFiles`).
+  const routeTable = planRouteTable(planBytes), files = buildPageFiles(stage, pages, routeTable);
+  for (const [i, doc] of pages.entries()) {
+    const html = doc.page, file = files[i];
     mkdirSync(resolve(stage, file, '..'), { recursive: true });
     writeFileSync(resolve(stage, file), html);
   }
-  if (pages.length) writeCrawlerFiles(stage, pages, app.origin, planRouteTable(planBytes));
+  if (pages.length) writeCrawlerFiles(stage, pages, app.origin, routeTable);
   // A render that reached its deadline still ships: its placeholders show
   // until the runtime asks what was pending (LLP 1048.000 D9).
   const late = pages.filter((doc) => doc.settled === false).map((doc) => doc.location);
