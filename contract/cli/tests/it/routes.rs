@@ -1279,3 +1279,19 @@ fn a_route_literal_spells_its_escapes_as_a_browser_sends_them() {
         );
     }
 }
+
+/// The not-found screen's way home is the root route's pattern as a value,
+/// so a quote in that pattern neither ends its `href` nor drops the screen.
+#[test]
+fn a_quote_in_the_root_route_keeps_the_not_found_screen() {
+    let source = "routes nav\n  home \"/say\\\"hi\\\"\"\n  index \"/\"\ncomponent App\n  view\n    main navigationKey=`${top(nav).id}` width=\"100%\" height=\"100%\"\n      for e in stack(nav) key=e.id\n        column navigationKey=`${e.id}` position=\"absolute\" inset=0\n          if e.name == \"home\"\n            text \"Home\" testId=\"home\"\n";
+    let plan = contract::compile(source).unwrap();
+    let r = boot(plan, "/absent");
+    let k = r.kernel();
+    assert_eq!(k.find_by_test_id("not-found").len(), 1);
+    let link = k.find_by_test_id("not-found-home")[0];
+    assert_eq!(
+        k.node_by_key(link).unwrap().props.str(PropId::Href),
+        Some("/say\"hi\"")
+    );
+}

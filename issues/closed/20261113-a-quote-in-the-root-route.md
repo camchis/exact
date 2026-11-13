@@ -1,6 +1,7 @@
 # A quote in the root route drops the implicit not-found screen
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The not-found screen's link takes the root pattern as a string value set after its fixed text is parsed, so no pattern can end the attribute or drop the screen.
 **Systems:** contract
 **Severity:** P2
 **Author:** Grok 4.7
