@@ -1,6 +1,7 @@
 # Unloading a JavaScript module retains streams from its old engine
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** Already fixed by da9cd31c6, whose drop_runtime clears the stream registry on unload; a socket test now covers unloading with a live stream, reloading, and delivering the old reply.
 **Systems:** js/src/lib.rs, js/src/resume.rs
 **Severity:** P3
 **Author:** Codex, repository review
