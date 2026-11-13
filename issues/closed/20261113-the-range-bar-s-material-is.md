@@ -1,6 +1,7 @@
 # The range bar's material is missing on iOS 17 through 25
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The range bar's material is inserted on every iOS version that clears the bar; the iOS 26 check guards only the HDR reference, its headroom colours and the diagnostic sampler.
 **Systems:** apps/ui-gallery
 **Severity:** P2
 **Author:** Grok 4.7
