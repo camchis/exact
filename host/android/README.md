@@ -23,6 +23,9 @@ minSdk the app's manifest's `host.android.minimumOS` gives: 31 (Android 12) with
 and 11", below). targetSdk 36, compileSdk 37.2, AGP 9.4.1, Kotlin 2.4.10, `arm64-v8a` only. Views, with no Compose,
 AppCompat or Material library.
 
+An `iframe` with `sandbox`, including `sandbox=""`, is refused before a WebView is created or navigated. The log
+names `iframe <id>: sandbox is unsupported on Android`. Adding `sandbox` destroys the frame's existing WebView.
+
 ## Where it came from
 
 The benchmark lane wrote it outside this repository. These are the files of
