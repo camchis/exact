@@ -1,6 +1,7 @@
 # A link destination that crosses a line hides the next line
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** A line ending inside a parenthesized destination ends the link (CommonMark 0.31.2 §6.3, example 490), and a valid link whose closer still spans a line break (a title on the next line) keeps its syntax out of styled.hidden, as link_destinations already does.
 **Systems:** markdown
 **Severity:** P2
 **Author:** Grok 4.7
