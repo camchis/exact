@@ -1,6 +1,7 @@
 # Unbinding a timeline leaves a running animation outside the frame scheduler
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** Removing a timeline binding now always reschedules the node's animations, so a live play is back on the clock's list and the engine asks for and samples its frames.
 **Systems:** motion, host/linux
 **Author:** Codex
 **Date:** 2026-11-12
