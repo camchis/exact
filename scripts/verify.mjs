@@ -15,8 +15,9 @@
 // its texts compared before and after (LLP 1116.010 D6; `judgeReload` says what it forgives): a screen that reloads into another state
 // ('Card 2 of 3' → '0 / 0') is a note, not a problem, since a game or a draft in progress lives in memory by design (LLP 1116.011 D5);
 // it is a finding only when a saved value came back different (`savedChanges`: a `persist` state, a field showing what the app kept).
-// A native host's cold launch is `/` (LLP 1038 §7), so iOS has no such reload to compare. A refusal
-// the host journaled during the run (`logs`: 'swipeContent … is refused: …') is shown first in the report (LLP 1116.010 D5). One capture of each screen is kept in
+// Native relaunch opens at the launch location (on iOS, the manifest's `start_url` by default), so verify
+// compares end-route reloads only on the web. A refusal the host journaled during the run
+// (`logs`: 'swipeContent … is refused: …') is shown first in the report (LLP 1116.010 D5). One capture of each screen is kept in
 // .exact/verify/ for milestones (four of the first screen: each width and scheme). It prints one short report
 // ending "verify: clean" or "verify: N problems" (`--json`: one object). Exit 1 when the build, a test, a launch
 // or the relaunch fails; check's findings, the relaunch's, those at the largest text size and the compiler's warnings
