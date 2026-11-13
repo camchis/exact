@@ -211,7 +211,12 @@ export function exercise(source: string): string {
     const owner=new URL('https://example.test/?x=1&y=2'), viewed=owner.searchParams.entries(), views:unknown[]=[viewed.next().value];
     owner.search='?p=1&q=2&r=3';const pair=viewed.next().value!;pair[0]='changed';views.push(pair,String(owner.searchParams));
     owner.href='https://example.test/?only=1';views.push(viewed.next().done,owner.searchParams.size);
-    return JSON.stringify({seen,visits,steps,views,first,linked,href:url.href,same:params===url.searchParams,entries:Array.from(params),bad:URL.canParse('/x'),parse:URL.parse('not a url'),nul:new URLSearchParams([['\0','\0']]).get('\0')});
+    // The constructor removes one leading `?` and a URL's query has none: a second is the name's
+    const marks:unknown[]=[new URLSearchParams('??a=1'),new URLSearchParams('?%3Fa=1'),new URL('https://example.test/??a=1&b=2').searchParams].map(p=>[...p]);
+    const marked=new URL('https://example.test/??a=1&b=2'), own=new URLSearchParams('??a=1');
+    marked.searchParams.set('b','3');own.append('c','2');
+    marks.push(marked.searchParams.get('?a'),marked.searchParams.has('a'),marked.href,own.get('?a'),String(own));
+    return JSON.stringify({seen,visits,steps,views,marks,first,linked,href:url.href,same:params===url.searchParams,entries:Array.from(params),bad:URL.canParse('/x'),parse:URL.parse('not a url'),nul:new URLSearchParams([['\0','\0']]).get('\0')});
   }
   if(source==='headersWork') {
     // Iterating 4,000 unchanged headers three ways, within the test's turn budget

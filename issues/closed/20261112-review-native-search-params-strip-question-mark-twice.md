@@ -1,6 +1,7 @@
 # Native URLSearchParams removes a question mark that belongs to the parameter name
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** Ibex's Rust query parser no longer removes a leading `?`, leaving the one removal to the JavaScript constructor as the URL Standard has it, so `??a=1` names `?a`.
 **Systems:** vendored Ibex URLSearchParams, native JavaScript data sources
 **Author:** Codex
 **Date:** 2026-11-12

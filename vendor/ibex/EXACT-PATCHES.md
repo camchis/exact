@@ -928,3 +928,12 @@ the whole list for each, so iterating N headers sorted them 2N times.
 `PartialEq` compares the entries alone. `stdlib/fetch.rs` tests the reads
 across changes; `js/tests/it/pure.rs` checks the scaling and, against
 Chrome, mutation during iteration. Replay on a refresh.
+
+## Local patch 41, query data keeps a `?` that begins a name
+
+`stdlib/url.rs`'s `SearchParams::parse` no longer removes a leading `?`.
+Its input is query data: `bindings/url.js` removes the one delimiter the
+URL Standard's constructor removes, and a URL's query excludes its own, so
+a second removal made `??a=1` the name `a` rather than `?a`. `url.rs`
+tests the parse; `js/tests/it/pure.rs` compares construction, a URL's
+view, lookup and mutation with Chrome. Replay on a refresh.
