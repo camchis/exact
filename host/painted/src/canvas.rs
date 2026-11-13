@@ -249,7 +249,7 @@ pub use stream::drawing;
 
 thread_local! {
     /// The last finished recording and the pictures it introduced.
-    static FINISHED: RefCell<Option<Vec<u32>>> = const { RefCell::new(None) };
+    pub(crate) static FINISHED: RefCell<Option<Vec<u32>>> = const { RefCell::new(None) };
     /// The last finished recording's scrollers and the offsets drawn at.
     static GROUPS: RefCell<Vec<(u32, (f32, f32))>> = const { RefCell::new(Vec::new()) };
 }
