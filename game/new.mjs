@@ -1218,14 +1218,18 @@ function dropPlatform(dir, platform) {
   return removed.length ? `without ${platform} (removed ${removed.join(', ')})` : `without ${platform} (it shipped none already)`;
 }
 
-/** The manifest's paths into the checkout, rewritten after it moved: the schema, and a Snapback app's driver mount. */
+/** The manifest's paths into the checkout, rewritten after it moved: the schema, and a Snapback app's driver mount.
+ * Without the Snapback client the mount is left as it is, and the note returned says so. */
 function refreshManifestPaths(dir) {
   const manifestPath = resolve(dir, 'app.json');
-  if (!existsSync(manifestPath)) return;
+  if (!existsSync(manifestPath)) return null;
   const text = readFileSync(manifestPath, 'utf8');
   let next = text.replace(/("\$schema"\s*:\s*)"[^"]*"/, (_, head) => head + JSON.stringify(pathFrom(appHome(dir), resolve(ROOT, 'scripts/app.schema.json'))));
-  next = next.replace(/("snapback4"\s*:\s*)"[^"]*"/, (line, head) => JSON.parse(next).typescript?.sources?.snapback4 ? head + JSON.stringify(driverMount(dir, onlineMount(JSON.parse(next).typescript.sources.snapback4))) : line);
+  const mount = JSON.parse(next).typescript?.sources?.snapback4;
+  const driver = mount && resolve(ROOT, onlineMount(mount) ? 'snapback4/online' : 'snapback4/ts');
+  if (driver && existsSync(driver)) next = next.replace(/("snapback4"\s*:\s*)"[^"]*"/, (_, head) => head + JSON.stringify(driverMount(dir, onlineMount(mount))));
   if (next !== text) writeFileSync(manifestPath, next);
+  return driver && !existsSync(driver) ? `app.json's snapback4 mount left as it was: ${NO_SNAPBACK}` : null;
 }
 
 /** An older app may predate the generated test command. Preserve authored tests; otherwise start with a boot check
@@ -1287,9 +1291,9 @@ function updateApp(dir, name, { without = null, with: platforms = [] } = {}) {
     const edits = platformEdits(dir, platforms, without);
     const notes = updateNotes(dir, name);
     if (editorTasks(dir)) notes.push('.vscode/tasks.json');
-    refreshManifestPaths(dir);
+    const unmounted = refreshManifestPaths(dir);
     defaultTest(dir);
-    return `Updated ${dir}: exact.mjs${edits.length ? `, ${edits.join(', ')}` : ''}${notes.length ? `, ${notes.join(', ')}` : ''}`;
+    return `Updated ${dir}: exact.mjs${edits.length ? `, ${edits.join(', ')}` : ''}${notes.length ? `, ${notes.join(', ')}` : ''}${unmounted ? `\n${unmounted}` : ''}`;
   }
   if (!existsSync(resolve(dir, 'Cargo.toml'))) throw new Error(`${dir}: its crates name no workspace of their own (no Cargo.toml beside app.json). ${NO_WORKSPACE}`);
   // Before anything is written: a host crate update would add needs the root the copied-up workspace has.
@@ -1356,7 +1360,7 @@ function updateApp(dir, name, { without = null, with: platforms = [] } = {}) {
   }
   const notes = updateNotes(dir, name);
   if (editorTasks(dir)) notes.push('.vscode/tasks.json');
-  refreshManifestPaths(dir);
+  const unmounted = refreshManifestPaths(dir);
   defaultTest(dir);
   // The Apple entry's plan and compatibility document come with its host.rs (`exact_plan()`, `exact_compat()`): an
   // Apple build links them (`exact_apple::baked`), and the constants an older entry declares read a file it no longer writes.
@@ -1380,7 +1384,7 @@ function updateApp(dir, name, { without = null, with: platforms = [] } = {}) {
   const crates = new Map(JSON.parse(metadata.stdout).packages.map(p => [p.name, dirname(p.manifest_path)]));
   crates.set('ibex2-sqlite', resolve(ROOT, 'vendor/ibex/crates/ibex2-sqlite'));
   const { changed, unresolved } = updateManifests(dir, crates, rootText);
-  const said = `Updated ${dir}: patches, toolchain, exact.mjs${addedLinux ? ', a linux/ host crate' : ''}${addedAndroid ? ', an android/ crate (bun exact.mjs android builds the APK)' : ''}${edits.length ? `, ${edits.join(', ')}` : ''}${without && ['linux', 'android'].includes(without) ? ', Cargo.lock' : ''}${notes.length ? `, ${notes.join(', ')}` : ''}${changed.length ? `, exact2 paths in ${changed.join(', ')}` : ''}${unresolved.length ? `\n<exact2> left unresolved in ${unresolved.join(', ')}: a path into exact2 is written \`<exact2>/\` and then forward slashes` : ''}`;
+  const said = `Updated ${dir}: patches, toolchain, exact.mjs${addedLinux ? ', a linux/ host crate' : ''}${addedAndroid ? ', an android/ crate (bun exact.mjs android builds the APK)' : ''}${edits.length ? `, ${edits.join(', ')}` : ''}${without && ['linux', 'android'].includes(without) ? ', Cargo.lock' : ''}${notes.length ? `, ${notes.join(', ')}` : ''}${changed.length ? `, exact2 paths in ${changed.join(', ')}` : ''}${unresolved.length ? `\n<exact2> left unresolved in ${unresolved.join(', ')}: a path into exact2 is written \`<exact2>/\` and then forward slashes` : ''}${unmounted ? `\n${unmounted}` : ''}`;
   // Whether the workspace loads: every member's manifest read, nothing resolved or fetched, so only the app's files can
   // fail it. One that does not load builds nothing, so the update failed, though its files are written.
   const loads = spawnSync('cargo', ['metadata', '--no-deps', '--offline', '--format-version', '1'], { cwd: dir, env: cargoEnvironment(), stdio: ['ignore', 'ignore', 'pipe'], encoding: 'utf8' });

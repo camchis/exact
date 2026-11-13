@@ -1150,6 +1150,22 @@ test.skipIf(hasSnapback)('exact new --snapback in a checkout without the client 
   } finally { rmSync(parent, { recursive: true, force: true }); }
 });
 
+// Without the client, update still rewrites the schema path, leaves a Snapback app's mount as it was and says why.
+test.skipIf(hasSnapback)('update of a Snapback app in a checkout without the client keeps its mount and finishes', () => {
+  const parent = mkdtempSync(resolve(tmpdir(), 'exact-new-')), dir = resolve(parent, 'guest');
+  try {
+    createApp(dir);
+    const path = resolve(dir, 'app.json'), manifest = JSON.parse(readFileSync(path, 'utf8'));
+    manifest.$schema = '../old/scripts/app.schema.json';
+    manifest.typescript = { ...manifest.typescript, sources: { ...manifest.typescript?.sources, snapback4: '../old/snapback4/ts' } };
+    writeFileSync(path, JSON.stringify(manifest, null, 2));
+    assert.match(createApp(dir, { update: true }), /snapback4 mount left as it was: this checkout has no Snapback client/);
+    const after = JSON.parse(readFileSync(path, 'utf8'));
+    assert.equal(after.$schema, pathFrom(dir, resolve(import.meta.dir, '../scripts/app.schema.json')));
+    assert.equal(after.typescript.sources.snapback4, '../old/snapback4/ts');
+  } finally { rmSync(parent, { recursive: true, force: true }); }
+});
+
 // `exact new --snapback` (the author's ruling of 2026-10-12, via the sb4 app farm): the README's setup block, run. The
 // backend is the directory above; the device build is `bun exact.mjs snapback`'s, skipped here (`build: false`).
 test.skipIf(!hasSnapback)('a new Snapback app is wired to the backend above it, and update follows a moved checkout\'s mount', () => {
