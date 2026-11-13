@@ -1,12 +1,15 @@
-const CODEC_PATHS: [&str; 8] = [
+const CODEC_PATHS: [&str; 11] = [
     "../vendor/taffy/src/style/grid.rs",
     "build.rs",
     "build/codec.rs",
     "src/style/calc/wire.rs",
     "src/style/calc/parse.rs",
+    "src/style/relative.rs",
+    "src/style/relative/wire.rs",
     "src/style/grid.rs",
     "src/style/grid/parse.rs",
     "src/wire/codec.rs",
+    "src/wire/ops.rs",
 ];
 const SCHEMA_PATH: &str = "tables/schema.json";
 const DIGEST_DOMAIN: &[u8] = b"exact-kernel-schema-v1\0";

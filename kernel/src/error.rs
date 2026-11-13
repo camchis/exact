@@ -33,6 +33,8 @@ pub enum StyleDomainError {
 #[allow(missing_docs)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DecodeError {
+    /// An incoming patch carried an invalid retained relative length.
+    InvalidRelativeLength,
     /// Invalid line-height tag, negative length or ratio.
     InvalidLineHeight,
     /// Fewer bytes remained than the field needs.

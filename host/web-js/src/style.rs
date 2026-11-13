@@ -672,7 +672,9 @@ fn ramp_rem(text: &str) -> Option<String> {
     };
     Some(format!(
         "{}rem",
-        exact_web::css::num(unit.basis(MEDIUM, MEDIUM, 1.0) / MEDIUM)
+        exact_web::css::num(
+            unit.basis(MEDIUM, MEDIUM, 1.0, &exact_kernel::Env::default()) / MEDIUM
+        )
     ))
 }
 
@@ -772,7 +774,9 @@ pub static TEXT_STYLE_MAP: std::sync::LazyLock<String> = std::sync::LazyLock::ne
     use exact_kernel::style::relative::{Unit, MEDIUM};
     let mut pairs = Vec::new();
     for (i, s) in exact_kernel::TEXT_STYLES.iter().enumerate() {
-        let rem = Unit::TextStyle(i as u8).basis(MEDIUM, MEDIUM, 1.0) / MEDIUM;
+        let rem =
+            Unit::TextStyle(i as u8).basis(MEDIUM, MEDIUM, 1.0, &exact_kernel::Env::default())
+                / MEDIUM;
         let css = format!("{rem}rem");
         pairs.push(format!("{:?}:{css:?}", format!("-exact-{}", s.name)));
         if !s.alias.is_empty() {

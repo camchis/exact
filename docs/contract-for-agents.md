@@ -5500,10 +5500,11 @@ Contract attributes. See [CSS Grid's track sizing](https://www.w3.org/TR/css-gri
 Dimension rows (width/height, their min/max, padding/margins, offsets and
 border radii) accept `vw`, `vh`, `vmin`, `vmax`, and `svw/svh/lvw/lvh/dvw/dvh`.
 On native, all viewport variants follow the window; on web, CSS resolves
-small/large/dynamic viewports. Scalar lengths such as font size and gap do
-not yet accept viewport units.
+small/large/dynamic viewports. Font size, line height, letter spacing, text indent,
+gaps, border widths, border spacing and shape margin accept these units too.
+Inherited font sizes and lengths in `em` follow the resolved font on resize.
 
-The same rows take `env(safe-area-inset-top|right|bottom|left)` and CSS's
+Dimension rows also take `env(safe-area-inset-top|right|bottom|left)` and CSS's
 `calc()`, `min()`, `max()` and `clamp()` over px (and in/cm/mm/q/pt/pc/ch/lh),
 percentages, those insets, viewport segments and viewport lengths. Functions
 can nest, add or subtract lengths, and multiply or divide by a number:
