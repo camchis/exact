@@ -1114,6 +1114,8 @@ package final class Presenter {
             // Only scheduled: the hit-test is the next display frame's.
             if relaid { followPointer() }
         }
+        // No view changed: no pass over the views. A correction may have scrolled a context preview's source.
+        if Self.onlySnapshots(batch) { tables.sync(batch); positionContexts(); return }
         if !batch.ops.isEmpty { textViewportIndex = nil }
         var reparented = Set<UInt32>()
         let structureChanged = batch.ops.contains { [.children, .roots, .destroy, .create, .renew, .style].contains($0.op) }

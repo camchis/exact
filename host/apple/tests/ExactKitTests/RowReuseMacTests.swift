@@ -8,6 +8,7 @@
 #if os(macOS)
 import AppKit
 import XCTest
+import ExactCore
 @testable import ExactKit
 
 final class RowReuseMacTests: XCTestCase {
@@ -168,6 +169,21 @@ final class RowReuseMacTests: XCTestCase {
                 XCTAssertEqual(reused.table.selectedRow, fresh.table.selectedRow)
             }
         }
+    }
+
+    /// A batch that only says where lists stand (a report's answer that
+    /// moved no view, half a fling's batches) skips the passes over the
+    /// views; one that carries anything else of the page's does not.
+    func testABatchOfListSnapshotsAloneIsTheListsAlone() {
+        func batch(_ ops: [BatchOp], error: String? = nil) -> Batch { Batch(ops: ops, timers: false, motion: false, clock: nil, error: error) }
+        let snapshot = BatchOp(op: .collections)
+        XCTAssertTrue(Presenter.onlySnapshots(batch([snapshot])))
+        XCTAssertTrue(Presenter.onlySnapshots(batch([snapshot, snapshot])))
+        XCTAssertFalse(Presenter.onlySnapshots(batch([])), "an empty batch is not one")
+        XCTAssertFalse(Presenter.onlySnapshots(batch([snapshot, BatchOp(op: .props, nodeID: 3)])))
+        XCTAssertFalse(Presenter.onlySnapshots(batch([snapshot], error: "refused")), "an error is said")
+        var held = batch([snapshot]); held.wakelock = true
+        XCTAssertFalse(Presenter.onlySnapshots(held), "a wake lock is taken")
     }
 
     /// A focused row is pinned: it stays mounted with its item and its
