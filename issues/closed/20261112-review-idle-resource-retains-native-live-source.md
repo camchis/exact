@@ -1,6 +1,7 @@
 # Closing a resource gate does not release its native live source
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** A resource whose gate closed no longer counts as a reader of its bound live source, so its argument group, or with the last reader the whole name, is released; opening the gate asks again.
 **Systems:** runner, native modules
 **Author:** Codex
 **Date:** 2026-11-12
