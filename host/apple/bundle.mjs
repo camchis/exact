@@ -14,7 +14,7 @@ import { memoryEntitlements } from './plist.mjs';
 import { listAssets } from '../web/serve.mjs';
 import { appIcon, buildInfo, iosAssets, appleAssets, copyNativeResources, IOS_RESOURCE_ROOT, iosBundleGrants, iosExecutableRefusal, shareIosResources, iconFiles, signingOrder, helperEntitlements, wrapFramework, assertArchiveFrameworks, plistFile } from './assets.mjs';
 import { allows, profile, identity, embeddedProfile } from './devices.mjs';
-import { grantEntitlements } from './presence.mjs';
+import { grantEntitlements, macHostIdentity } from './presence.mjs';
 import { stripForDistribution, stripProductionExecutable } from './link.mjs';
 import { assertLibraryNames, placeLibrary } from '../../scripts/package-libraries.mjs';
 import { fileURLToPath } from 'node:url';
@@ -99,6 +99,8 @@ export function assembleMac({intents, shared, library, moduleLibraries = [], ser
     writeFileSync(resolve(binDir, 'receipt.json'), receipt(app, { compatibilityId:bakedCompat.id, build:buildReceipt, composition, platform: 'macos', target: process.arch === 'arm64' ? 'aarch64-apple-darwin' : 'x86_64-apple-darwin', sdk, identity: sha1 ?? 'ad-hoc', profile: provisioning ? { name: provisioning.profile.name, team: provisioning.profile.team, expires: provisioning.profile.expires } : profiles ? { name: profiles.app.name, team, expires: profiles.app.expires } : null, entitlements: ent ? readFileSync(ent, 'utf8') : null, gpu: hasGpu ? dylib : null, development }));
     // A local .app gives Launch Services an owner for development links, and is what `--run` launches (a bare executable has no Info.plist).
     // A profile's entitlements hold only in a bundle that embeds it.
+    // What runs beside an executable in its bundle's MacOS directory: the app's and the sample host's.
+    const beside = [...loaded, ...(canvasGpuBuilt ? [canvasGpuLoadName] : []), ...(modulesBuilt ? [modulesLoadName] : []), ...serviceDylibs.map(svc => svc.load), ...(hasGpu ? [loadName] : []), ...moduleDylibs.map(m => m.load)];
     if (shared || provisioning || args.includes('--bundle') || args.includes('--run') || buildReceipt.binary.metadata.appleAssetCatalogs?.length) {
       const bundleDestination = appleArtifacts(app).bundle;
       const output = resolve(bundleDestination, '..');
@@ -110,7 +112,7 @@ export function assembleMac({intents, shared, library, moduleLibraries = [], ser
       const executables = resolve(contents, 'MacOS'), resources = resolve(contents, 'Resources');
       mkdirSync(executables, { recursive: true });
       mkdirSync(resources);
-      for (const file of [paths.executable, ...loaded, ...(canvasGpuBuilt ? [canvasGpuLoadName] : []), ...(modulesBuilt ? [modulesLoadName] : []), ...serviceDylibs.map(svc => svc.load), ...(hasGpu ? [loadName] : []), ...moduleDylibs.map(m => m.load)]) copyFileSync(resolve(binDir, file), resolve(executables, file));
+      for (const file of [paths.executable, ...beside]) copyFileSync(resolve(binDir, file), resolve(executables, file));
       writeFileSync(resolve(contents, 'Info.plist'), macInfoPlist(app, { development, distributed: distribution, reach: appleReach, icon: { ...widgetKeys, ...rosterKeys, ...assetKeys, ...buildInfo(app, { root, production: production || distribution, ...stampSdk }) } }));
       copyAppleStaticTrees(paths.capture, resources);
       for (const file of ['Assets.car', ...(assetKeys.CFBundleIconFile ? [`${assetKeys.CFBundleIconFile}.icns`] : [])]) if (existsSync(resolve(binDir, file))) copyFileSync(resolve(binDir, file), resolve(resources, file));
@@ -160,6 +162,47 @@ export function assembleMac({intents, shared, library, moduleLibraries = [], ser
       rmSync(stage, { recursive: true, force: true });
       bundlePath = placed;
       console.log(`local client: ${placed}\n  ${development ? `Open this app once to register its opening link for ${development.origins[0]}.` : 'No development opening link: build with --url <dev server URL> to register one.'}`);
+    }
+    // The sample host (LLP 1031 D10) is a bundle beside the app's, as on iOS: its executable over the app's resources
+    // and frameworks, under the app's profile and entitlements when the app's build has a profile, so what a profile
+    // grants (iCloud, push, a keychain group) holds in its sessions too (#396).
+    if (products.includes('ExactHostMac')) {
+      const signedBy = provisioning?.profile ?? profiles?.app ?? null, host = macHostIdentity(app, signedBy);
+      const destination = appleArtifacts(app, { host: true }).bundle;
+      mkdirSync(dirname(destination), { recursive: true });
+      const stage = mkdtempSync(resolve(dirname(destination), '.host-'));
+      cleanup.push(stage);
+      const bundle = resolve(stage, basename(destination)), contents = resolve(bundle, 'Contents');
+      const executables = resolve(contents, 'MacOS'), resources = resolve(contents, 'Resources'), plist = resolve(contents, 'Info.plist');
+      mkdirSync(executables, { recursive: true });
+      mkdirSync(resources);
+      for (const file of ['ExactHostMac', ...beside]) copyFileSync(resolve(binDir, file), resolve(executables, file));
+      // The app's plist under the host's name and identity, with no document type or link scheme: those are the app's to open.
+      writeFileSync(plist, macInfoPlist(app, { distributed: distribution, reach: appleReach, icon: { ...rosterKeys, ...assetKeys, ...buildInfo(app, { root, production: production || distribution, ...stampSdk }) } }));
+      for (const key of ['CFBundleDocumentTypes', 'UTExportedTypeDeclarations', 'CFBundleURLTypes']) spawnSync('plutil', ['-remove', key, plist], { stdio: 'ignore' });
+      for (const [key, value] of [['CFBundleExecutable', 'ExactHostMac'], ['CFBundleIdentifier', host.id], ['CFBundleName', host.name], ['CFBundleDisplayName', host.name]]) run('plutil', ['-replace', key, '-string', value, plist]);
+      copyAppleStaticTrees(paths.capture, resources);
+      for (const file of ['Assets.car', ...(assetKeys.CFBundleIconFile ? [`${assetKeys.CFBundleIconFile}.icns`] : [])]) if (existsSync(resolve(binDir, file))) copyFileSync(resolve(binDir, file), resolve(resources, file));
+      verifyBakeFiles(bakedCompat, bakedPlan, listAssets(resources, true, ['typescript']));
+      writeUsageStrings(appleReach, resources);
+      copyFileSync(resolve(binDir, 'receipt.json'), resolve(resources, 'receipt.json'));
+      if (signedBy) copyFileSync(signedBy.path, resolve(contents, 'embedded.provisionprofile'));
+      for (const file of [...loaded, ...(canvasGpuBuilt ? [canvasGpuLoadName] : []), ...(modulesBuilt ? [modulesLoadName] : []), ...serviceDylibs.map(svc => svc.load)]) run('codesign', ['--force', '--sign', sha1 ?? '-', '--timestamp=none', resolve(executables, file)], { stdio: 'ignore' });
+      copyNativeResources(app, contents, buildReceipt.binary.metadata.nativeResources ?? []);
+      const frameworks = resolve(contents, 'Frameworks');
+      if (library) run('codesign', ['--force', '--sign', sha1 ?? '-', '--timestamp=none', placeLibrary(library, frameworks)], { stdio: 'ignore' });
+      if (shared) {
+        mkdirSync(frameworks, { recursive: true });
+        cpSync(shared.framework, resolve(frameworks, 'ExactCore.framework'), { recursive: true, verbatimSymlinks: true });
+        run('codesign', ['--force', '--sign', sha1, '--timestamp=none', resolve(frameworks, 'ExactCore.framework')], { stdio: 'ignore' });
+      }
+      const nativeRoots = (app.manifest.host?.macos?.resources ?? []).map(({to}) => resolve(contents, to)), order = signingOrder(bundle, bakedCompat);
+      helperEntitlements(bundle, app.manifest, bakedCompat, order);
+      for (const file of order.filter(file => nativeRoots.some(root => file === root || file.startsWith(root + '/')))) run('codesign', ['--force', '--sign', sha1 ?? '-', '--timestamp=none', file], { stdio: 'ignore' });
+      run('codesign', ['--force', '--sign', sha1 ?? '-', '--timestamp=none', ...(ent ? ['--entitlements', ent] : []), bundle], { stdio: 'ignore' });
+      assertAppleIdentity(app, resolve(executables, 'ExactHostMac'), bakedCompat.id, shared && resolve(frameworks, 'ExactCore.framework/ExactCore'));
+      placeAppleArtifact(bundle, destination);
+      console.log(`sample host: ${destination} (${host.id}${signedBy ? `, under "${signedBy.name}"` : ''})`);
     }
     return bundlePath;
 }

@@ -959,6 +959,11 @@ plan cannot reach (LLP 1036.000 §5–§10). `--bundle` prints the stable Mac bu
 `<target>/clients/<source-key>/<id>/macos/<Name>.app`; `scripts/exact.mjs`,
 `agent --app` and metrics use that same resolver. `--host` leaves both standalone
 and sample products; simulator and device bundles have separate destinations.
+On the Mac the sample host is a bundle beside the app's, `<Name> Host.app`, which
+`agent host` launches. Under the app's macOS profile it embeds that profile and takes
+the app's id and entitlements (iCloud, push, a keychain group), so its two sessions
+keep what the app's do; with none it is `<id>.host`. It registers no document type or
+link scheme, which stay the app's.
 Two apps can build together. A second Apple build of the same source/app fails
 with its owner's PID and lock path before baking; remove a stale lock only after
 verifying that owner is no longer running. Failed packaging retains the previous
