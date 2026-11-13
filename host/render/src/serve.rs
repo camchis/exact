@@ -799,10 +799,17 @@ fn respond<D: DataSource + 'static>(
     if let Some(response) = deferred::response(path, &shared.checkpoints) {
         return response;
     }
-    if path == "/sitemap.xml" {
+    // An authored route at a crawler file's path is the app's page, not the generated file.
+    let crawler = matches!(path, "/robots.txt" | "/sitemap.xml")
+        && !shared
+            .plan
+            .routes
+            .iter()
+            .any(|r| !r.notfound && canonical_location(shared.plan.str(r.pattern)) == path);
+    if crawler && path == "/sitemap.xml" {
         return sitemap::sitemap(shared, data);
     }
-    if path == "/robots.txt" {
+    if crawler && path == "/robots.txt" {
         // Neutral until hosting decides a crawler policy (LLP 1048 §9.9).
         let sitemap = shared
             .serve
