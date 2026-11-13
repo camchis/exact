@@ -209,7 +209,9 @@ Ports    web: --port/EXACT_PORT, else a named store’s port (20000-47999), else
       ['--json', 'the report as one JSON object (ios: `scrolling`, each finding\'s metric, value, UIKit\'s and remedy)'],
     ],
     internal: ['--app <name>'],
-    body: `web launches at 390x844 and 1280x900, ios at the simulator's own size with UIKit's bars (an edit to only
+    body: `Host     unnamed: one app.json ships (host, deploy.store, deploy.binaries): web when they name it or nothing, else the
+         first of ios, windows and android that drives here; with none of those, the semantics check alone, saying why.
+web launches at 390x844 and 1280x900, ios at the simulator's own size with UIKit's bars (an edit to only
 app.contract or app.ts runs its new plan, no native rebuild), each on a fresh scratch store, and runs check
 light and dark on the screen it opens to. The tests are app.test.contract's, then each other *.test.contract's
 beside it, as test runs them. Each test's last screen is checked the same way in the test's own session (web: at
@@ -228,14 +230,12 @@ Large    each of those screens again at the largest text size (ios: the simulato
 Native   windows: headless at app.json's window size, then the desktop's window (windows-window.png); android: the APK, light and dark. Neither checks, reads the largest text or scrolls yet.
 Scroll   ios: ~15 s of real touches on a long first-screen list, once per build (host/apple/feel): "like UIKit", or
          a counted finding per metric the app can fix; Exact's own one uncounted line; load > cores: physics only.
-Runs     to completion: exit 1 when the build, a test, a launch or the relaunch fails; the
-         findings (check's, the relaunch's, the largest text size's, scrolling's) and the compiler's
-         warnings are counted, never fail it but under --strict. A screen no test ends on is not checked: end a test there.
-         Its first line says about how long it takes (its last run's time): wait that once.
-Server   an app with its own (server.ts, the rest pattern's): verify runs it where app.ts calls
-         it, on an empty database (DB=.exact/verify/db.sqlite), through the relaunch, then stops
-         it; one already answering there (a dev server) is refused, named, never written to; so is
-         a server entry that does not read DB (process.env.DB), with the fix.
+Runs     to completion: exit 1 when the build, a test, a launch or the relaunch fails; the findings (check's, the relaunch's,
+         the largest text size's, scrolling's) and the compiler's warnings are counted, never fail it but under --strict. A
+         screen no test ends on is not checked: end a test there. Its first line says about how long it takes (its last run's time): wait that once.
+Server   an app with its own (server.ts, the rest pattern's): verify runs it where app.ts calls it, on an empty database
+         (DB=.exact/verify/db.sqlite), through the relaunch, then stops it; one already answering there (a dev server) is
+         refused, named, never written to; so is a server entry that does not read DB (process.env.DB), with the fix.
 Ports    none to choose: test's and agent's (headless Chrome over a pipe; a simulator's socket).`,
     example: 'bun exact.mjs verify            # bun exact.mjs verify ios once at the end, for an iPhone app',
   },
