@@ -1,6 +1,7 @@
 # A held app-decides bundle with a rotten plan is never restaged
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** A pending entry is current only when its plan matches its card, and a preparation that finds a damaged plan unstages it, so the next check writes it again.
 **Systems:** update
 **Severity:** P2
 **Author:** Grok 4.7

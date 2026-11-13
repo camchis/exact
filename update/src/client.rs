@@ -336,7 +336,7 @@ impl Client {
     }
 
     /// The staged generation, pinned but not applied.
-    pub fn prepare_activation(&self) -> Result<Option<PreparedSelection>, String> {
+    pub fn prepare_activation(&mut self) -> Result<Option<PreparedSelection>, String> {
         self.store.prepare_activation()
     }
 
