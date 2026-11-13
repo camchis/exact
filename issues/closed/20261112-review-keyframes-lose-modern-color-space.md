@@ -1,6 +1,7 @@
 # Keyframes convert modern colors to legacy sRGB before interpolation
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** A keyframe's modern colour now parses to an unclipped premultiplied Oklab value that serialises back as `oklab()`, the compiler links the wide forms before it parses keyframes, and Apple samples such an animation rather than lowering it to an sRGB track.
 **Systems:** motion
 **Author:** Codex
 **Date:** 2026-11-12
