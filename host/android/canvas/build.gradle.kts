@@ -18,6 +18,7 @@ android {
             "../../../packages/camera/android", "../../../packages/camera/test",
             "../../../packages/contacts/android", "../../../packages/contacts/test",
             "../../../packages/gamepad/android", "../../../packages/gamepad/test",
+            "../../../packages/geofencing/android", "../../../packages/geofencing/test",
             "../../../packages/geolocation/android", "../../../packages/geolocation/test",
             "../../../packages/text-detection/android", "../../../packages/text-detection/test",
             "../../../packages/media-capture/android", "../../../packages/media-capture/test",
@@ -41,6 +42,7 @@ dependencies {
     testImplementation("androidx.lifecycle:lifecycle-runtime:2.9.4")
     testImplementation("androidx.credentials:credentials:1.6.0")
     testImplementation("com.google.android.gms:play-services-wallet:20.0.0")
+    testImplementation("com.google.android.gms:play-services-location:21.4.0")
     testImplementation("androidx.core:core-telecom:1.0.1")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
 }
