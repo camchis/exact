@@ -1059,6 +1059,7 @@ pub fn unsupported_input_type(value: &Expr) -> Option<&str> {
         Expr::Match { some, none, .. } => {
             unsupported_input_type(some).or_else(|| unsupported_input_type(none))
         }
+        Expr::Let { body, .. } => unsupported_input_type(body),
         _ => None,
     }
 }
@@ -1068,11 +1069,13 @@ pub fn unsupported_input_type(value: &Expr) -> Option<&str> {
 /// (`shown ? "text" : "password"`, a password's show and hide). The node is
 /// a text field either way, so the choice can be made as the app runs, as
 /// the attribute can be set on the web; any other expression could name a
-/// control the compiler has to know (LLP 1069.001 D1).
+/// control the compiler has to know (LLP 1069.001 D1). A `let` around the
+/// choice (a prop read twice, evaluated once) is the same choice.
 pub fn text_input_type(value: &Expr) -> bool {
     match value {
         Expr::Str(t, _) => control_type(t).is_none() && unsupported_input_type(value).is_none(),
         Expr::Ternary(_, a, b, _) => text_input_type(a) && text_input_type(b),
+        Expr::Let { body, .. } => text_input_type(body),
         _ => false,
     }
 }
