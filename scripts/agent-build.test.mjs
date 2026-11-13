@@ -1068,6 +1068,13 @@ test('a failed web build keeps the explanation under a bare error marker', async
   // The capture's size caps say which packages (js/bake/src/typescript.mjs `stagePackages`).
   const capped = 'package declarations exceed 64 MiB: heavy 69.0 MiB (from page/main.ts). The type check stages …';
   assert.deepEqual(webBuildFailure(`${capped}\nerror: app: app.ts failed the type check every host's build runs\n`), [`${capped}\nerror: app: app.ts failed the type check every host's build runs`]);
+  for (const refusal of [
+    '@scratch/module@1.0.0 requires peer @scratch/peer@^1.4.0, but the app has @scratch/peer@2.0.0; install a compatible version',
+    'package declarations: two copies of pkg (/app/node_modules/pkg, /module/node_modules/pkg); install one',
+  ]) {
+    const stderr = `${refusal}\nerror: app: app.ts failed the type check every host's build runs`;
+    assert.deepEqual(webBuildFailure(stderr), [stderr]);
+  }
 });
 
 // An Apple build's bake says its warnings on every build: the SF Symbols only the web draws blank one line where the
