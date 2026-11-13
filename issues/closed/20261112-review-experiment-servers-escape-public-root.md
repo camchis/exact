@@ -1,6 +1,7 @@
 # Two game comparison servers can serve files outside their public directory
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** Both servers bind to 127.0.0.1, serve only a regular file whose real path lies under the real dist directory, and answer a malformed escape with 400.
 **Systems:** experiments/game-engine-comparison/full/three/server.mjs, experiments/game-engine-comparison/full/godot/serve.mjs
 **Author:** Codex
 **Date:** 2026-11-12
