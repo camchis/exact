@@ -1,6 +1,7 @@
 # A live module swap clears the web Canvas 2D roster
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The web module's replacement carries the Canvas 2D roster, so Placed snapshots it unchanged across a swap.
 **Systems:** js, data
 **Severity:** P2
 **Author:** Grok 4.7
