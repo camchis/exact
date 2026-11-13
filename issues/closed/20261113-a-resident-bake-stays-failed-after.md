@@ -1,6 +1,7 @@
 # A resident bake stays failed after a removed source is already gone
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The stage sync treats a file already gone as removed and updates the remembered capture per file as each disk change succeeds, so a failed bake leaves it true of the stage.
 **Systems:** js
 **Severity:** P2
 **Author:** Grok 4.7
