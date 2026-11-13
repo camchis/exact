@@ -958,7 +958,12 @@ async function openWebUnlocked({
         // Frame and image callbacks can start GPU work after the first read.
         const settled = await readPicture();
         if (settled.error) throw new Error(settled.error);
-        const { data } = await call('Page.captureScreenshot', { format: 'png' });
+        // A viewport-only capture can retain a rounded background painted before its image became opaque.
+        const { cssVisualViewport: v } = await call('Page.getLayoutMetrics');
+        const { data } = await call('Page.captureScreenshot', {
+          format: 'png', captureBeyondViewport: true,
+          clip: { x: v.pageX, y: v.pageY, width: v.clientWidth, height: v.clientHeight, scale: v.scale },
+        });
         writeFileSync(path, Buffer.from(data, 'base64'));
         return { ...tags, screenshot: path, w: size[0], h: size[1], ...(pending ? { imagesPending: pending } : {}) };
       },
