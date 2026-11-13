@@ -1,6 +1,7 @@
 # An OAuth request awaiting a 401 can be retried as a different signed-in account
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** Each sign-in keeps a random `login` its refreshes carry, and a request refused after its sign-in was replaced throws `session_changed` (or `signed_out`) instead of being sent again with the new session's token.
 **Systems:** packages/oauth/index.ts
 **Author:** Codex
 **Date:** 2026-11-12
