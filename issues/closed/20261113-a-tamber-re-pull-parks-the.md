@@ -1,6 +1,7 @@
 # A Tamber re-pull parks the light mode when the kept context changes
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** A pull remembers a light mode's id under every context it stands for, its twins in `also` included, so a later export that keeps another of them reuses that mode, default and values, with nothing parked or removed.
 **Systems:** tools/figma-tamber
 **Severity:** P2
 **Author:** Grok 4.7
