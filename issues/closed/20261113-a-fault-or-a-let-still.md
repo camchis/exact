@@ -1,6 +1,7 @@
 # A fault or a let still spends Jev's return
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** When a point, a fault or a let leaves the ball dead, the tick clears both players' planned contact, so Jev neither commits nor swings at a return the point already ended.
 **Systems:** game/tennis
 **Severity:** P2
 **Author:** Grok 4.7
