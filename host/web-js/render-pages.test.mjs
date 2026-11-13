@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import { createServer } from 'node:net';
 import { webCompiler } from './module.mjs';
 import { buildTreeFile } from '../web/serve.mjs';
+import { generationOf } from '../web/generations.mjs';
 
 const root = resolve(import.meta.dir, '../..');
 const contract = (call, extra = '') => `routes nav
@@ -275,4 +276,49 @@ component App
       expect(readFileSync(resolve(dist, 'product/declared page/index.html'), 'utf8')).toContain('>declared page</');
     });
   } finally { api.stop(true); }
+}, 120000);
+
+test('the render server sends a navigation the head of a request page before its data settles, based on its generation', async () => {
+  const source = `routes nav
+  home "/" render=request
+
+component App
+  resource greeting = greeting() as shape string else empty()
+  view
+    main
+      text greeting testId="greeting"
+`;
+  // The data source's answer comes from a server that holds it for 600 ms: a render waits for a fetch.
+  const slow = Bun.serve({ port: 0, hostname: '127.0.0.1', fetch: () => new Promise(done => setTimeout(() => done(new Response('Hello')), 600)) });
+  await builtPages(source, `export const grants = 'net.fetch http://127.0.0.1:${slow.port}';
+export async function answer(name: string): Promise<any> {
+  return await (await fetch('http://127.0.0.1:${slow.port}/')).text();
+}
+`, async ({ status, output, dist }) => {
+    expect(status, output).toBe(0);
+    // The receipt `web-build` writes, which names the build's generation.
+    writeFileSync(resolve(dist, '.exact-build.json'), JSON.stringify({ exactBuild: 1, target: 'js', files: [] }));
+    const id = generationOf(dist);
+    expect(id).toMatch(/^[0-9a-f]{32}$/);
+    const probe = createServer();
+    await new Promise(ok => probe.listen(0, '127.0.0.1', ok));
+    const port = probe.address().port;
+    await new Promise(ok => probe.close(ok));
+    const child = Bun.spawn([process.execPath, 'host/web-js/render.mjs', dist, '--serve', '--port', String(port)], { cwd: root, stdout: 'pipe', stderr: 'pipe' });
+    try {
+      for await (const bytes of child.stdout) if (new TextDecoder().decode(bytes).includes('serving ')) break;
+      for (const encoding of ['identity', 'br']) {
+        const response = await fetch(`http://127.0.0.1:${port}/`, { headers: { accept: 'text/html', 'sec-fetch-dest': 'document', 'accept-encoding': encoding } });
+        expect(response.status).toBe(200);
+        const reader = response.body.getReader(), decoder = new TextDecoder();
+        // The first part, before the data source answers: the head, its base the generation's, and no greeting.
+        const first = decoder.decode((await reader.read()).value, { stream: true });
+        expect(first).toContain(`<base href="/.exact/gen/${id}/">`);
+        expect(first).not.toContain('Hello');
+        let page = first;
+        for (let part; !(part = await reader.read()).done;) page += decoder.decode(part.value, { stream: true });
+        expect(/data-testid="greeting"[^>]*>([^<]*)</.exec(page)?.[1]).toBe('Hello');
+      }
+    } finally { child.kill(); await child.exited; }
+  }).finally(() => slow.stop(true));
 }, 120000);
