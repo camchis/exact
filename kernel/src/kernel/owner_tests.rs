@@ -244,3 +244,44 @@ fn a_box_moved_or_mounted_into_an_owner_reads_its_insets() {
     layout(&mut k);
     assert_eq!(k.node(7).unwrap().frame.height, 83.0);
 }
+
+/// D9: an author's `--exact-safe-area-inset-*` on a node is what its
+/// subtree reads, over the host's value on an owner's root, as an inherited
+/// custom property; a change reaches the readers below it.
+#[test]
+fn an_authored_inset_is_what_its_subtree_reads() {
+    let mut k = page();
+    k.set_local_insets(2, Some([106.0, 0.0, 83.0, 0.0]))
+        .unwrap();
+    let top = StyleId::LocalInsetTop;
+    k.apply(0, 2, &[style(3, &[(top, "20")])]).unwrap();
+    layout(&mut k);
+    assert_eq!(y(&k, 4), 20.0, "the box's own, which it reads too");
+    assert_eq!(k.local_insets(4), Some([20.0, 0.0, 83.0, 0.0]), "inherited");
+    k.apply(0, 3, &[style(3, &[(top, "30")])]).unwrap();
+    layout(&mut k);
+    assert_eq!(y(&k, 4), 30.0, "a change reaches the reader");
+    // On the owner's root, over the host's value
+    k.apply(0, 4, &[style(2, &[(top, "12")])]).unwrap();
+    assert_eq!(k.local_insets(2), Some([12.0, 0.0, 83.0, 0.0]));
+    // An override reads another edge as the node has it: the node's own
+    // where it declares one (30), its parent's otherwise
+    let bottom = StyleId::LocalInsetBottom;
+    let plus = "calc(var(--exact-safe-area-inset-top) + 5px)";
+    k.apply(0, 5, &[style(3, &[(bottom, plus)])]).unwrap();
+    assert_eq!(k.local_insets(3).unwrap()[2], 35.0, "the node's own top");
+    k.apply(0, 6, &[style(5, &[(bottom, plus)])]).unwrap();
+    let root = k.env().local_inset(Edge::Top);
+    assert_eq!(k.local_insets(5).unwrap()[2], root + 5.0, "the parent's");
+    // One that reads itself is a cycle: unset, so inherited
+    let cycle = "calc(var(--exact-safe-area-inset-top) + 1px)";
+    k.apply(0, 7, &[style(5, &[(top, cycle)])]).unwrap();
+    assert_eq!(
+        k.local_insets(5).unwrap()[0],
+        k.env().local_inset(Edge::Top)
+    );
+    // A percentage is no length a custom property of `<length>` takes
+    let mut props = StyleProps::default();
+    let pct = StyleValue::Text("10%".into());
+    assert!(props.set_dynamic(top, &pct).is_err());
+}

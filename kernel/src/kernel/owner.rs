@@ -9,52 +9,112 @@
 //! its nearest declaration, and the session root's
 //! ([`crate::Env::local`]) where no owner holds the node.
 //!
+//! An author may declare the property on any node, spelled as it is read
+//! (`--exact-safe-area-inset-bottom="0px"`); its subtree then reads that,
+//! as CSS Variables 1 inherits a custom property's computed value. On an
+//! owner's root the authored value stands over the host's, which stands
+//! over the parent's.
+//!
 //! The values change no layout by themselves: a length that reads one is
 //! resolved per node where its engine style is derived, so the bars' room
-//! is a length an author can pad with, or pull a background under.
+//! is a length an author can pad with, or pull a background under. The
+//! owner's own clearance of its chrome (D3) is the covers' (`cover.rs`).
 
 use super::Kernel;
 use crate::arena::NodeArena;
 use crate::error::{KernelError, LayoutError};
-use crate::generated::StyleProps;
+use crate::generated::{StyleId, StyleProps};
 use crate::id::{NodeFlags, ViewId};
 use crate::layout::LayoutMirror;
 use crate::style::{Dimension, Edge, Env, RowValue};
 use std::borrow::Cow;
 
-/// Whether a style holds a length that reads a local inset.
+/// The rows an author overrides the four insets with, top right bottom left.
+pub(crate) const OVERRIDES: [StyleId; 4] = [
+    StyleId::LocalInsetTop,
+    StyleId::LocalInsetRight,
+    StyleId::LocalInsetBottom,
+    StyleId::LocalInsetLeft,
+];
+
+/// Whether a style holds a length that reads a local inset, its own
+/// overrides aside (they read their parent's, [`local_at`]).
 pub(crate) fn reads_local(style: &StyleProps) -> bool {
-    style.mask.iter().any(
-        |id| matches!(style.get(id), RowValue::Dimension(Dimension::Compare(c)) if c.reads_local()),
-    )
+    style.mask.iter().any(|id| {
+        !OVERRIDES.contains(&id)
+            && matches!(style.get(id), RowValue::Dimension(Dimension::Compare(c)) if c.reads_local())
+    })
 }
 
 /// The environment `slot`'s lengths, `style`, resolve against: the
-/// arena's, unless they read a local inset under an owner ([`env_at`]).
+/// arena's, unless they read a local inset ([`env_at`]).
 pub(crate) fn env_for<'a>(arena: &'a NodeArena, slot: u32, style: &StyleProps) -> Cow<'a, Env> {
-    match arena.blocks.has_locals() && reads_local(style) {
+    match reads_local(style) {
         true => env_at(arena, slot),
         false => Cow::Borrowed(arena.env()),
     }
 }
 
 /// The environment `slot`'s lengths resolve against: the arena's, with the
-/// local insets of the nearest owner at or above `slot` in place of the
-/// session root's.
+/// local insets `slot` inherits ([`local_at`]) in place of the session
+/// root's.
 pub(crate) fn env_at(arena: &NodeArena, slot: u32) -> Cow<'_, Env> {
-    if !arena.blocks.has_locals() {
+    let local = local_at(arena, slot);
+    if Edge::ALL.map(|e| arena.env().local_inset(e)) == local {
         return Cow::Borrowed(arena.env());
     }
-    let mut at = Some(slot);
-    while let Some(s) = at {
-        if let Some(local) = arena.blocks.local(s) {
-            let mut env = arena.env().clone();
-            env.local = Some(local);
-            return Cow::Owned(env);
-        }
-        at = arena.parent(s);
+    let mut env = arena.env().clone();
+    env.local = Some(local);
+    Cow::Owned(env)
+}
+
+/// The four insets at `slot`, top right bottom left (LLP 1123 D9): an
+/// override `slot` declares, else its owner's host value when `slot` is an
+/// owner's root, else its parent's; at a root, the session root's. An
+/// override's own `var()` reads what `slot` would have without it, another
+/// edge's override on `slot` included; one that reads itself is a cycle,
+/// invalid at computed-value time, and so unset.
+pub(crate) fn local_at(arena: &NodeArena, slot: u32) -> [f32; 4] {
+    let base = match arena.blocks.local(slot) {
+        Some(host) => host,
+        None => match arena.parent(slot) {
+            Some(parent) => local_at(arena, parent),
+            None => Edge::ALL.map(|e| arena.env().local_inset(e)),
+        },
+    };
+    let style = arena.style(slot);
+    if !OVERRIDES.iter().any(|&id| style.mask.has(id)) {
+        return base;
     }
-    Cow::Borrowed(arena.env())
+    let declared = OVERRIDES.map(|id| match style.get(id) {
+        RowValue::Dimension(d) if style.mask.has(id) => Some(d),
+        _ => None,
+    });
+    let reads = |d: &Dimension| matches!(d, Dimension::Compare(c) if c.reads_local());
+    let mut env = arena.env().clone();
+    let mut out = base;
+    // Plain lengths first, then those that read another edge's
+    for pass in [false, true] {
+        env.local = Some(out);
+        for (i, d) in declared.iter().enumerate() {
+            let Some(d) = d.as_ref().filter(|d| reads(d) == pass) else {
+                continue;
+            };
+            let edge = Edge::ALL[i];
+            if pass && cycles(d, edge) {
+                continue;
+            }
+            let mut at = env.clone();
+            at.local = Some(base);
+            out[i] = d.at_basis(if pass { &env } else { &at }, 0.0);
+        }
+    }
+    out
+}
+
+/// Whether an override of `edge` reads `edge` itself.
+fn cycles(d: &Dimension, edge: Edge) -> bool {
+    matches!(d, Dimension::Compare(c) if c.reads_local_edge(edge))
 }
 
 /// A box moved to another parent, created ones included, may be in another

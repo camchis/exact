@@ -658,6 +658,20 @@ fn a_local_inset_is_the_browsers_custom_property() {
         let (out, _) = crate::css::css_text(&style, &[]);
         assert!(out.contains(css), "{text}: {out}");
     }
+    // An author's own value is the custom property on the element, which
+    // its subtree inherits (D9); the opt-out of a clearance the browser
+    // never makes writes nothing, and is no row skipped (D4).
+    let mut style = StyleProps::default();
+    let own = StyleValue::Text("calc(var(--exact-safe-area-inset-top) + 8px)".into());
+    style.set_dynamic(StyleId::LocalInsetBottom, &own).unwrap();
+    let off = StyleValue::Text("top bottom".into());
+    style.set_dynamic(StyleId::SafeArea, &off).unwrap();
+    let (out, skipped) = crate::css::css_text(&style, &[]);
+    assert_eq!(
+        out,
+        "--exact-safe-area-inset-bottom:calc(8px + var(--exact-safe-area-inset-top));"
+    );
+    assert!(skipped.is_empty(), "{skipped:?}");
 }
 
 /// LLP 1116.018 D3: a live region's `aria-atomic` reaches the page.

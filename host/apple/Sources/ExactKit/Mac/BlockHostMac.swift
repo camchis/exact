@@ -148,10 +148,11 @@ final class BlockHost {
         tell([(node.id, block)], placements: [(node.id, placement)], shows: placeholder ? [(node.id, true)] : [])
     }
 
-    /// @ref LLP 1123 D9 — an owner's local insets: its container's safe area
-    /// (the title bar and toolbar over a full-size content view, none in a
-    /// sheet's window), told when they change. A container not yet in its
-    /// window has none, which a pane's first resize there corrects.
+    /// @ref LLP 1123 D3, D9 — an owner's local insets: its container's safe
+    /// area (the title bar and toolbar over a full-size content view, none in
+    /// a sheet's window), told when they change, and cleared as the owner's
+    /// cover, which the kernel adds to its authored padding. A container not
+    /// yet in its window has none, which a pane's first resize there corrects.
     private func tellInsets(_ node: NodeView, in container: NSView) {
         guard entries[node.id]?.owner == true else { return }
         let safe = container.safeAreaInsets
@@ -159,6 +160,8 @@ final class BlockHost {
         guard entries[node.id]?.insets != insets else { return }
         entries[node.id]?.insets = insets
         presenter?.session?.localInsets([(node.id, insets)])
+        let edges = HostCover.Edges(top: safe.top, right: safe.right, bottom: safe.bottom, left: safe.left)
+        presenter?.covers.report("owner \(node.id)", insets.allSatisfy { $0 == 0 } ? [:] : [node.id: .edges(edges)])
     }
 
     /// A split's placeholder this shows was restyled by a commit: its shown
@@ -186,7 +189,10 @@ final class BlockHost {
         let following = siblings.drop { $0 !== node }.dropFirst().first { $0.superview === entry.home }
         entries[node.id] = nil
         used[node.id] = nil
-        if entry.insets != nil, presenter?.views[node.id] === node { presenter?.session?.localInsets([(node.id, nil)]) }
+        if entry.insets != nil, presenter?.views[node.id] === node {
+            presenter?.session?.localInsets([(node.id, nil)])
+            presenter?.covers.report("owner \(node.id)", [:])
+        }
         if presenter?.views[node.id] === node, let home = entry.home {
             // Before the sibling that followed it, when that is still there;
             // the authored parent's next `children` op settles any other order.
@@ -224,6 +230,7 @@ final class BlockHost {
     /// The node is gone, and its block with it.
     func destroyed(_ id: UInt32) {
         if let node = entries[id]?.node { onDestroyed?(node) }
+        if entries[id]?.insets != nil { presenter?.covers.report("owner \(id)", [:]) }
         entries[id] = nil; used[id] = nil; rects[id] = nil; margined[id] = nil
     }
 

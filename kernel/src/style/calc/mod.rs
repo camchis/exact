@@ -469,7 +469,7 @@ impl Comparison {
     pub fn reads(&self, edge: Edge, env: &Env) -> bool {
         self.tree(|t| {
             t.any(&|n| {
-                matches!(n, Node::Env(EnvTerm::Inset(e) | EnvTerm::Region(Region::SafeAreaCorners, e)) if *e == edge)
+                matches!(n, Node::Env(EnvTerm::Inset(e) | EnvTerm::Local(e) | EnvTerm::Region(Region::SafeAreaCorners, e)) if *e == edge)
             })
         })
         .unwrap_or_else(|| match self.substituted(env) {
@@ -504,6 +504,16 @@ impl Comparison {
         self.with(|e| match e {
             Entry::Tree(t) => t.any(&|n| matches!(n, Node::Env(EnvTerm::Local(_)))),
             Entry::Text { text, .. } => text.contains(env::LOCAL_PREFIX),
+        })
+    }
+
+    /// Whether it reads the local inset at `edge`.
+    pub(crate) fn reads_local_edge(&self, edge: Edge) -> bool {
+        self.with(|e| match e {
+            Entry::Tree(t) => t.any(&|n| matches!(n, Node::Env(EnvTerm::Local(e)) if *e == edge)),
+            Entry::Text { text, .. } => {
+                text.contains(&format!("{}{}", env::LOCAL_PREFIX, edge.name()))
+            }
         })
     }
 

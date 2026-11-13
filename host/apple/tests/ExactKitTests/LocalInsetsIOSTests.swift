@@ -8,7 +8,9 @@ import XCTest
 /// `var(--exact-safe-area-inset-*)`, so a background reaches up under the bar
 /// without a hard-coded height (expo/exact#36), on an iPhone and an iPad
 /// alike; a box outside every route reads the screen's insets, and a sheet's
-/// content its sheet's.
+/// content its sheet's. And over `scripts/fixtures/bar-hero.contract`, a
+/// route whose scroller starts at its top opts that edge out of its
+/// clearance (D4), so the scroller's first box reaches under the bar.
 final class LocalInsetsIOSTests: XCTestCase {
     private var window: UIWindow?
     private var sessions: [ExactSession] = []
@@ -28,7 +30,7 @@ final class LocalInsetsIOSTests: XCTestCase {
     }
 
     /// The fixture in a window of the test host's scene, the screen's size.
-    private func fixture() throws -> (ExactSession, ExactView) {
+    private func fixture(_ key: String = "BAR_INSETS") throws -> (ExactSession, ExactView) {
         guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene else {
             throw missing("scene", "the bars and the safe area are a scene window's")
         }
@@ -43,7 +45,7 @@ final class LocalInsetsIOSTests: XCTestCase {
         host.view.addSubview(view)
         view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         self.window = window
-        XCTAssertNil(session.boot(plan: try fixturePlan("BAR_INSETS"), size: window.bounds.size).error)
+        XCTAssertNil(session.boot(plan: try fixturePlan(key), size: window.bounds.size).error)
         view.frame = host.view.bounds
         view.layoutIfNeeded()
         return (session, view)
@@ -93,6 +95,27 @@ final class LocalInsetsIOSTests: XCTestCase {
             guard let probe = self.node(session, "sheet-probe") else { return false }
             return abs(probe.bounds.height - c.view.safeAreaInsets.bottom) < 0.5
         }
+    }
+
+    func testAScrollerAtTheTopOptsOutAndItsFirstBoxReachesUnderTheBar() throws {
+        let (session, _) = try fixture("BAR_HERO")
+        until("the route shows under its bar") {
+            guard let route = self.node(session, "route"), let c = session.presenter.navigation.controllers[route.id] else { return false }
+            return c.viewIfLoaded?.window != nil && c.view.safeAreaInsets.top > 0 && c.collapseScroll != nil
+        }
+        let route = try XCTUnwrap(node(session, "route"))
+        let c = try XCTUnwrap(session.presenter.navigation.controllers[route.id])
+        let list = try XCTUnwrap(node(session, "list")), sv = try XCTUnwrap(list.scrollView)
+        XCTAssertEqual(sv.contentInsetAdjustmentBehavior, .never, "UIKit insets nothing of the top")
+        let top = c.view.safeAreaInsets.top
+        until("the hero's text clears the bar it reads") {
+            guard let text = self.node(session, "hero-text") else { return false }
+            return abs(self.onScreen(text).minY - top) < 0.5
+        }
+        let hero = try XCTUnwrap(node(session, "hero"))
+        XCTAssertEqual(onScreen(hero).minY, 0, accuracy: 0.5, "the hero's background starts at the screen's top, under the bar")
+        XCTAssertEqual(sv.contentOffset.y + sv.adjustedContentInset.top, 0, accuracy: 0.5, "at its start")
+        if case .edges(let edges)? = session.presenter.navigation.covers[route.id] { XCTAssertEqual(edges.top, 0, "no top cover") }
     }
 }
 #endif

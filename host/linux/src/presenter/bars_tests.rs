@@ -1147,3 +1147,38 @@ fn a_barred_routes_content_reads_the_room_its_bars_take() {
     assert_eq!(inset(&p), (top, bottom), "the room the route is inset by");
     assert_eq!(kernel.local_insets(route), Some([top, 0.0, bottom, 0.0]));
 }
+
+/// @ref LLP 1123 D3, D4 — the bars' room is a route's clearance: a route
+/// that opts its top out starts under the top bar, and one whose padding
+/// reads the inset is cleared once, not twice.
+#[test]
+fn a_route_opts_out_of_or_credits_its_bars_room() {
+    let list_top = |source: &str| {
+        let (p, _) = barred(source);
+        let route = id(&p, "route-home");
+        let kernel = p.host().kernel();
+        let slot = kernel.arena().slot_of(route).unwrap();
+        let Some(HostCover::Edges([top, ..])) = kernel.arena().cover(slot) else {
+            panic!("the bars inset the route");
+        };
+        (kernel.node(id(&p, "list")).unwrap().frame.y, top)
+    };
+    let (cleared, top) = list_top(APP);
+    assert_eq!(cleared, top, "below the top bar");
+    let home = r#"testId="route-home" position="absolute""#;
+    let off = APP.replace(
+        home,
+        &home.replace("position", r#"-exact-safe-area="top" position"#),
+    );
+    assert_eq!(list_top(&off).0, 0.0, "under the top bar");
+    let reads = APP.replace(
+        home,
+        &home.replace(
+            "position",
+            r#"padding-top="var(--exact-safe-area-inset-top)" position"#,
+        ),
+    );
+    assert_eq!(list_top(&reads).0, top, "credited: once");
+    let plain = APP.replace(home, &home.replace("position", "padding-top=10 position"));
+    assert_eq!(list_top(&plain).0, top + 10.0, "a plain padding adds");
+}

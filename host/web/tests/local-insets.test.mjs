@@ -19,12 +19,13 @@ beforeAll(() => {
       <div id="exact-root">
         <div style="padding-top:60px"><div id="page" style="${probe}"></div></div>
         <div navigationPresentation="modal"><div id="sheet" style="${probe}"></div></div>
+        <div style="--exact-safe-area-inset-top:calc(var(--exact-safe-area-inset-bottom) + 8px)"><div><div id="own" style="${probe}"></div></div></div>
       </div>`, { headers: { 'content-type': 'text/html' } });
   } });
 });
 afterAll(() => server?.stop(true));
 
-test('a box reads its container\'s insets, a sheet\'s its own', async () => {
+test('a box reads its container\'s insets, a sheet\'s its own, and an author\'s value', async () => {
   const browser = await suiteBrowser('chromium');
   try {
     const read = async (width) => {
@@ -32,15 +33,16 @@ test('a box reads its container\'s insets, a sheet\'s its own', async () => {
       const cdp = await page.context().newCDPSession(page);
       await cdp.send('Emulation.setSafeAreaInsetsOverride', { insets: { top: 47, bottom: 34, left: 0, right: 0 } });
       await page.goto(server.url.href);
-      return page.evaluate(() => Object.fromEntries(['page', 'sheet'].map((id) => {
+      return page.evaluate(() => Object.fromEntries(['page', 'sheet', 'own'].map((id) => {
         const s = getComputedStyle(document.getElementById(id));
         return [id, [s.height, s.paddingBottom, s.marginTop].map(parseFloat)];
       })));
     };
     // Narrow: the page reads env(); the sheet starts below the status bar and reaches the bottom.
-    expect(await read(390)).toEqual({ page: [47, 34, -47], sheet: [0, 34, 0] });
+    // An author's own value, as css.rs writes it, is what its subtree reads.
+    expect(await read(390)).toEqual({ page: [47, 34, -47], sheet: [0, 34, 0], own: [42, 34, -42] });
     // Wide: the sheet is a card clear of every edge.
-    expect(await read(1000)).toEqual({ page: [47, 34, -47], sheet: [0, 4, 0] });
+    expect(await read(1000)).toEqual({ page: [47, 34, -47], sheet: [0, 4, 0], own: [42, 34, -42] });
   } finally {
     await browser.close();
   }

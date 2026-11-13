@@ -5259,14 +5259,42 @@ bar, the navigation bar and a large title, the tab bar, the home indicator, a
 sheet's edges. Outside every route it is what the page itself reaches under: on
 iOS the status bar and the home indicator whenever a root stack or `tablist` takes
 the whole screen, even where `env()` is 0. On the web and a host that draws no bars
-it is `env()`'s, and a web sheet's top is 0. The host already clears a route's content of its bars, so read it for what
-reaches past that: a background under the navigation bar, without hard-coding its
-height, is `margin-top="calc(-1 * var(--exact-safe-area-inset-top))"
-padding-top="var(--exact-safe-area-inset-top)"` on a box at the route's top (the
-box starts under the bar and its content below it, and the boxes beside it stay);
-a box outside every route clears the status bar with
-`top="var(--exact-safe-area-inset-top)"`. It takes no fallback, and it follows the
-bars as the host lays them out (a rotation, a bar shown or hidden).
+it is `env()`'s, and a web sheet's top is 0. It takes no fallback, and it follows
+the bars as the host lays them out (a rotation, a bar shown or hidden). Any box may
+set it for its subtree, spelled as it is read:
+`--exact-safe-area-inset-bottom="0px"` (a length, no percentage; one that reads
+itself is ignored, as a CSS cycle is).
+
+The host clears a route's content of the chrome it did not write (LLP 1123 D3), on
+every host with bars: on each edge it pads the route by that inset, or the route's
+scroller takes it as its content inset where the scroller starts at the route's top
+or ends at its bottom. The clearance adds to the route's own padding
+(`padding-top=16` under a 106-point bar puts the content at 122), except where that
+padding reads the inset itself (`env(safe-area-inset-top)` or
+`var(--exact-safe-area-inset-top)`, alone or in `calc()`, `min()`, `max()`,
+`clamp()`): then the edge is the larger of the two, so
+`padding-bottom="max(16px, var(--exact-safe-area-inset-bottom))"` is "at least 16, or
+the home indicator". Padding on a box inside the route always adds. A header the
+bar replaces neither clears nor counts. `-exact-safe-area` on the route (or a
+`tabpanel`) turns the clearance off: `none`, or the edges to turn off
+(`-exact-safe-area="top"`), the rest staying cleared; anywhere else it is refused.
+The route's `background-color` already fills under the bars. For a background or
+picture under the bar:
+
+- Where the route is padded, pull a box at its top up and pad it back:
+  `margin-top="calc(-1 * var(--exact-safe-area-inset-top))"
+  padding-top="var(--exact-safe-area-inset-top)"`. Its content starts below the bar
+  and the boxes beside it stay where they were.
+- Where the route's scroller starts at its top (a list under a large title), opt the
+  top out and pad the scroller's first box: `-exact-safe-area="top"` on the route,
+  `padding-top="var(--exact-safe-area-inset-top)"` on the hero. The scroller then
+  starts under the bar, at its start the hero's background reaches the screen's top
+  and its text rests below the bar. `navigationBar="transparent"` does the same and
+  also hides the bar's background until the content scrolls under it.
+
+A box outside every route clears the status bar with
+`top="var(--exact-safe-area-inset-top)"`.
+
 Sizes, padding and radii clamp negative results to zero; margins and insets keep
 them. `env(titlebar-area-x|y|width|height)` is the title bar beside a Mac window's
 traffic lights under `viewport-fit="cover"` (in the tall title row an app without routes

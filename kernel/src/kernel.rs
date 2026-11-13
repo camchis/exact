@@ -39,11 +39,11 @@ mod wide;
 
 pub(crate) use block::{apply as apply_block, publication_start, Blocks};
 pub use block::{BlockAxis, BlockMeasure, HostBlock};
-pub use cover::HostCover;
 pub(crate) use cover::{
     applied_padding as cover_padding, apply as apply_cover, chain_changed as cover_chain_changed,
     children_changed as cover_children_changed, style_changed as cover_style_changed,
 };
+pub use cover::{credited_edges, HostCover};
 pub use sticky::StickyConstraint;
 
 /// How many receipts the kernel retains for late readers.

@@ -1005,7 +1005,9 @@ env(safe-area-inset-bottom)) + 44px)"`, `width="min(50%, 600px)"`. `env()` is th
 screen's safe area; `var(--exact-safe-area-inset-top)` (and `-right`, `-bottom`,
 `-left`) is the one where the box is: inside a route, its bars included, so
 `margin-top="calc(-1 * var(--exact-safe-area-inset-top))"` takes a background up
-under the navigation bar (LLP 1123 D9). Supported values
+under the navigation bar (LLP 1123 D9). A route is cleared of its bars by itself, the
+clearance added to its padding unless that padding reads the inset; `-exact-safe-area`
+on the route turns it off per edge (D3, D4). Supported values
 are property-specific; this is not
 an unrestricted browser stylesheet. The compiler and kernel reject unsupported
 names or values. `line-height=1.5` is a ratio; `line-height="24px"` is fixed.

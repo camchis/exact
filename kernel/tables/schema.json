@@ -2312,6 +2312,18 @@
       ],
       "default": "normal"
     },
+    "SafeArea": {
+      "_comment": "@ref LLP 1123 D4: `-exact-safe-area`, the keywords of the safe_area row, not a wire enum. auto is 0 (every edge cleared); each edge is one bit in this order (top bit 0, left bit 3); none is every edge.",
+      "values": [
+        "auto",
+        "none",
+        "top",
+        "right",
+        "bottom",
+        "left"
+      ],
+      "default": "auto"
+    },
     "FontVariantLigatures": {
       "_comment": "CSS Fonts 4 `font-variant-ligatures`, the keywords of the font_variant_ligatures row, not a wire enum. normal is 0; each later value is one bit in this order (common-ligatures is bit 0, no-contextual bit 7), and none, which has no bit of its own, is every no- value (CSS: all four kinds disabled). A value and its no- form are refused together, as CSS takes one of each pair. Each kind is OpenType features of the chosen face: common liga and clig, discretionary dlig, historical hlig, contextual calt.",
       "values": [
@@ -4802,6 +4814,56 @@
       "codec": "enum:ScrollSnapStop",
       "cold": true,
       "_comment": "CSS Scroll Snap 1 §6.2 `scroll-snap-stop` on a snap area: `always` keeps a snap from passing over the area's snap position, so one fling moves one card or one page."
+    },
+    {
+      "bit": 242,
+      "field": "safe_area",
+      "codec": "u8",
+      "keywords": "SafeArea",
+      "rare": true,
+      "layout": true,
+      "default": 0,
+      "_comment": "@ref LLP 1123 D4: `-exact-safe-area`, on a content owner's authored root (a route, a tab panel): the edges whose automatic clearance of the owner's chrome is off, as SwiftUI's `ignoresSafeArea(.container, edges:)`, as SafeArea's bits. `auto` (0) clears every edge, `none` none. Authored padding and the owner's allocation are unchanged; `var(--exact-safe-area-inset-*)` still reads the inset. Not inherited."
+    },
+    {
+      "bit": 243,
+      "field": "local_inset_top",
+      "refusesPercent": true,
+      "codec": "dimension",
+      "inherited": true,
+      "layout": true,
+      "default": 0,
+      "_comment": "@ref LLP 1123 D9: an author's `--exact-safe-area-inset-top`, a length with no percentage, which this node's subtree reads through `var(--exact-safe-area-inset-top)` in place of the content owner's local inset. Inherited as its computed length (an `em` resolved where it is declared); one invalid at computed-value time (a `var()` cycle) is unset. The host's own value stands on each owner's root, below any authored one."
+    },
+    {
+      "bit": 244,
+      "field": "local_inset_right",
+      "refusesPercent": true,
+      "codec": "dimension",
+      "inherited": true,
+      "layout": true,
+      "default": 0,
+      "_comment": "The right side of `local_inset_top`'s override."
+    },
+    {
+      "bit": 245,
+      "field": "local_inset_bottom",
+      "refusesPercent": true,
+      "codec": "dimension",
+      "inherited": true,
+      "layout": true,
+      "default": 0,
+      "_comment": "The bottom side of `local_inset_top`'s override."
+    },
+    {
+      "bit": 246,
+      "field": "local_inset_left",
+      "refusesPercent": true,
+      "codec": "dimension",
+      "inherited": true,
+      "layout": true,
+      "default": 0,
+      "_comment": "The left side of `local_inset_top`'s override."
     }
   ],
   "_transitions": "The `transition` row is CSS `transition` (LLP 1002): count u8 (≤8), then per declaration property u8 (0 all, then 1 + `Property`: 1 translate, 2 scale, 3 rotate, 4 opacity, 5 height, 6 stroke-dashoffset, 7 r, 8 color, 9 background-color, 10 fill, 11 stroke, 12 cx, 13 cy, 14 x, 15 y, 16 rx, 17 ry, 18 border-top-color, 19 border-right-color, 20 border-bottom-color, 21 border-left-color, 22 -exact-tint-color, 23 box-shadow — LLP 1062; 24, box-shadow's colour alone, is refused; 25 font-weight, 26 font-stretch, 27 font-variation-settings — LLP 1019 §13 D10; 28 is CSS's `border-color` shorthand; 29 is a path's `d`, LLP 1055.000 D15), duration f32 s, delay f32 s, easing u8 (0 linear, 1 ease, 2 ease-in, 3 ease-out, 4 ease-in-out, 5 cubic-bezier + 4×f32, 6 steps + u16 count + u8 position, 7 spring + f32 stiffness/damping/mass, 8 linear() + u8 count + count×(f32 input, f32 output)). Its Rust type lives in exact-motion; the kernel owns the bytes.",
