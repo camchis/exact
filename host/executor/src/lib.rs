@@ -708,9 +708,17 @@ impl Core {
             // Queued closures are destroyed by their executor owner. Doing
             // it here could run an arbitrary destructor on the UI thread.
             if self.machine.is_none() {
-                for queue in &mut state.completed {
-                    queue.clear();
+                for lane in 0..2 {
+                    let outcomes = std::mem::take(&mut state.completed[lane]);
+                    for done in outcomes.iter().filter(|done| !done.message) {
+                        state.counts[lane] -= 1;
+                        state.bytes[lane] -= done.bytes;
+                        state.streams -= usize::from(done.stream);
+                    }
                 }
+                state.light = 0;
+                state.agains = 0;
+                state.ordered.clear();
             } else if let Some(machine) = &self.machine {
                 machine.stop(&mut state);
             }
@@ -889,9 +897,7 @@ fn complete(shared: &Shared, ticket: u64, outcome: Outcome) {
     let finished_at = std::time::Instant::now();
     let mut state = shared.state.lock().unwrap();
     if state.retired {
-        if state.book.retiring {
-            asynch::external_end(shared, &mut state, ticket);
-        }
+        asynch::external_end(shared, &mut state, ticket);
         return;
     }
     let Some(at) = state.running.iter().position(|run| run.ticket == ticket) else {
@@ -958,10 +964,6 @@ fn complete(shared: &Shared, ticket: u64, outcome: Outcome) {
 /// and a long native call it hands to the app's native module.
 fn handoff(request: &Request) -> bool {
     (request.continuation.is_some() && request.storage.is_none()) || request.is_native()
-}
-
-fn handed_off(job: &Job) -> bool {
-    handoff(&job.request) && matches!(job.work, Some(OwnedWork::Later(_)))
 }
 
 /// An HTTP read with no effect to lose if it is never sent (RFC 9110 §9.2.1).
@@ -1098,7 +1100,10 @@ fn worker(
             loop {
                 if state.retired {
                     let abandoned = std::mem::take(&mut state.jobs[lane]);
+                    state.counts[lane] -= abandoned.len();
+                    state.bytes[lane] -= abandoned.iter().map(|job| job.charge).sum::<usize>();
                     let fenced = std::mem::take(&mut state.fenced);
+                    state.fenced_bytes = 0;
                     let discarded = std::mem::take(&mut state.discard);
                     drop(state);
                     drop((abandoned, fenced, discarded));
