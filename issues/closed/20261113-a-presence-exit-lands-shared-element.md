@@ -1,6 +1,7 @@
 # A presence exit lands shared-element flights while enumerating them
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** Not a defect: a Swift `Dictionary` is a value, so `for f in flights.values` iterates its own copy of the storage and `landFlight`'s removal copies on write; nothing traps, and every flight inside the exiting view lands (`ContentOwnersIOSTests.testALeavingAncestorTakesItsPresentedRouteWithIt` drives this path and passes).
 **Systems:** host/apple
 **Severity:** P1
 **Author:** Grok 4.7
