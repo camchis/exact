@@ -421,9 +421,14 @@ package final class TextArea: UITextView {
     /// The authored `::placeholder` colour (LLP 1104 D3); nil, UIKit's.
     var placeholderColor: UIColor?
     // A scroll view's own drawing does not move with its content: the
-    // decorations' lines are drawn again at each new offset.
+    // decorations' lines and visible placeholder are drawn again at each offset.
     package override var contentOffset: CGPoint {
-        didSet { if contentOffset != oldValue, decorations?.drawsLines == true { setNeedsDisplay() } }
+        didSet {
+            if contentOffset != oldValue,
+               decorations?.drawsLines == true || (text.isEmpty && !placeholder.isEmpty) {
+                setNeedsDisplay()
+            }
+        }
     }
     /// The placeholder it draws may be in the tint: drawn again as the tint changes
     package override func tintColorDidChange() {
@@ -438,7 +443,9 @@ package final class TextArea: UITextView {
             // box: what overflows the view is clipped, as the web clips a
             // textarea's placeholder at its padding box. `draw(in:)` drops a
             // line its rect cannot hold whole, so a short box drew nothing.
-            let box = bounds.inset(by: textContainerInset)
+            // The container starts in content coordinates; bounds.origin is
+            // the scroll offset.
+            let box = CGRect(origin: .zero, size: bounds.size).inset(by: textContainerInset)
             var attributes: [NSAttributedString.Key: Any] = [
                 .font: font ?? UIFont.systemFont(ofSize: 16),
                 .foregroundColor: placeholderColor ?? ThemeRoles.color("placeholder", in: self, or: UIColor.placeholderText),
