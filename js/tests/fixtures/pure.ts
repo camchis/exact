@@ -458,6 +458,12 @@ export function exercise(source: string): string {
     const made=new Intl.NumberFormat('en-US',shared), before=made.format(12345);
     shared.maximumFractionDigits=0; shared.minimumFractionDigits=0;
     out['en-US compact options kept']=[before,made.format(12345),made.format(12000),String(made.resolvedOptions().maximumFractionDigits)];
+    // A compact formatter's signDisplay, applied after rounding: 0.4 rounds
+    // to a zero that "exceptZero" prints unsigned. sv-SE's minus is U+2212.
+    const signed=[0,-0,0.5,999,12345,-12345,1234567,-1e12,0.00001,-0.00001];
+    for(const locale of ['en-US','de-DE','ja-JP','sv-SE']) for(const signDisplay of ['always','exceptZero','never','auto'] as const)
+      out[locale+' compact '+signDisplay]=signed.map(v=>new Intl.NumberFormat(locale,{notation:'compact',signDisplay}).format(v))
+        .concat([0.4,-0.4].map(v=>new Intl.NumberFormat(locale,{notation:'compact',signDisplay,maximumFractionDigits:0}).format(v)));
     // A DateTimeFormat with an explicit timeZone and the same locales and
     // options shares an engine formatter, each `new` an object of its own; a Date's
     // toLocale…String adds its default fields when the options name none.

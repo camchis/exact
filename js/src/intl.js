@@ -251,6 +251,13 @@
         resolved.locale + " is not available on this host; numbers are formatted in full");
     }
   }
+  // The sign `signDisplay` gives a number (ECMA-402 GetNumberFormatPattern):
+  // `zero` says it rounded to zero, and -0 counts as negative.
+  function signOf(display, negative, zero) {
+    if (display === "never" || (zero && (display === "exceptZero" || display === "negative"))) return "";
+    if (negative) return "-";
+    return display === "always" || display === "exceptZero" ? "+" : "";
+  }
   Compact.prototype = Object.create(Native.prototype);
   Compact.prototype.constructor = Compact;
   // The rounded scaled value as a decimal string, and its cell.
@@ -296,11 +303,16 @@
       while (text.indexOf(".") >= 0 && text.split(".")[1].length > least && /0$/.test(text)) text = text.slice(0, -1);
     text = text.replace(/\.$/, "");
     var fraction = (text.split(".")[1] || "").length, value = Number(text);
-    // Grouping as compact's (`min2`): only from five integer digits.
+    var sign = signOf(o.signDisplay, n < 0 || (n === 0 && 1 / n < 0), value === 0);
+    // Grouping as compact's (`min2`): only from five integer digits. The
+    // engine prints its locale's minus; Apple's ignores signDisplay, so a
+    // plus takes the minus's place, as ICU derives its plus pattern.
     var digits = partsOf(new Native(this.native.resolvedOptions().locale, {
-      minimumFractionDigits: fraction, maximumFractionDigits: fraction,
-      useGrouping: value >= 10000, signDisplay: o.signDisplay,
-    }), n < 0 || (n === 0 && 1 / n < 0) ? -value : value);
+      minimumFractionDigits: fraction, maximumFractionDigits: fraction, useGrouping: value >= 10000,
+    }), sign ? -value : value);
+    if (sign === "+") digits = digits.map(function (p) {
+      return { type: p.type === "minusSign" ? "plusSign" : p.type, value: p.value.replace(/[-\u2212]/, "+") };
+    });
     if (!s.cell) return digits;
     var suffix = s.cell.suffix, space = /^[\s  ]*/.exec(suffix)[0], tail = /[‎‏]*$/.exec(suffix)[0];
     var word = suffix.slice(space.length, suffix.length - tail.length);
