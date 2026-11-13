@@ -1,6 +1,7 @@
 # A Spotlight ack forgets a newer content-index update
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** Each telling stamps its keys and an acknowledgement unmarks only keys still at its stamp; Spotlight is told only after the mirror is written.
 **Systems:** host/apple
 **Severity:** P2
 **Author:** Grok 4.7
