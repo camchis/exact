@@ -1,6 +1,7 @@
 # A queued synchronous answer runs its continuation as App
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** A waiting send keeps its commit's causes beside its origin and invocation, and `run_next` makes its `next` commit, arms its `then` and makes a refused ask's reconciling commit under all three.
 **Systems:** runner/src/runner/queue.rs, runner/src/runner/modules/admit.rs
 **Author:** Codex
 **Date:** 2026-11-12
