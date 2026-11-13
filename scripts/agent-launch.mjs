@@ -793,8 +793,10 @@ export function depInfoInputs(bin, info = `${bin}.d`, base = process.cwd()) {
 // build reruns that script with other variables (the web build does, for its
 // render pass) without its sources changing; those sources are in the dep-info
 // themselves, so they, not the output, decide. A bake made before Cargo for a
-// linked plan (`….baked/`, scripts/linked-plan.mjs) names its own in its record.
-const GENERATED = /\/build\/[^/]+\/out\/|\.baked\//;
+// linked plan (`….baked/`, scripts/linked-plan.mjs) names its own in its record,
+// and so decides for the copy of it Cargo compiles (`bake-compiled/<digest>/`,
+// `compiledBakeDir`), which the first build of those bytes writes after its start.
+const GENERATED = /\/build\/[^/]+\/out\/|\.baked\/|\/bake-compiled\/[0-9a-f]+\//;
 // Bare dep-info records optional directories even while absent and carries no
 // entry types. A receipt's inventory distinguishes a deleted extensionless file.
 const DIRECTORY_WATCH = /\/[^./]+$/;
