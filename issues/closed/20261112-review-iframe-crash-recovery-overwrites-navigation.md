@@ -1,6 +1,7 @@
 # A delayed iframe crash recovery overwrites a newer navigation
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** A navigation, traversal, new src or stopLoading cancels a crash's queued recovery, and a recovery loads only while it is the latest crash's and nothing has taken the frame.
 **Systems:** host/apple
 **Author:** Codex
 **Date:** 2026-11-12
