@@ -1,6 +1,7 @@
 # A mixed-case color profile name cannot be referenced
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The shared `color(--name …)` parse keeps an app profile's dashed ident as written, so the kernel and the bake bind the profile it names; standard spaces still match in any case.
 **Systems:** color, kernel style, bake
 **Severity:** P2
 **Author:** Grok 4.7
