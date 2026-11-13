@@ -17,6 +17,7 @@ use exact_kernel::StyleId;
 use exact_plan::Stdlib;
 use std::collections::{BTreeMap, BTreeSet};
 
+mod back_control;
 mod container;
 mod counts;
 mod fixed_beside;
@@ -158,6 +159,7 @@ pub(crate) fn with_text_styles(
     performance_now(root, &checked.file.fns, &mut out);
     sounds::undeclared(checked, &mut out);
     geometry::unnamed(checked, &mut out);
+    back_control::unnamed(checked, &mut out);
     transform::owners(checked, &mut out);
     transform_drag::check(&root.view, &checked.file.styles, &mut out);
     // @ref LLP 1027.005 D6 — an identifying argument of the launch's own.

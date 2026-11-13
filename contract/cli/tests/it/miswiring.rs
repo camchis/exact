@@ -719,3 +719,86 @@ fn a_geometry_read_in_a_child_is_checked_against_the_whole_view() {
     assert_eq!(warned(&src), [(GEOMETRY.to_string(), 13)]);
     assert!(messages(&src)[0].contains("did you mean `frame(\"panel\")`?"));
 }
+
+const BACK: &str = "lower-navigation-back-id";
+
+/// A two-route app whose root names `navigationBack="back"`, with `control`
+/// in each route's header beside its heading.
+fn back_app(root: &str, control: &str) -> String {
+    format!("routes nav\n  home \"/\"\n    detail \"/detail\"\n\ncomponent App\n  state closed = 0\n  action back\n    closed = closed + 1\n    nav = back(nav)\n  action done\n    closed = 0\n  view\n    main navigationKey=`${{top(nav).id}}` {root} width=\"100%\" height=\"100%\"\n      for e in stack(nav) key=e.id\n        column navigationKey=`${{e.id}}`\n          header\n            {control}\n              text \"Close\"\n            text e.name role=\"heading\" aria-level=1\n")
+}
+
+fn back_warnings(src: &str) -> Vec<(u32, String)> {
+    let (result, warnings) = contract::compile_warned(src);
+    if let Err(e) = result {
+        panic!("a warning never fails a build: {e}\n{src}");
+    }
+    warnings
+        .into_iter()
+        .filter(|w| w.id == BACK)
+        .map(|w| (w.span.line, w.message))
+        .collect()
+}
+
+/// The port's case: `navigationBack` read as "Back runs the `back` action",
+/// while it names a control's `id` and no control has it. The platform's Back
+/// then only pops the route, and what `press=back` does never runs on Back.
+#[test]
+fn a_navigation_back_that_names_no_control_beside_its_namesake_action_is_named() {
+    let src = back_app("navigationBack=\"back\"", "button press=back");
+    let found = back_warnings(&src);
+    assert_eq!(found.len(), 1, "{src}");
+    assert_eq!(found[0].0, 13);
+    assert_eq!(
+        found[0].1,
+        "`navigationBack=\"back\"` names a control's `id`, not an action, and nothing in the view has `id=\"back\"`. Back therefore cannot press the control with `press=back` through this name; it falls back to the root's `navigate` handler, or to the router's Back when there is no handler. If Back should press the control with `press=back`, give it `id=\"back\"`"
+    );
+    // The repair the warning names silences it.
+    assert_eq!(
+        back_warnings(&back_app(
+            "navigationBack=\"back\"",
+            "button id=\"back\" press=back"
+        )),
+        []
+    );
+    // A test id is named as the near miss it is; a misspelt id is suggested.
+    let tested = back_warnings(&back_app(
+        "navigationBack=\"back\"",
+        "button testId=\"back\" press=back",
+    ));
+    assert!(tested[0].1.ends_with("`testId=\"back\"` names an element for tests and the agent, not for Back: if Back should press that control, give it `id=\"back\"` as well"), "{}", tested[0].1);
+    let typo = back_warnings(&back_app(
+        "navigationBack=\"back\"",
+        "button id=\"bakc\" press=back",
+    ));
+    assert!(
+        typo[0]
+            .1
+            .contains("Did you mean `navigationBack=\"bakc\"`?"),
+        "{}",
+        typo[0].1
+    );
+}
+
+/// Naming a Back control is optional, and a name that matches nothing behaves
+/// as none: with no control pressing an action of that name nothing is lost,
+/// and what the compiler cannot see is given the benefit of the doubt.
+#[test]
+fn a_navigation_back_that_loses_nothing_or_might_name_a_control_is_not_named() {
+    for (root, control) in [
+        // Boilerplate on an app whose close control presses another action.
+        ("navigationBack=\"back\"", "button press=done"),
+        // No name, an empty one, or another name than the action's.
+        ("", "button press=back"),
+        ("navigationBack=\"\"", "button press=back"),
+        ("navigationBack=\"close\"", "button id=\"close\" press=back"),
+        // A computed id may be the one.
+        (
+            "navigationBack=\"back\"",
+            "button id=`${e.name}-back` press=back",
+        ),
+    ] {
+        let src = back_app(root, control);
+        assert_eq!(back_warnings(&src), [], "{src}");
+    }
+}

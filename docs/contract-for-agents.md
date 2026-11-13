@@ -2248,7 +2248,11 @@ itself: its content goes in a `scroll`, `list` or `overflow-y="auto"` box, which
 the bar's scroller with nothing written (`navigationScroll` names another; "Routes
 and web documents"). A sheet's swipe down and a pushed screen's edge swipe press the
 route's enabled control whose `id` is the root's `navigationBack`, or, when the route
-has none, one outside every route (a header the screens share). Naming a control is optional:
+has none, one outside every route (a header the screens share). `navigationBack` names
+that control's `id`, not an action: with `navigationBack="back"` and `button press=back`
+but no `id="back"`, Back cannot press that button and falls back to the root's `navigate`
+handler, or to the router's Back, so the `back` action may not run on Back; the build
+warns (`lower-navigation-back-id`). Naming a control is optional:
 the navigation root is the app view's first element, and `navigationKey` alone there names none. The agent's
 `back` presses it too, as Escape does on a Mac sheet. When a sheet's swipe down should not do what its
 Cancel does (Cancel reverts the edits, a swipe down keeps them), give Cancel another `id`:

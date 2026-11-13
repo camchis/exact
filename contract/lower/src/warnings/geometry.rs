@@ -77,14 +77,14 @@ pub(super) fn unnamed(checked: &Checked<'_>, out: &mut Vec<LowerError>) {
 }
 
 /// The literal ids and test ids of a view.
-struct Ids {
-    ids: BTreeSet<String>,
-    test_ids: BTreeSet<String>,
+pub(super) struct Ids {
+    pub(super) ids: BTreeSet<String>,
+    pub(super) test_ids: BTreeSet<String>,
 }
 
 impl Ids {
     /// `None` when an element's id is one the compiler cannot read.
-    fn of(view: &[Node]) -> Option<Ids> {
+    pub(super) fn of(view: &[Node]) -> Option<Ids> {
         let mut found = Ids {
             ids: BTreeSet::new(),
             test_ids: BTreeSet::new(),
