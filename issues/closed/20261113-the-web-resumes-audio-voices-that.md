@@ -1,6 +1,7 @@
 # The web resumes audio voices that a native suspend stopped
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** WebOutput::suspend stops every voice before suspending the context, so a resume starts only the voices the next sync asks for, as on Apple and Windows.
 **Systems:** game
 **Severity:** P3
 **Author:** Grok 4.7
