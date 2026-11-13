@@ -1,6 +1,7 @@
 # A store refresh drops a failed local write and reverts the slot
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The Apple host records what the disk held when a write first failed; a refresh that still reads those bytes keeps the owed value in the snapshot it adopts and keeps the write queued, and only a changed name drops it as a peer's.
 **Systems:** host/apple
 **Severity:** P1
 **Author:** Grok 4.7

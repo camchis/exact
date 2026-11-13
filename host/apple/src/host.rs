@@ -263,6 +263,8 @@ pub struct Host<D: DataSource> {
     secrets: Option<Box<dyn crate::store::KeptStore>>,
     pending_store_writes: Vec<exact_runner::StoreWrite>,
     pending_store_stamps: std::collections::BTreeMap<String, exact_data::secrets::Stamp>,
+    /// What the disk held for each owed name when its write first failed.
+    pending_store_bases: std::collections::BTreeMap<String, Option<Vec<u8>>>,
     reported_store_failures: BTreeSet<String>,
     data_activated: bool,
     /// The source's activation, run ahead of `activate_data` by `prepare_data`.
@@ -620,6 +622,7 @@ impl<D: DataSource> Host<D> {
             secrets,
             pending_store_writes: Vec::new(),
             pending_store_stamps: Default::default(),
+            pending_store_bases: Default::default(),
             reported_store_failures: BTreeSet::new(),
             update_line: None,
             delivery,
