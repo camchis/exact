@@ -117,6 +117,53 @@ export const time=()=>{if(!clock.agent)clock.now=Math.max(clock.now,wall.now)};\
   } finally { globalThis.exact = old; rmSync(dir, { recursive: true, force: true }); }
 });
 
+test('a queued tool call waits at most five seconds behind a running call', async () => {
+  const dir = mkdtempSync(resolve(tmpdir(), 'exact-call-wait-')), old = globalThis.exact;
+  cpSync(resolve(ROOT, 'host/web-js/calls.js'), resolve(dir, 'calls.js'));
+  writeFileSync(resolve(dir, 'rt.js'), `export const clock={now:0,agent:true,timers:[]},data={},After=[],Clocked=[],Mutations=[],Origin={now:()=>'app'},say=()=>{},order=()=>0,drive=()=>{},time=()=>{};`);
+  writeFileSync(resolve(dir, 'held.js'), 'export const Counting=new Set(),heldTickets=()=>[];');
+  try {
+    globalThis.exact = {};
+    const { tools } = await import(pathToFileURL(resolve(dir, 'calls.js')).href);
+    const { clock } = await import(pathToFileURL(resolve(dir, 'rt.js')).href);
+    const { Counting } = await import(pathToFileURL(resolve(dir, 'held.js')).href);
+    let runs = 0;
+    tools({ run: [() => () => { runs++; Counting.add({}); }, {}, 'reads', [false, true, true], 'run'] });
+    const calls = globalThis.exact.calls;
+    const fire = async now => { clock.now = now; clock.timers.splice(0).forEach(t => t.action()); await Promise.resolve(); };
+    const release = async () => { Counting.clear(); clock.timers.splice(0).forEach(t => t.action()); await Promise.resolve(); };
+    // Behind a call that settles after the wait: refused at 5 s, never run.
+    const first = calls.call({ tool: 'run' }), second = calls.call({ tool: 'run' }), third = calls.call({ tool: 'run' });
+    await Promise.resolve();
+    expect(clock.timers.map(t => t.due)).toEqual([5000]);
+    await fire(5000);
+    expect(calls.called(second.call)).toMatchObject({ outcome: 'refused', reason: 'busy', certainty: 'none' });
+    expect(calls.called(third.call)).toMatchObject({ outcome: 'refused', reason: 'busy' });
+    expect(calls.called(first.call).state).toBe('running');
+    expect(clock.timers.map(t => t.due)).toEqual([10000]);
+    // Behind a call that times out within its wait: dispatched then.
+    clock.now = 7000;
+    const fourth = calls.call({ tool: 'run' }); await Promise.resolve();
+    expect(clock.timers.map(t => t.due)).toEqual([10000]);
+    await fire(10000);
+    expect(calls.called(first.call).outcome).toBe('timeout');
+    expect(calls.called(fourth.call).state).toBe('running');
+    // Behind a call that settles within the wait: dispatched when it ends.
+    const fifth = calls.call({ tool: 'run' }); await Promise.resolve();
+    clock.now = 14000; await release();
+    expect(calls.called(fourth.call).outcome).toBe('ok');
+    expect(calls.called(fifth.call).state).toBe('running');
+    expect(runs).toBe(3);
+    // Settling after the wait ran out does not dispatch the call it held.
+    const sixth = calls.call({ tool: 'run' }); await Promise.resolve();
+    expect(clock.timers.map(t => t.due)).toEqual([19000]);
+    clock.now = 20000; await release();
+    expect(calls.called(fifth.call).outcome).toBe('ok');
+    expect(calls.called(sixth.call)).toMatchObject({ outcome: 'refused', reason: 'busy' });
+    expect(runs).toBe(3);
+  } finally { globalThis.exact = old; rmSync(dir, { recursive: true, force: true }); }
+});
+
 test.each([false, true])('a wake after an idle spell has its full budget (agent: %s)', async agent => {
   const server = Bun.serve({ hostname: '127.0.0.1', port: 0, fetch(request) {
     const path = new URL(request.url).pathname;

@@ -1,6 +1,7 @@
 # A tool queued behind another call ignores its five-second wait limit
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** Both tool controllers refuse each waiting call `busy` once it has waited five seconds, whatever is running, schedule the earlier of that and the running call's limit, and so never dispatch a call past its wait.
 **Systems:** runner/src/runner/modules/calls.rs, host/web-js/calls.js
 **Author:** Codex
 **Date:** 2026-11-12
