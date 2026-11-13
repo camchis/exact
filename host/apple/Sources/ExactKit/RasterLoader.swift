@@ -315,13 +315,16 @@ private final class RasterBackend: @unchecked Sendable {
                 if let picture = input.decoded {
                     return try RasterImage.picture(picture, metadata: metadata, plan: plan, charge: charge, sourceOwner: source)
                 }
-                let bytes = try withExtendedLifetime(resolver) { try input.bytes() }
-                guard exact_raster_is_cancelled(work.permit) == 0 else { throw RasterFailure.decode }
-                #if DEBUG
-                lock.lock(); let decline = testDeclines > 0; testDeclines = max(0, testDeclines - 1); lock.unlock()
-                if decline { throw RasterFailure.decode }
-                #endif
-                return try RasterImage.decode(bytes, metadata: metadata, plan: plan, charge: charge, sourceOwner: source, url: input.url)
+                return try withExtendedLifetime(resolver) {
+                    try input.withBytes { bytes, file in
+                        guard exact_raster_is_cancelled(work.permit) == 0 else { throw RasterFailure.decode }
+                        #if DEBUG
+                        lock.lock(); let decline = testDeclines > 0; testDeclines = max(0, testDeclines - 1); lock.unlock()
+                        if decline { throw RasterFailure.decode }
+                        #endif
+                        return try RasterImage.decode(bytes, metadata: metadata, plan: plan, charge: charge, sourceOwner: source, file: file)
+                    }
+                }
             }
             let owner = UInt64(UInt(bitPattern: Unmanaged.passRetained(image).toOpaque()))
             _ = exact_raster_complete(work.permit, owner, { value in

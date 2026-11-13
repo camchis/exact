@@ -569,16 +569,17 @@ final class SnapshotDriverTests: XCTestCase {
         try Data([0]).write(to: roots["tmp"]!.appending(path: "picked.png"))
         try Data([0]).write(to: group.appending(path: "secret.png"))
         try Data([0]).write(to: group.appending(path: "data.png"))
-        XCTAssertEqual(SnapshotRasters.resolve("app:/data/photo.jpg", roots: [], appGroup: group, appID: id)?.path, roots["data"]!.appending(path: "photo.jpg").standardizedFileURL.resolvingSymlinksInPath().path, "the file the app wrote")
-        XCTAssertEqual(SnapshotRasters.resolve("app:/cache/avatar.png", roots: [], appGroup: group, appID: id)?.lastPathComponent, "avatar.png")
-        XCTAssertEqual(SnapshotRasters.resolve("app:/tmp/picked.png", roots: [], appGroup: group, appID: id)?.path, roots["tmp"]!.appending(path: "picked.png").standardizedFileURL.resolvingSymlinksInPath().path, "app:/tmp is the host's temporary directory")
-        XCTAssertNil(SnapshotRasters.resolve("app:/cache/../secret.png", roots: [], appGroup: group, appID: id))
-        XCTAssertNil(SnapshotRasters.resolve("app:/data/../../../../../data.png", roots: [], appGroup: group, appID: id))
-        XCTAssertNil(SnapshotRasters.resolve("app:/cache/avatar.png", roots: [], appGroup: nil, appID: id), "no group, no app:/")
-        XCTAssertNil(SnapshotRasters.resolve("app:/cache/avatar.png", roots: [], appGroup: group, appID: nil), "no app id, no app:/")
-        XCTAssertNil(SnapshotRasters.resolve("app:/other/avatar.png", roots: [], appGroup: group, appID: id))
-        XCTAssertNil(SnapshotRasters.resolve("app:/cache", roots: [], appGroup: group, appID: id), "a root alone")
-        XCTAssertNil(SnapshotRasters.resolve("../group/secret.png", roots: [Self.out.appending(path: "assets")], appGroup: nil, appID: nil))
+        for path in ["app:/data/photo.jpg", "app:/cache/avatar.png", "app:/tmp/picked.png"] {
+            let file = try XCTUnwrap(SnapshotRasters.open(path, roots: [], appGroup: group, appID: id))
+            XCTAssertEqual(try file.readToEnd(), Data([0]), "the file the app wrote at \(path)")
+        }
+        XCTAssertNil(SnapshotRasters.open("app:/cache/../secret.png", roots: [], appGroup: group, appID: id))
+        XCTAssertNil(SnapshotRasters.open("app:/data/../../../../../data.png", roots: [], appGroup: group, appID: id))
+        XCTAssertNil(SnapshotRasters.open("app:/cache/avatar.png", roots: [], appGroup: nil, appID: id), "no group, no app:/")
+        XCTAssertNil(SnapshotRasters.open("app:/cache/avatar.png", roots: [], appGroup: group, appID: nil), "no app id, no app:/")
+        XCTAssertNil(SnapshotRasters.open("app:/other/avatar.png", roots: [], appGroup: group, appID: id))
+        XCTAssertNil(SnapshotRasters.open("app:/cache", roots: [], appGroup: group, appID: id), "a root alone")
+        XCTAssertNil(SnapshotRasters.open("../group/secret.png", roots: [Self.out.appending(path: "assets")], appGroup: nil, appID: nil))
     }
 
     /// The invocation's raster cache keeps decoded bytes under its budget,

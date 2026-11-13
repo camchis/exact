@@ -730,14 +730,13 @@ impl<D: DataSource> Host<D> {
     /// `cancel`, LLP 1069.002 D9). Also the picker's `showPicker` hold and
     /// `pickedPath`, whose reply adds the file to copy into. A `share` hold
     /// delivers nothing but the journal line the runner writes (LLP 1069.003
-    /// D6). `appFile` names the file behind an `app:/` path, what an export
-    /// copies from (LLP 1069.010 D3); `appRoots` the three roots, which the
+    /// D6). `appRoots` names the three roots, which the
     /// Swift host resolves an image's `app:/` source against (LLP 1069.002
     /// D7); `shareFile` a share's confined copy (LLP 1125 D12). `None` else.
     pub fn answer_hold(&mut self, request: &str) -> Option<String> {
         let op = exact_runner::agent::field_str(request, "op");
-        if let Some(op @ ("appFile" | "shareFile")) = op.as_deref() {
-            return Some(crate::picker::file_op(op, request, self.runner.data_ref()));
+        if op.as_deref() == Some("shareFile") {
+            return Some(crate::picker::share_file(request, self.runner.data_ref()));
         }
         if op.as_deref() == Some("appRoots") {
             return Some(crate::picker::app_roots_reply(self.runner.data_ref()));

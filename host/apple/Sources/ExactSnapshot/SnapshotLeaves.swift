@@ -370,8 +370,10 @@ public final class SnapshotRasters {
     package var keptKeys: [String] { lock.lock(); defer { lock.unlock() }; return kept.map(\.key) }
 
     public func decode(_ source: String?, roots: [URL], appGroup: URL?, appID: String?, box: CGSize, fit: String, scale: CGFloat) -> Decoded? {
-        guard let source, !source.isEmpty, let url = Self.resolve(source, roots: roots, appGroup: appGroup, appID: appID) else { return nil }
-        return decode(url, box: box, fit: fit, scale: scale)
+        guard let source, !source.isEmpty, let input = Self.input(source, roots: roots, appGroup: appGroup, appID: appID),
+              let provider = FileImageSource.provider(input.file),
+              let imageSource = CGImageSourceCreateWithDataProvider(provider, nil) else { return nil }
+        return decode(imageSource, key: input.url.path, box: box, fit: fit, scale: scale)
     }
 
     /// The decode a box needs: its own pixels for `fill`, `contain` and
@@ -379,8 +381,13 @@ public final class SnapshotRasters {
     /// dimension fills the box, which is the window shown; either scaled
     /// down to the pixel budget's area.
     public func decode(_ url: URL, box: CGSize, fit: String, scale: CGFloat) -> Decoded? {
+        guard let imageSource = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
+        return decode(imageSource, key: url.path, box: box, fit: fit, scale: scale)
+    }
+
+    private func decode(_ imageSource: CGImageSource, key: String, box: CGSize, fit: String, scale: CGFloat) -> Decoded? {
         let pixels = CGSize(width: box.width * scale, height: box.height * scale)
-        guard let natural = Self.natural(url), natural.width > 0, natural.height > 0 else { return nil }
+        guard let natural = Self.natural(imageSource), natural.width > 0, natural.height > 0 else { return nil }
         var size: CGSize
         if fit == "cover" {
             let cover = max(pixels.width / natural.width, pixels.height / natural.height)
@@ -395,15 +402,14 @@ public final class SnapshotRasters {
             let factor = (CGFloat(pixelBudget) / area).squareRoot()
             size = CGSize(width: size.width * factor, height: size.height * factor)
         }
-        return decode(url, longest: Int(max(1, max(size.width, size.height).rounded(.up))), natural: natural)
+        return decode(imageSource, key: key, longest: Int(max(1, max(size.width, size.height).rounded(.up))), natural: natural)
     }
 
-    private func decode(_ url: URL, longest: Int, natural: CGSize) -> Decoded? {
-        let key = "\(url.path)|\(longest)"
+    private func decode(_ imageSource: CGImageSource, key: String, longest: Int, natural: CGSize) -> Decoded? {
+        let key = "\(key)|\(longest)"
         lock.lock()
         if let hit = kept.first(where: { $0.key == key }) { lock.unlock(); return hit.value }
         lock.unlock()
-        guard let imageSource = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
         let options: [CFString: Any] = [
             kCGImageSourceCreateThumbnailFromImageAlways: true,
             kCGImageSourceCreateThumbnailWithTransform: true,
@@ -426,8 +432,12 @@ public final class SnapshotRasters {
 
     /// The image's pixel size, upright (EXIF orientations 5–8 swap the sides).
     public static func natural(_ url: URL) -> CGSize? {
-        guard let imageSource = CGImageSourceCreateWithURL(url as CFURL, nil),
-              let properties = CGImageSourceCopyPropertiesAtIndex(imageSource, 0, nil) as? [CFString: Any],
+        guard let imageSource = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
+        return natural(imageSource)
+    }
+
+    private static func natural(_ imageSource: CGImageSource) -> CGSize? {
+        guard let properties = CGImageSourceCopyPropertiesAtIndex(imageSource, 0, nil) as? [CFString: Any],
               let width = (properties[kCGImagePropertyPixelWidth] as? NSNumber)?.doubleValue,
               let height = (properties[kCGImagePropertyPixelHeight] as? NSNumber)?.doubleValue else { return nil }
         let orientation = (properties[kCGImagePropertyOrientation] as? NSNumber)?.intValue ?? 1
@@ -438,19 +448,23 @@ public final class SnapshotRasters {
     /// `app:/tmp/…` under the app's directories in the group container,
     /// laid out as the app lays them out (`picker::app_dirs`), so a widget
     /// reads the file the app wrote; any other name under one of the bundle
-    /// roots; `..` and a root alone are refused, and the resolved path must
-    /// stay under its root.
-    public static func resolve(_ source: String, roots: [URL], appGroup: URL?, appID: String?) -> URL? {
+    /// roots. An app file opens through no symbolic link; `..` and a root
+    /// alone are refused. The descriptor survives replacement of its name.
+    public static func open(_ source: String, roots: [URL], appGroup: URL?, appID: String?) -> FileHandle? {
+        input(source, roots: roots, appGroup: appGroup, appID: appID)?.file
+    }
+
+    private static func input(_ source: String, roots: [URL], appGroup: URL?, appID: String?) -> (url: URL, file: FileHandle)? {
         if source.hasPrefix("app:/") {
             let parts = source.dropFirst(5).split(separator: "/", omittingEmptySubsequences: false).map(String.init)
             guard let appGroup, let appID, parts.count >= 2, let root = appRoots(group: appGroup, appID: appID)[parts[0]],
-                  !parts.dropFirst().contains(where: { $0.isEmpty || $0 == "." || $0 == ".." }) else { return nil }
-            return confined(parts.dropFirst().reduce(root) { $0.appending(path: $1) }, under: root)
+                  let file = AppFileWalk.open(root, Array(parts.dropFirst())) else { return nil }
+            return (parts.dropFirst().reduce(root) { $0.appending(path: $1) }, file)
         }
         for root in roots {
             let candidate: URL = source.hasPrefix("/") ? URL(fileURLWithPath: source)
                 : root.appending(path: source.hasPrefix("assets/") ? source : "assets/" + source)
-            if let url = confined(candidate, under: root) { return url }
+            if let url = confined(candidate, under: root), let file = try? FileHandle(forReadingFrom: url) { return (url, file) }
         }
         return nil
     }

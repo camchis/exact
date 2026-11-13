@@ -489,7 +489,7 @@ final class RasterImage: @unchecked Sendable {
 
     static func decode(_ bytes: Data, metadata: RasterMetadata, plan: RasterDecodePlan,
                        charge: any RasterBackingCharge, sourceOwner: (any RasterSourceOwner)? = nil,
-                       url: URL? = nil) throws -> RasterImage {
+                       file: FileHandle? = nil) throws -> RasterImage {
         guard bytes.count == metadata.encodedBytes, bytes.count <= RasterMetadata.encodedLimit else { throw RasterFailure.encodedLimit }
         // A file can change between metadata inspection and worker admission.
         // Recheck the actual bytes before asking ImageIO for any pixel buffer.
@@ -523,7 +523,7 @@ final class RasterImage: @unchecked Sendable {
                 headroom = Self.headroom(of: thumbnail)
                 if headroom > 0, #available(iOS 18, macOS 15, tvOS 18, *), let tagged = CGImageCreateCopyWithContentHeadroom(headroom, image) { image = tagged }
             }
-            let animation = url.flatMap { RasterAnimation.read(source, url: $0, plan: plan, owner: sourceOwner) }
+            let animation = file.flatMap { RasterAnimation.read(source, file: $0, plan: plan, owner: sourceOwner) }
             return RasterImage(image: owner.own(image), natural: metadata.naturalSize, bytes: plan.outputBytes,
                                animation: animation, headroom: headroom)
         }
