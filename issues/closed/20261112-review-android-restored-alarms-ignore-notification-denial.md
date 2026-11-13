@@ -1,6 +1,7 @@
 # Android alarms can ring after their notification is blocked
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** Restoring after a boot or package replacement ends every held alarm instead of ringing when notifications or the alarm channel are blocked, and the ringing service ends its rings on the two block-state broadcasts.
 **Systems:** Alarms package, Android permission and restore lifecycle
 **Author:** Codex
 **Date:** 2026-11-12
