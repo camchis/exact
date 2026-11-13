@@ -1,6 +1,7 @@
 # Overlapping Weatherlight deliveries can drop a counted tip
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** One delivery runs at a time: a delivery asked for while one runs only reads the count, and the running one reads the queue again before it finishes, so every write comes from one snapshot that holds every token counted.
 **Systems:** apps/weatherlight
 **Severity:** P2
 **Author:** Grok 4.7
