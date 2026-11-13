@@ -1,6 +1,7 @@
 # Removing a font transition leaves the running animation active
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** Fixed by 65605c3c3 (a running transition stops when its declaration no longer covers the property); runner/tests/it/font_axes.rs pins weight, stretch and a variation axis.
 **Systems:** runner
 **Author:** Codex
 **Date:** 2026-11-12
