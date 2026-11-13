@@ -521,7 +521,10 @@ test('outside production trust the SDK compiles for iOS 17.0, and the app keeps 
   assert.deepEqual(compiledTargets(app, 'production'), { ios: '18.0', macos: '15.0' });
   assert.deepEqual(compiledTargets({ manifest: {} }, 'development'), deploymentTargets({ manifest: {} }));
   const launching = { manifest: { launch: ['player'], host: { ios: { minimumOS: '18.0' } } } };
-  assert.deepEqual(compiledTargets(launching, 'development'), deploymentTargets(launching), 'launch Swift compiles in the host package at the app minimum');
+  assert.deepEqual(compiledTargets(launching, 'development', 'darwin'), deploymentTargets(launching), 'on a Mac, launch Swift compiles in the host package at the app minimum');
+  // The native build system (the Linux cross build) gives the launch modules and the executable that imports them
+  // the app's own target, so the host keeps the floor.
+  assert.deepEqual(compiledTargets(launching, 'development', 'linux'), { ...deploymentTargets(launching), ios: '17.0' });
 
   // One spelling per version, so apps that write it differently share one Swift scratch (expo/exact-build#94).
   for (const minimumOS of ['18', '18.0', '18.0.0', 18]) assert.equal(deploymentTargets({ manifest: { host: { ios: { minimumOS } } } }).ios, '18.0', String(minimumOS));

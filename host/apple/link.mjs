@@ -73,11 +73,16 @@ export function deploymentTargets(app) {
  * compile of each, which a minimum of its own compiled cold (about 440 s).
  * Code built for 17.0 runs on every later iOS, and the app installs only where
  * its Info.plist says. Rust and C check no availability as they compile, so the
- * app's crate loses nothing at the floor. An app with `launch` modules keeps
- * its own minimum: their Swift compiles inside the host's package
- * (`ExactLaunchParts`), where Swift checks availability. */
-export const compiledTargets = (app, trust = process.env.EXACT_UPDATE_TRUST ?? 'development') =>
-  trust === 'production' || app.manifest.launch?.length ? deploymentTargets(app) : { ...deploymentTargets(app), ios: '17.0' };
+ * app's crate loses nothing at the floor. An app's `launch` modules compile
+ * inside the host's package (`ExactLaunchParts`), where Swift checks
+ * availability. Under SwiftPM's native build system (the Linux cross build,
+ * toolchain.mjs) they and the executable that imports them take the app's own
+ * triple by a target flag of their own (Package.swift's
+ * `EXACT_LAUNCH_PARTS_TARGET`), and the rest keeps the floor. Swift Build (a
+ * Mac) puts its generated `-target` after a target's flags, so there the whole
+ * package compiles at the app's minimum. */
+export const compiledTargets = (app, trust = process.env.EXACT_UPDATE_TRUST ?? 'development', platform = process.platform) =>
+  trust === 'production' || app.manifest.launch?.length && platform !== 'linux' ? deploymentTargets(app) : { ...deploymentTargets(app), ios: '17.0' };
 
 /** The capabilities with a Swift half, by name, and the product of
  * `Package.swift` (its `capabilities` table) each is. */

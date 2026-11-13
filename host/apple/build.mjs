@@ -760,6 +760,9 @@ async function main(args, lockHeld = false) {
     ...(tv ? { TVOS_DEPLOYMENT_TARGET: compiled.ios } : ios ? { IPHONEOS_DEPLOYMENT_TARGET: compiled.ios } : { MACOSX_DEPLOYMENT_TARGET: targets.macos }),
     // Package.swift's `platforms` entry, which is what SwiftPM compiles each target for (not --triple's OS version).
     ...(ios || tv ? { EXACT_IOS_DEPLOYMENT: compiled.ios } : {}),
+    // Under the native build system the launch modules and ExactIOS compile at the app's minimum (Package.swift), so
+    // the host shares the floor's compile (compiledTargets).
+    ...(launchPartsDir && (ios || tv) && process.platform === 'linux' ? { EXACT_LAUNCH_PARTS_TARGET: iosTripleFor(app, device, tv) } : {}),
     EXACT_LIB_DIR: libDir,
     EXACT_LIB: crate.replace(/-/g, '_'),
     EXACT_APP_COMPOSITION: composition,
