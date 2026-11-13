@@ -8,7 +8,8 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSyn
 import { tmpdir } from 'node:os';
 import { basename, delimiter, dirname, relative, resolve } from 'node:path';
 import { appleArtifacts, appleRunBinary } from '../host/apple/build.mjs';
-import { moduleGraph, notBuildInput, receiptChanges, refuseBinaryBackend } from './agent-launch.mjs';
+import { notBuildInput, receiptChanges, refuseBinaryBackend } from './agent-launch.mjs';
+import { moduleGraph } from './module-graph.mjs';
 import { directoryInputSnapshot } from './cargo-dep-info.mjs';
 import { buildArgs, buildFirst, buildReason, childFailure, failureSummary, linuxRebuild, lockHolder, logged, nativeBuild, overrideDir, planOverride, planSource, planSources, ownVerb, prebuild, rebuildCommand, refuseBuild } from './agent-build.mjs';
 import { openStdio } from './agent-stdio.mjs';

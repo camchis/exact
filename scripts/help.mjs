@@ -121,7 +121,7 @@ export const HELP = {
       ['--render rust|js|none', 'pre-rendered pages: rust (the app\'s <app>-render entry; the default where it has one), js (Bun; the default otherwise), none'],
       jsonBuilt(),
     ],
-    internal: ['--js', '--wasm', '--bake'],
+    internal: ['--js', '--wasm', '--bake', '--check'],
     body: `Builds the JS target (a game: wasm) into the app's target/web-dist; about a second when
 nothing changed. A capability the JS runtime lacks fails the build, named. Beside the pages
 are shell.html and routes.json, the route table a static host serves them by (serve).

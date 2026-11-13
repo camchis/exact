@@ -30,8 +30,7 @@ import { closeSync, existsSync, mkdirSync, openSync, mkdtempSync, readFileSync, 
 import { basename, delimiter, dirname, isAbsolute, relative, resolve, sep, toNamespacedPath } from 'node:path';
 import { constants, homedir, tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { gzipSync } from 'node:zlib';
-import { BINARYEN } from '../host/web/stages.mjs';
+import { BINARYEN, packageGpuWasm, webGpuTools } from '../host/web/stages.mjs';
 import { SHELL_SOURCES } from '../host/web/look.mjs';
 import { createHash } from 'node:crypto';
 import { refuse } from './deploy-signing.mjs';
@@ -333,25 +332,19 @@ export function checkModuleRoster(app, provided, where, release) {
  * on the web), then wasm-opt; `<stem>.js` + `<stem>_bg.wasm`, the primary as
  * `gpu`, a declared module as `gpu/<name>`. `cargo` builds the crates first,
  * on stable (@ref LLP 1047: a GPU crate keeps its toolchain's std), as the wasm target's bake does
- * (the JS target has no bake); the wasm target passes false, having built them. Missing packaging tools refuse the build. */
-export function webGpuArtifacts(app, stage, { cargo = false, env = process.env, profile = 'web' } = {}) {
+ * (the JS target has no bake); the wasm target passes false, having built them.
+ * `check` validates tooling without building or packaging; wasm-opt is optional. */
+export function webGpuArtifacts(app, stage, { cargo = false, check = false, env = process.env, profile = 'web' } = {}) {
   const artifacts = [...(app.hasGpu ? [{ crate: app.crate('gpu'), stem: 'gpu' }] : []),
     ...gpuModules(app.manifest).map(({ name }) => ({ crate: app.crate(`gpu-${name}`), stem: `gpu/${name}` }))];
-  const kib = (n) => `${(n / 1024).toFixed(0)} KiB`;
+  if (artifacts.length) webGpuTools(env);
+  if (check) return;
   let note = '';
   for (const { crate, stem } of artifacts) {
     if (cargo) buildCommand('cargo', ['build', ...cargoReproducibilityFlags(app), ...injectedProfiles(app), ...wasmRemapFlags(app), '-p', crate,
       '--target', 'wasm32-unknown-unknown', '--profile', profile, '--lib', '--config', `profile.${profile}.strip=false`], app, cargoEnvironment({ ...env, CARGO_TARGET_DIR: app.target }), 'inherit');
     const wasm = resolve(app.target, 'wasm32-unknown-unknown', profile, crate.replace(/-/g, '_') + '.wasm');
-    const [dir, name] = stem.includes('/') ? [resolve(stage, 'gpu'), stem.slice(4)] : [stage, stem];
-    const wb = spawnSync('wasm-bindgen', ['--target', 'web', '--no-typescript', '--out-dir', dir, '--out-name', name, wasm], { stdio: 'inherit' });
-    if (wb.error?.code === 'ENOENT') throw new Error('wasm-bindgen not on PATH; run bun scripts/exact.mjs setup in the SDK checkout');
-    if (wb.status !== 0) throw new Error(`wasm-bindgen ${crate} failed`);
-    const bg = resolve(stage, `${stem}_bg.wasm`);
-    // `EXACT_WEB_NAMES=1` keeps the name section, as host/web/build.mjs does for app.wasm: a profile then names GPU functions.
-    const o = profile === 'gpu-dev' ? {status:null} : spawnSync('wasm-opt', ['-Oz', '--enable-bulk-memory', '--enable-nontrapping-float-to-int', '--enable-sign-ext', '--enable-mutable-globals', env.EXACT_WEB_NAMES === '1' ? '-g' : '--strip-debug', '--strip-producers', '-o', bg, bg], { stdio: 'inherit' });
-    const bytes = readFileSync(bg);
-    note += `${note ? '; ' : ''}${stem}_bg.wasm ${kib(bytes.length)} (${kib(gzipSync(bytes, { level: 9 }).length)} gzip${o.status === 0 ? ', wasm-opt' : ''}), ${stem}.js ${kib(readFileSync(resolve(stage, `${stem}.js`)).length)}`;
+    note += `${note ? '; ' : ''}${packageGpuWasm(crate, wasm, stage, stem, { env, profile })}`;
   }
   return { note: note || 'no GPU crate', built: artifacts.length > 0 };
 }
