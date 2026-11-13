@@ -224,6 +224,10 @@ final class WebViews {
     private var nextToken: UInt32 = 1
     private(set) var failure: String?
     var moduleLocation: () -> String = WebViews.modulePath
+    #if os(macOS)
+    /// Whether the guests brought the session's window up from behind (`keepGuestsSeen`).
+    private var lifted = false
+    #endif
 
     var status: String {
         if module != nil { return "module loaded; \(entries.count) iframes" }
@@ -285,7 +289,31 @@ final class WebViews {
         let view = Unmanaged<ExactWebPlatformView>.fromOpaque(rawView).takeUnretainedValue()
         entry.handle = handle
         entry.platformView = view
+        // The node's create commit can come before its window holds it.
+        DispatchQueue.main.async { [weak self] in self?.keepGuestsSeen() }
         return view
+    }
+
+    /// A drive's window sits behind the other apps' (`NSWindow.Level.agentBehind`),
+    /// where it is usually covered, and WebKit runs a covered window's pages as
+    /// a hidden tab's: no animation frames, timers about once a second, nothing
+    /// new painted. While the session holds a guest its window stands at the
+    /// normal level, in front, as a live frame recording lifts it
+    /// (`Agent.liveFrames`), and goes back behind when the last guest goes.
+    private func keepGuestsSeen() {
+        #if os(macOS)
+        guard Agent.windowsBehind, let window = session?.presenter.viewport.window else { return }
+        let guests = entries.values.contains { $0.handle != nil }
+        if guests, !lifted, window.level == .agentBehind {
+            lifted = true
+            window.level = .normal
+            window.orderFrontRegardless()
+        } else if !guests, lifted {
+            lifted = false
+            window.level = .agentBehind
+            window.orderFront(nil)
+        }
+        #endif
     }
 
     /// `partition`, `zoom` and the `apple.*` words as the arm takes them
@@ -541,6 +569,7 @@ final class WebViews {
         held = held.filter { $0.value.view != id }
         if let handle = entry.handle { module?.destroy(handle) }
         entries.removeValue(forKey: id)
+        keepGuestsSeen()
     }
 
     func reset() {
