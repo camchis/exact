@@ -1,6 +1,7 @@
 # A Linux hatch input is not a replacement
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The painted host dispatches a hatch's input as ControlValue::Replacement with the caret at the end, so its inputType is insertReplacementText as on the web and Apple.
 **Systems:** host/linux, runner, host/web, host/apple
 **Severity:** P3
 **Author:** Grok 4.7
