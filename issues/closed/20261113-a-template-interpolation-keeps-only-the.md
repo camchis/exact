@@ -1,6 +1,7 @@
 # A template interpolation keeps only the first line of its expression
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** Not a defect: a template literal ends on the line it starts (the lexer refuses one that does not close there), so a `${…}` fragment never holds a line break and the newline the parser accepts after its expression is always the fragment's last token; a test now pins the refusal.
 **Systems:** contract syntax parser
 **Severity:** P2
 **Author:** Grok 4.7
