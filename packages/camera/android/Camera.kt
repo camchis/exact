@@ -23,7 +23,7 @@
 //   outside the app's directories through the reader's `Files` provider, under a write grant for that file while it is
 //   up; the photo replaces the answered path only when the person keeps it, so a cancel leaves what was there, and
 //   nothing reaches MediaStore or the gallery. An app that uses only this asks for no permission. Android refuses the
-//   intent to an app that declares CAMERA (any other name of the package derives it) without holding it, so such an
+//   intent to an app that declares CAMERA (`getUserMedia(video=)` derives it) without holding it, so such an
 //   app asks for it first, as a hand-built one must. Under the agent the runner holds the person's sheet, and `take`
 //   writes the agent's picture.
 package exact.camera

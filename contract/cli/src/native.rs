@@ -283,21 +283,30 @@ pub fn derived(plan: &exact_plan::Plan, text: &str, target: &str) -> Vec<(String
             Value::Array(own) => own.clone(),
             _ => sub["grants"].as_array().cloned().unwrap_or_default(),
         };
-        let line = (lines.first().and_then(Value::as_str))
+        let first = (lines.first().and_then(Value::as_str))
             .unwrap_or_default()
             .to_owned();
-        let mut keys: Vec<&str> = Vec::new();
+        // A name whose lines are by argument (`getUserMedia`'s `video` is the
+        // camera's) takes an option's own line.
+        let line_of = |option: &str| {
+            (sub["nameGrants"][option].as_str()).map_or_else(|| first.clone(), str::to_owned)
+        };
+        let mut keys: Vec<(String, &str)> = Vec::new();
         match declares {
-            Value::Array(list) => keys.extend(list.iter().filter_map(Value::as_str)),
+            Value::Array(list) => keys.extend(
+                list.iter()
+                    .filter_map(Value::as_str)
+                    .map(|k| (first.clone(), k)),
+            ),
             Value::Object(by) => {
                 for (option, d) in by {
                     let flag = option.rsplit('.').next().unwrap_or(option);
                     match d {
-                        Value::String(k) if names(text, flag) => keys.push(k),
+                        Value::String(k) if names(text, flag) => keys.push((line_of(option), k)),
                         Value::Object(values) => keys.extend(
                             (values.iter())
                                 .filter(|(v, _)| quoted(v))
-                                .filter_map(|(_, k)| k.as_str()),
+                                .filter_map(|(_, k)| Some((line_of(option), k.as_str()?))),
                         ),
                         _ => {}
                     }
@@ -305,8 +314,8 @@ pub fn derived(plan: &exact_plan::Plan, text: &str, target: &str) -> Vec<(String
             }
             _ => {}
         }
-        for key in keys {
-            let pair = (line.clone(), key.to_owned());
+        for (line, key) in keys {
+            let pair = (line, key.to_owned());
             if !out.contains(&pair) {
                 out.push(pair);
             }

@@ -74,6 +74,7 @@
       "grants": [],
       "origin": "app",
       "foreground": true,
+      "gesture": true,
       "options": {
         "facingMode": "option<enum<user|environment>>",
         "path": {
@@ -92,10 +93,8 @@
           "typed": false
         },
         "unsupported": [
-          "web",
           "macos",
           "linux",
-          "ios",
           "tvos",
           "windows",
           "terminal"

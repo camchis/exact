@@ -1080,14 +1080,19 @@ reading. Nothing that isn't HTML is added by it.
   web, `input capture` and the system camera UI, and the Windows, Linux,
   tvOS, visionOS and watchOS cells.
   **Expanded (2026-11-12, expo/exact#381; LLP 1133.008 D1 as amended):**
-  the system camera UI on Android, `takePhotoWithCameraApp` from
-  `@exact/camera`: `MediaStore.ACTION_IMAGE_CAPTURE`, the photo the person
-  keeps written to an `app:/` path and answered as `takePhoto`'s, with no
-  grant line. Consumer: an access-control app whose guards photograph a
-  visitor's identity card with the phone's own camera app (its shutter,
-  flash and review). Unblocks that without app Kotlin. Take: none offered;
-  Charlie's waiver is owed. Still out: the system camera UI on iOS
-  (`UIImagePickerController`) and every other target, and `input capture`.
+  the system camera UI, `takePhotoWithCameraApp` from `@exact/camera`:
+  Android's camera app (`MediaStore.ACTION_IMAGE_CAPTURE`), iOS's
+  `UIImagePickerController` with `.camera`, and the web's file input with
+  `accept="image/*"` and `capture` opened inside the press, the photo the
+  person keeps written to an `app:/` path and answered as `takePhoto`'s.
+  It needs no grant line; iOS needs the `device.camera` line's usage key,
+  and Android's `CAMERA` comes from `getUserMedia(video=)`, not that
+  line. Consumer: an access-control app whose guards photograph a visitor's
+  identity card with the phone's own camera app (its shutter, flash and
+  review). Unblocks that without app Kotlin or Swift. Take: none offered;
+  waived by Charlie's ask (2026-11-12: work the open issues through to the
+  ideal end state). Still out: the macOS, Windows, Linux, tvOS, visionOS
+  and watchOS cells, and `capture` on the HTML `input` tag.
 - **Expanded (Charlie, 2026-10-23, "Expand, no take", on LLP 1133.009 §15
   question 6):** recording the microphone to a file and reading its level,
   by Media Capture's and MediaStream Recording's names (`getUserMedia(audio=)`

@@ -140,6 +140,12 @@
         "video": "device.camera",
         "videoConstraints": "device.camera"
       },
+      "derives": {
+        "android": {
+          "video": "android.permission.CAMERA",
+          "videoConstraints": "android.permission.CAMERA"
+        }
+      },
       "options": {
         "audio": "option<bool>",
         "audioConstraints": "option<MediaTrackConstraints>",
