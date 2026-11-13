@@ -108,6 +108,32 @@ test('a discovered work is added without a length, and finishing it moves no pag
   expect((await call('library')).pagesRead).toBe(304 + 120);
 });
 
+// A write that fails leaves the library as stored: the screen never shows an
+// edit a relaunch would not have.
+test('a failed write leaves the library as stored', async () => {
+  let bytes = new TextEncoder().encode(JSON.stringify({ books: [{ id: 'mine', title: 'My Own Book' }], goal: 12 }));
+  let full = false;
+  const storage = { fs: {
+    readFile: async () => bytes.buffer,
+    mkdir: async () => {},
+    atomicWriteFile: async (_path: string, next: Uint8Array) => {
+      if (full) throw Object.assign(new Error('No space left on device'), { code: 'failed' });
+      bytes = next.slice();
+    },
+  } };
+  const source = await import(`./app.ts?case=${Math.random()}`);
+  const call = (name: string, ...args: unknown[]) => source.answer(name, args, {}, storage, {});
+  const titles = async () => (await call('library')).books.map((b: { title: string }) => b.title);
+  expect(await titles()).toEqual(['My Own Book']);
+  full = true;
+  expect(await call('addBook', 'Unsaved', 'Me', 100, 'want', '', '', 1)).toEqual({ ok: false });
+  expect(await call('removeBook', 'mine')).toEqual({ ok: false });
+  expect(await titles()).toEqual(['My Own Book']);
+  full = false;
+  expect(await call('addBook', 'Saved', 'Me', 100, 'want', '', '', 2)).toEqual({ ok: true });
+  expect(await titles()).toEqual(['Saved', 'My Own Book']);
+});
+
 // Only a missing file is a first launch. Any other failed read leaves the
 // library not ready and refuses every edit, so the seed never replaces it.
 test('a failed read is not a first launch, and no edit saves over the stored library', async () => {

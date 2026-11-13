@@ -1,6 +1,7 @@
 # Shelf shows a library edit as saved when the write failed
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** A failed write makes the data module forget its in-memory library and read the file again, an unstored edit shows an alert, and the add sheet closes only once its book is stored.
 **Systems:** apps/shelf
 **Severity:** P2
 **Author:** Grok 4.7

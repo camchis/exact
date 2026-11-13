@@ -99,6 +99,8 @@ async function persist(storage: Storage): Promise<void> {
 // An edit applies to the newest state, read and set with no await between:
 // two edits that waited on the same first load would otherwise both start
 // from its snapshot, and the later persist would drop the earlier edit.
+// A failed write forgets the library in memory, so the next answer reads the
+// file again and shows only what is stored.
 async function change(storage: Storage, edit: (s: Saved) => Saved): Promise<Result<'removeBook'>> {
   try {
     await load(storage);
@@ -107,6 +109,8 @@ async function change(storage: Storage, edit: (s: Saved) => Saved): Promise<Resu
     return { ok: true };
   } catch (error) {
     console.log(`shelf: save failed: ${String(error)}`);
+    state = null;
+    loading = null;
     return { ok: false };
   }
 }
