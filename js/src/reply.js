@@ -6,11 +6,13 @@
 (function (global) {
   "use strict";
   global.__exact_reply = function (env) {
-    var captureString = env.captureString, keptReply = env.keptReply;
+    var captureString = env.captureString,
+      keptReply = env.keptReply;
     function ok(value, held) {
       var reply = { tag: 0, value: value === undefined ? null : value };
       if (typeof captureString !== "function") return keptReply(reply, null);
-      var head = null, root = true;
+      var head = null,
+        root = true;
       return keptReply(reply, function (key, item) {
         var first = root;
         root = false;
@@ -28,17 +30,18 @@
           for (var link = parent; link && link.parent; link = link.parent) depth++;
           var path = [];
           function pathKey(key) {
-            Object.defineProperty(path, --depth, {value:key, enumerable:true, writable:true, configurable:true});
+            Object.defineProperty(path, --depth, { value: key, enumerable: true, writable: true, configurable: true });
           }
           if (!first) pathKey(key);
           for (var link = parent; link && link.parent; link = link.parent) pathKey(link.key);
           // Application toJSON hooks apply to its values, never our path metadata.
-          Object.defineProperty(path, "toJSON", {value:undefined});
-          captureString(JSON.stringify(path), item); if (held) env.owe();
+          Object.defineProperty(path, "toJSON", { value: undefined });
+          captureString(JSON.stringify(path), item);
+          if (held) env.owe();
           return "";
         }
         // Only ancestors of the current object are needed for later capture paths.
-        if (object) head = {value:item, parent:parent, key:key};
+        if (object) head = { value: item, parent: parent, key: key };
         return item;
       });
     }
@@ -57,7 +60,14 @@
       var message = e && typeof e === "object" && e.message !== undefined ? e.message : e;
       // `reason`: what `failure(x).reason` reads, a string the error carries (the snapback4 driver's refusal code).
       var reason = e && typeof e === "object" && typeof e.reason === "string" ? e.reason : "";
-      return JSON.stringify({ tag: 2, kind: kind, code: e && e.code, failure: failureCode(e), reason: reason, message: String(message) });
+      return JSON.stringify({
+        tag: 2,
+        kind: kind,
+        code: e && e.code,
+        failure: failureCode(e),
+        reason: reason,
+        message: String(message),
+      });
     }
     return { ok: ok, fail: fail };
   };

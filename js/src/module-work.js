@@ -16,13 +16,21 @@
     // that no ended call's value is kept alive by it.
     var MODULE = Object.freeze({ id: -1 });
     var turn = null;
-    var ready = new Map();           // live answer's call -> [steps for its own turn]
-    var discarded = [];              // steps of answers let go before their turn, run with no store
+    var ready = new Map(); // live answer's call -> [steps for its own turn]
+    var discarded = []; // steps of answers let go before their turn, run with no store
     var tearingDown = false;
-    var adopted = 0;                 // adopted fetches in flight
-    function waiting() { var n = 0; ready.forEach(function (steps) { n += steps.length; }); return n; }
+    var adopted = 0; // adopted fetches in flight
+    function waiting() {
+      var n = 0;
+      ready.forEach(function (steps) {
+        n += steps.length;
+      });
+      return n;
+    }
     // What may still settle an answer waiting on module work, for the executor.
-    function note() { host(22, "state", JSON.stringify({ outstanding: adopted + waiting() })); }
+    function note() {
+      host(22, "state", JSON.stringify({ outstanding: adopted + waiting() }));
+    }
     function runDiscarded() {
       turn = null;
       for (var n = 0; discarded.length && n < 1024; n++) discarded.shift()();
@@ -33,12 +41,22 @@
       setTurn: function (t) {
         turn = t ? t.id : null;
         var steps = t && t !== MODULE ? ready.get(t) : null;
-        if (steps) { ready.delete(t); steps.forEach(function (s) { s(); }); note(); }
+        if (steps) {
+          ready.delete(t);
+          steps.forEach(function (s) {
+            s();
+          });
+          note();
+        }
       },
       // Finish readied storage chains when no further answer turn can run
       teardown: function () {
         tearingDown = true;
-        ready.forEach(function (steps) { steps.forEach(function (s) { discarded.push(s); }); });
+        ready.forEach(function (steps) {
+          steps.forEach(function (s) {
+            discarded.push(s);
+          });
+        });
         ready.clear();
         runDiscarded();
         note();
@@ -51,7 +69,9 @@
       route: function (at, step, key, arg) {
         if (tearingDown || !at || (turn !== null && turn !== MODULE.id) || !hooks.live(at)) return false;
         if (!ready.has(at)) ready.set(at, []);
-        ready.get(at).push(function () { step(key, arg); });
+        ready.get(at).push(function () {
+          step(key, arg);
+        });
         note();
         return true;
       },
@@ -64,15 +84,29 @@
         var steps = ready.get(call);
         if (!steps) return 0;
         ready.delete(call);
-        steps.forEach(function (s) { discarded.push(s); });
+        steps.forEach(function (s) {
+          discarded.push(s);
+        });
         note();
         return steps.length;
       },
-      inModuleTurn: function () { return turn === MODULE.id; },
-      readied: function (call) { return ready.has(call); },
-      adopted: function () { adopted++; note(); },
-      landed: function () { adopted--; note(); },
-      outstanding: function () { return adopted + waiting() > 0; },
+      inModuleTurn: function () {
+        return turn === MODULE.id;
+      },
+      readied: function (call) {
+        return ready.has(call);
+      },
+      adopted: function () {
+        adopted++;
+        note();
+      },
+      landed: function () {
+        adopted--;
+        note();
+      },
+      outstanding: function () {
+        return adopted + waiting() > 0;
+      },
     });
   };
 })(globalThis);
@@ -83,7 +117,10 @@
   "use strict";
   global.__exact_waiting_answers = function (calls, pending, work, headOwner) {
     return function (ids) {
-      var own = new Set(), unclaimed = false, at = headOwner(), ready = [];
+      var own = new Set(),
+        unclaimed = false,
+        at = headOwner(),
+        ready = [];
       pending.forEach(function (p) {
         if (p.claimed || p.stream || p.module) return;
         if (p.call && p.call.status === "pending" && !p.call.letGo && calls.has(p.call.id)) own.add(p.call.id);
@@ -94,7 +131,15 @@
         if (!c) return;
         var claims = unclaimed && c.status === "pending" && !c.storage;
         if (claims) unclaimed = false;
-        if (c.ran || c.status !== "pending" || work.readied(c) || own.has(id) || c.storage && (!at || at === c) || claims) ready.push(id);
+        if (
+          c.ran ||
+          c.status !== "pending" ||
+          work.readied(c) ||
+          own.has(id) ||
+          (c.storage && (!at || at === c)) ||
+          claims
+        )
+          ready.push(id);
       });
       return JSON.stringify(ready);
     };
