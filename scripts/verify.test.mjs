@@ -918,14 +918,16 @@ test('agent\'s server: started on a database of its own, shared by overlapping d
     assert.match(await c.said(), /^agent: started server\.ts at \S+ for this drive \(an empty database\); stopped after\n$/);
     assert.deepEqual([await up(), existsSync(resolve(dir, '.exact/agent-server'))], [false, false]);
 
-    // The builder's own server answers: used, said nothing of, and still running after.
+    // The builder's own server answers: used, said in one line naming it, and still running after.
     const theirs = Bun.spawn([process.execPath, 'server.ts'], { cwd: dir, env: { ...process.env, DB: resolve(dir, 'theirs.db') }, stdout: 'ignore', stderr: 'ignore' });
     try {
       for (let i = 0; !(await up()); i++) { assert.ok(i < 100, 'their server answers'); await Bun.sleep(100); }
       const d = drive('three');
       assert.equal(await d.next(), 'up');
       assert.equal(await d.end(), 'stopped');
-      assert.equal(await d.said(), '');
+      const named = await d.said();
+      assert.ok(named.startsWith(`agent: ${url} already answers (pid ${theirs.pid}: `), named);
+      assert.ok(named.endsWith('), a server no drive started: this drive uses it and its data, not a database of its own; stop it to have the drive start server.ts itself\n'), named);
       assert.deepEqual([await up(), theirs.exitCode], [true, null]);
       // Asked empty, a drive is refused rather than writing into theirs.
       assert.match(await drive('three', 'fresh').next(), /but something already answers at /);
@@ -958,13 +960,13 @@ test.skipIf(!!chromium().unavailable)('agent on a server app: its server for the
       const other = agent(...flags, 'clock data', 'state lib.items');
       assert.match(other.stdout, /^\[\]$/m, other.stdout + other.stderr);
     }
-    // A server the builder runs is used, and runs on.
+    // A server the builder runs is used, said so, and runs on.
     const theirs = Bun.spawn([process.execPath, 'server.ts'], { cwd: dir, stdout: 'ignore', stderr: 'ignore' });
     try {
       for (let i = 0; !(await fetch(`${url}/health`).then((r) => r.ok, () => false)); i++) { assert.ok(i < 100, 'their server answers'); await Bun.sleep(100); }
       const used = agent('--storage', 's3', 'clock data', 'state lib.items');
       assert.equal(used.status, 0, used.stdout + used.stderr);
-      assert.doesNotMatch(used.stderr, /^agent: /m);
+      assert.deepEqual(used.stderr.match(/^agent: .*$/gm), [`agent: ${url} already answers (pid ${theirs.pid}: ${used.stderr.match(/\(pid \d+: ([^)]*)\)/)?.[1]}), a server no drive started: this drive uses it and its data, not a database of its own; stop it to have the drive start server.ts itself`]);
       assert.equal(theirs.exitCode, null, 'their server runs on');
     } finally { theirs.kill(); await theirs.exited; rmSync(resolve(dir, 'data.db'), { force: true }); }
   } finally { rmSync(parent, { recursive: true, force: true }); }

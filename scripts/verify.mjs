@@ -170,12 +170,19 @@ const serverRun = (server, name) => `${(server.command ?? ['bun', server.entry, 
 /** Whether anything answers HTTP at `url` (any status). */
 export const answering = (url) => fetch(url, { signal: AbortSignal.timeout(1000) }).then(() => true, () => false);
 
+/** The process listening on `server.port`, when the system says: its `pid`, and `holder`, " already answers (pid …:
+ * <command>)" to follow the URL. */
+function portHolder(server) {
+  const pid = spawnSync('lsof', ['-nP', `-iTCP:${server.port}`, '-sTCP:LISTEN', '-Fp'], { encoding: 'utf8' }).stdout?.match(/^p(\d+)/m)?.[1];
+  const command = pid ? commandLine(pid).slice(0, 60) : '';
+  return { pid, holder: ` already answers${pid ? ` (pid ${pid}${command ? `: ${command}` : ''})` : ''}` };
+}
+
 /** The one line a server's URL already answering gets: who holds the port, when the system says, and what to do. A
  * server this did not start is never stopped, nor written to. */
 export function heldLine(server) {
-  const pid = spawnSync('lsof', ['-nP', `-iTCP:${server.port}`, '-sTCP:LISTEN', '-Fp'], { encoding: 'utf8' }).stdout?.match(/^p(\d+)/m)?.[1];
-  const command = pid ? commandLine(pid).slice(0, 60) : '';
-  return `${server.url} already answers${pid ? ` (pid ${pid}${command ? `: ${command}` : ''})` : ''}, and the tests would ${server.database ? "write into that server's database" : 'change that server\'s state'}: stop it (${pid ? `kill ${pid}` : 'Ctrl-C where it runs'}) and run this again, which starts ${server.entry} itself${server.database ? ' on an empty one' : ''}`;
+  const { pid, holder } = portHolder(server);
+  return `${server.url}${holder}, and the tests would ${server.database ? "write into that server's database" : 'change that server\'s state'}: stop it (${pid ? `kill ${pid}` : 'Ctrl-C where it runs'}) and run this again, which starts ${server.entry} itself${server.database ? ' on an empty one' : ''}`;
 }
 
 /** Keep the URL appServer accepted, including its path and explicit default port, for exact record comparisons. */
@@ -268,7 +275,8 @@ async function started(dir, server, name, forward, give) {
 }
 
 /** The app's server for one `agent` drive (LLP 1116.008 D1): null when the app has none, or the URL it calls already answers
- * (the builder's own, or another drive's: used, said nothing of); else started where app.ts calls it, on a database of the
+ * (another drive's: used, said only when on another database; one no drive started, the builder's or another program's:
+ * used, and one line names its pid and command); else started where app.ts calls it, on a database of the
  * drive's own, `.exact/agent/<storage>/db.sqlite` kept for the `--storage` name so a second drive on it sees the first's data
  * (without one, an empty database removed after; `fresh`, a drive that starts its store empty, empties it first, and is
  * refused while another drive or the builder's server is using the app server), and one line says so. `{ stop() }` ends it. Drives that overlap share the
@@ -339,8 +347,10 @@ export async function driveServer(dir, storage, say = (line) => console.error(li
         await stop();
         throw new Error(`agent: ${server.url} answers, but its fixture does not belong to ${realpathSync(dir)}; use --backend http://127.0.0.1:<free-port> or PORT=<free-port> for this checkout`);
       }
-      const other = db && files('server').map(([file]) => { try { return JSON.parse(readIn(lease, file)).db; } catch { return null; } }).find((was) => was && was !== db);
-      if (other) say(`agent: ${server.entry} at ${server.url} is another drive's, on its database (${relative(dir, other)}); this drive uses it`);
+      const records = files('server').filter(([, pid]) => alive(pid)).map(([file]) => { try { return JSON.parse(readIn(lease, file)); } catch { return null; } }).filter((r) => r?.origin === server.url);
+      const other = db && records.map((r) => r.db).find((was) => was && was !== db);
+      if (!records.length) say(`agent: ${server.url}${portHolder(server).holder}, a server no drive started: this drive uses it and its data${server.database ? ', not a database of its own' : ''}; stop it to have the drive start ${server.entry} itself`);
+      else if (other) say(`agent: ${server.entry} at ${server.url} is another drive's, on its database (${relative(dir, other)}); this drive uses it`);
       return { stop };
     }
     if (db) mkdirSync(dirname(db), { recursive: true });

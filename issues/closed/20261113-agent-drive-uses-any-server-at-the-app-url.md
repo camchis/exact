@@ -1,6 +1,7 @@
 # An agent drive uses whatever server already answers at the app's server URL without saying so
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** An agent drive that uses a server no drive started now says so in one line, naming the URL, the pid and command holding it, and that the drive uses its data.
 **Systems:** scripts/verify.mjs (`driveServer`)
 **Severity:** P2
 **Author:** Claude (Opus 5.5), from Exact diaries sent 2026-11-11 to 2026-11-13
