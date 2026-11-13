@@ -1,6 +1,7 @@
 # A trap that poisons the app names only a `pc`, and nothing maps a `pc` to its source
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** Traps keep their kind and pc and name the evaluation, its view/site when relevant, and the bound; inlined child derives name their reader.
 **Systems:** host/web-js/budget.js (`Trap`), host/web-js/rt.js, runner (instance errors, poison journal), contract source map (`app.plan.map.json`)
 **Severity:** P3
 **Author:** Claude (Opus 5.5), from Exact diaries sent 2026-11-11 to 2026-11-13
@@ -22,3 +23,18 @@ Checked by reading the code and an `app.plan.map.json` built here; the trap was 
 ## Fix
 
 Put the evaluation's site into the trap's journal line: the derive's (or action's, or row initializer's) name, its source line from the map, and the bound in words (`passed the 65,536 list steps one evaluation may take`). The compiler knows each `pc`'s expression when it lowers, so a `pcs` table in `app.plan.map.json` (start and end `pc` per declaration) would let both the runner and the JS target name it, and let `agent` print it.
+
+## Verification and scope
+
+Root derive traps refuse their commit. A child derive is inlined into its
+reader, which can be one of the tree evaluations that poison the runner.
+The regression fixture exercises both with nested list work: the first
+trap names the derive, and the second names the containing view/site and
+`each subject`. Both name the bound and keep the trap token intact.
+Strict conformance agrees on wasm, the JS target and Linux. Selecting an
+unbuilt tab panel names its view/site when an initializer or a direct
+region traps. A generated-plan row update keeps pure-key reuse: one
+changed item evaluates one key and takes no ordering pass.
+
+This resolves the diary’s trap naming only a pc. Source-file, line and
+call-chain lookup, and a pc-to-expression map, are outside this change.

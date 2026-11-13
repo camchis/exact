@@ -281,6 +281,31 @@ the plan, so this is not an original-source revision guarantee.
 and exits nonzero when formatting differs. Plain `fmt <file>` writes the result
 explicitly. Formatting never runs automatically on save.
 
+## Contract evaluation limits
+
+Each evaluation may take 65,536 list steps, build a string of 64 MiB of
+UTF-8, or build a value of 16,777,216 nodes, 64 MiB of string bytes and
+64 levels. A bound trap keeps its `Trap(Kind { pc: N })` token and adds the
+evaluation and bound in words, in every build. For example:
+
+```text
+Trap(IterationLimit { pc: 343 }) in derive "visible": past the 65,536 list steps one evaluation may take
+```
+
+The evaluation names a derive, action, resource argument or state initializer.
+Resource and task gates, family keys and sequence evaluations name their owner too.
+A tree evaluation names its containing view and plan site, then the event
+argument, region subject, each key, state initializer, surface argument or
+list option. The JS target names the site alone. Argument numbers start at 1.
+A prop or style binding already names its site and row; its trap adds only
+the bound. A child's inlined derive or function names the evaluation that
+reads it. The pc is local to that evaluation's code body, not a source location.
+
+An action or derive trap refuses the commit. A prop or style binding trap
+unsets its row and journals it once until the binding succeeds again. Other
+tree evaluation traps poison the runner. Bake and boot errors carry the same
+evaluation and bound text (LLP 1090 D6, LLP 1017.003 D3).
+
 ## Run a terminal app
 
 `cargo build --profile host-dev -p harness-terminal -p llp-terminal` builds

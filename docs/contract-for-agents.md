@@ -387,7 +387,13 @@ what to write. Nothing runs because a value changed (no `useEffect` or watch).
   the trap until it evaluates to a value again, and the app goes on; an `if`,
   `match` or `for` subject, a key, a row's state initializer, a surface
   argument or a virtualized list's own options stops the runner (LLP 1090,
-  LLP 1017.003 D3).
+  LLP 1017.003 D3). Every build keeps `Trap(Kind { pc: N })` verbatim, then
+  names the evaluation and bound in words: a derive or action's name, a resource
+  argument, a state initializer, or the view and plan site with its event
+  argument, subject, key, initializer, surface argument or list option. The JS
+  target names the site alone. Arguments count from 1. A binding already names
+  its site and row, so it adds only the bound. An inlined child derive or `fn`
+  names its reader; the pc is local to that code body, not a source location.
 - A state's initializer runs before any resource answers and before any derive:
   it reads props, injects and the states declared above it, nothing else
   (`type-initializer-scope`). Derive a value from a resource instead, or keep

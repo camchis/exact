@@ -388,7 +388,9 @@ impl<D: DataSource> Runner<D> {
             // a row action reads and writes its row through them.
             let mut env = self.env(&args, frames);
             env.geometry = geometry.as_ref();
-            vm::eval(self.plan.code(row.body), &env, &allowed)?
+            vm::eval(self.plan.code(row.body), &env, &allowed).map_err(|t| {
+                RunnerError::from(t).evaluated(|| format!("action {:?}", self.plan.str(row.name)))
+            })?
         };
         // Sends (LLP 1016 §4): each asks the source now. An answer lands in
         // the mutation's slot inside this commit; a request goes to the host
