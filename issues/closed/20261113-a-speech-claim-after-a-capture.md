@@ -1,6 +1,7 @@
 # A speech claim after a capture skips ducking when the type matches
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** A capture that takes the session clears the spoken type, so the next speech claim applies its own configuration.
 **Systems:** host/apple
 **Severity:** P2
 **Author:** Grok 4.7
