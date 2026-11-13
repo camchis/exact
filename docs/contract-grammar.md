@@ -1083,11 +1083,11 @@ says. Every roster function has a row and an example, and each example written
 | Call | Result / restriction | Example |
 | --- | --- | --- |
 | `performanceNow()` | Milliseconds on the runner's clock since this launch of the app (it restarts at 0 on every launch; the driver's clock under the agent, from 0), as the web's `performance.now()`, not `Date.now()`: the date is `time.epochAtZero + performanceNow()`, with `resource time = exactTime() as shape T` declared, and that sum is what anything stored or sent takes ([timer recipe](recipes/timer-that-survives-relaunch.md)). `now()` is refused (`type-now-renamed`, LLP 1109 D1) with both repairs. A read does not schedule a render, and a derive that reads it is not read again as time passes (when it is depends on the host's clock), so a value that follows the clock comes from a timer: keep the time in state that a `task … every` action writes | `performanceNow() - startedAt`, in a timer's action, is the milliseconds since `startedAt` |
-| `formatTime(ms, offsetMinutes, "short")` | String; fixed offset east of UTC, en-US formatting (`exactTime().utcOffset` is the zone's offset now, answered again when it changes) | `formatTime(1790000000000, 0, "short")` is `"2:13 PM"` |
+| `formatTime(ms, offsetMinutes, "short")` | String; fixed offset east of UTC, in the [format locale](#formatting-by-locale) (`exactTime().utcOffset` is the zone's offset now, answered again when it changes) | `formatTime(1790000000000, 0, "short")` is `"2:13 PM"` |
 | `formatDate(ms, offsetMinutes, "medium" or "month-year" or "iso")` | String; format is a literal choice, not an expression containing `or`. `"iso"` is `YYYY-MM-DD`: the date at that wall time, which is `toISOString`'s date part at a whole-minute offset (a fractional offset's sub-millisecond wall time is not clipped again, as no style's is) (LLP 1102 §3.4); every style prints `""` outside years 1–9999 | `formatDate(1790000000000, 0, "medium")` is `"Sep 21, 2026"` |
-| `formatDay(then, now, offsetMinutes, "day" or "day-time" or "list")` | String; `then`'s day named from `now`'s, both at the one offset (its calendar days, so a DST change between them is not applied), en-US (LLP 1116.020 D8). `"day"` is `Today`, `Yesterday`, `Tomorrow`, else `formatDate`'s `"medium"`; `"day-time"` adds ` at ` and `formatTime`'s time (`Today at 4:42 PM`, `Oct 11, 2026 at 4:42 PM`); `"list"` is Mail's and Notes' list label: the time today, `Yesterday`, the weekday two to six days back, else `10/11/26` (a later day too). Pure: `now` is the app's ticked clock ([dates recipe](recipes/dates-and-days.md)); `""` when either instant is outside years 1–9999 | `formatDay(1790000000000, 1790000000000 + 86400000, 0, "day")` is `"Yesterday"` |
+| `formatDay(then, now, offsetMinutes, "day" or "day-time" or "list")` | String; `then`'s day named from `now`'s, both at the one offset (its calendar days, so a DST change between them is not applied), in the [format locale](#formatting-by-locale) (LLP 1116.020 D8); in en-US: `"day"` is `Today`, `Yesterday`, `Tomorrow`, else `formatDate`'s `"medium"`; `"day-time"` adds ` at ` and `formatTime`'s time (`Today at 4:42 PM`, `Oct 11, 2026 at 4:42 PM`); `"list"` is Mail's and Notes' list label: the time today, `Yesterday`, the weekday two to six days back, else `10/11/26` (a later day too). Pure: `now` is the app's ticked clock ([dates recipe](recipes/dates-and-days.md)); `""` when either instant is outside years 1–9999 | `formatDay(1790000000000, 1790000000000 + 86400000, 0, "day")` is `"Yesterday"` |
 | `formatNumber(n, "compact")` | String; admitted deterministic compact format (`1.2K`) | `formatNumber(1249, "compact")` is `"1.2K"` |
-| `formatNumber(n, "decimal")`, `formatNumber(n, "percent")`, `formatNumber(n, "currency", "USD")` | String; `Intl.NumberFormat("en-US")`'s deterministic forms (LLP 1116 D8): `"decimal"` is grouped with at most three fraction digits (`1,234.567`), `"percent"` multiplies by 100 with none (`0.256` is `26%`), `"currency"` takes an ISO 4217 code literal and prints its symbol and fraction digits (`$1,481.47`, `-$5.00`, `¥1,235`, `CHF 5.00`; the codes are USD, EUR, GBP, JPY, CNY, INR, CAD, AUD, NZD, HKD, SGD, CHF, SEK, NOK, DKK, PLN, MXN, BRL, KRW, ZAR, TWD, ILS, PHP and VND). Each rounds the value's shortest decimal digits half away from zero, as `Intl` does (`1.005` is `$1.01`, where `toFixed` says `1.00`), and signs a negative zero (`-0`); `NaN` and the infinities print `""`. The code is written with `"currency"` only (`type-format-style`) | `formatNumber(1481.47, "currency", "USD")` is `"$1,481.47"` |
+| `formatNumber(n, "decimal")`, `formatNumber(n, "percent")`, `formatNumber(n, "currency", "USD")` | String; `Intl.NumberFormat`'s deterministic forms in the [format locale](#formatting-by-locale) (LLP 1116 D8), in en-US: `"decimal"` is grouped with at most three fraction digits (`1,234.567`), `"percent"` multiplies by 100 with none (`0.256` is `26%`), `"currency"` takes an ISO 4217 code literal and prints its symbol and fraction digits (`$1,481.47`, `-$5.00`, `¥1,235`, `CHF 5.00`; the codes are USD, EUR, GBP, JPY, CNY, INR, CAD, AUD, NZD, HKD, SGD, CHF, SEK, NOK, DKK, PLN, MXN, BRL, KRW, ZAR, TWD, ILS, PHP and VND). Each rounds the value's shortest decimal digits half away from zero, as `Intl` does (`1.005` is `$1.01`, where `toFixed` says `1.00`), and signs a negative zero (`-0`); `NaN` and the infinities print `""`. The code is written with `"currency"` only (`type-format-style`) | `formatNumber(1481.47, "currency", "USD")` is `"$1,481.47"` |
 | `n.toFixed(digits)` | String; JavaScript's `Number.prototype.toFixed`: the binary value rounded (`(1.005).toFixed(2)` is `"1.00"`), a tie away from zero, `-0.001` at 2 is `"-0.00"`, `1e21` and up as `toString` prints; one declared difference: `NaN` and the infinities print `""` (LLP 1054.000.003 D7). `digits` is a whole-number literal 0–100 (LLP 1102 §3.2) | `(3.14159).toFixed(2)` is `"3.14"` |
 | `formatDecimal(units, digits)` | String; an integer count of a smallest unit as a decimal, exactly: `formatDecimal(1234, 2)` is `"12.34"`, `formatDecimal(-5, 2)` is `"-0.05"`, `-0` is `"0.00"`; a count that is not an integer, or not finite, is `""`, so money is a count of cents, or `formatDecimal(round(price * 100), 2)` for a price of at most two decimals under a trillion. `digits` is a whole-number literal 0–20 (LLP 1102 §3.2) | `formatDecimal(1234, 2)` is `"12.34"` |
 | `value.length` | Number; list item count or string UTF-16 code-unit count | `[4, 5, 6].length` is `3` |
@@ -1260,6 +1260,32 @@ constructible. The actual sources are [`format.json`](../plan/tables/format.json
 [`runner/src/stdlib.rs`](../runner/src/stdlib.rs), and the compiler's type/lowering
 modules. A function available in JavaScript, CSS, Swift, or a data module does
 not automatically become a Contract function.
+
+### Formatting by locale
+
+`formatTime`, `formatDate`, `formatDay` and `formatNumber` format in the locale of the
+strings table the app shows (`exactTime().resolvedLocale`, so `setLocale` moves them
+too), as `Intl` (ICU 78.1, CLDR 48) formats that locale (LLP 1054.000.003 D6): with a
+`de` table, `26.09.2026`, `September 2026`, `13:02`, `1.234,5`, `26 %`, `1.234,50 €`,
+`1,2 Mio.` and `Heute, 13:02`. An app with no tables, or with only `en` and `en-US`
+tables, prints the en-US forms above. The compiler bakes each table's data into the
+plan; a host carries none.
+
+- **A table's tag chooses CLDR's locale**, the longest prefix CLDR lists (`de-AT-x`,
+  then `de-AT`); a tag CLDR lists no prefix of formats as `en`. A region is a table's:
+  `en-GB` prints `26 Sep 2026` and `13:02`, `de-CH` `1'234.5`. An app that wants a
+  region's formats ships that region's table, which may be `{}` (it reads the base).
+- **The viewer's 12- or 24-hour choice applies**: `exactTime().formatLocale`'s
+  `-u-hc-h12` or `-u-hc-h23`, which Apple's hosts tell when the person set one. The
+  viewer's region does not otherwise change a format.
+- **Digits are the locale's own** (`ar-EG` and `fa` print their digits, `ar` Latin
+  ones), as `Intl` and Apple choose them. **Dates are Gregorian** in every locale
+  (`Intl`'s `-u-ca-gregory`): `th`, `fa` and `ar-SA` print Gregorian years where
+  their platforms default to another calendar.
+- **`formatDay`'s words** are CLDR's relative day names with a capital first letter
+  (`Heute`, `Gestern`, `Morgen`), in the date's place in the medium date and short
+  time (`Heute, 13:02`; en-US `Today at 1:02 PM`).
+- **`"iso"`** is `YYYY-MM-DD` in every locale.
 
 ## Built-in tags
 

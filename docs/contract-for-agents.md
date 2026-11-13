@@ -439,6 +439,14 @@ component Cart
   `option<number>`, counted as an age is (a Feb 29 birthday has its year on Mar 1).
   `formatDay(then, now, offset, "day")` names a day from `now` (`Today`, `Yesterday`, else
   the date; `"day-time"` adds the time, `"list"` is a list row's, as Mail's).
+- `formatTime`, `formatDate`, `formatDay` and `formatNumber` follow the strings table
+  the app shows: with `strings/de.json` shown they print `26.09.2026`, `13:02`,
+  `1.234,5` and `Heute`, and `setLocale` moves them with the text; the examples above
+  are en-US, which an app with no tables or only English ones prints. Do not write a
+  formatter of your own per language, and do not key one on `resolvedLocale`. A
+  table's region is its formats' (`en-GB.json`, which may be `{}`, prints `26 Sep
+  2026`); dates are Gregorian everywhere
+  ([formatting by locale](contract-grammar.md#formatting-by-locale)).
 - There is no general list append: add an item to
   resource-backed data in its source and answer the updated list (a mutation that
   `refreshes` the list's resource, or its own answer).
