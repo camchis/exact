@@ -23,7 +23,7 @@ import { decodePng } from './png.mjs';
 import { WASM_IMAGE_NOISE, bindingShape, bindingsCheck, componentIR, imageBoxes, irShape, namedCrops, namedOf, namedReport, pixelDiff, sameImageBoxes, unionNamed } from './stage12-named.mjs';
 import { s15b2Stage } from './stage12-s15b2.mjs';
 import { baseLength, cellsOf, overridesOf, pageTop } from './scale-check.mjs';
-import { LIBRARY_GATE, drivePlan } from './stage12-drive.mjs';
+import { LIBRARY_GATE, buildPlan, drivePlan } from './stage12-drive.mjs';
 export { drivePlan } from './stage12-drive.mjs';
 import { jsTargetBuild } from '../host/web/serve.mjs';
 import { placements } from './library-gate.mjs';
@@ -577,8 +577,7 @@ function libraryPlan(dir) {
   mkdirSync(app, { recursive: true });
   for (const f of ['app.contract', 'app.tamber']) writeFileSync(join(app, f), readFileSync(join(LIBRARY_GATE, f)));
   const plan = join(dir, 'library-gate.plan');
-  const r = run('cargo', ['run', '-q', '-p', 'contract', '--', 'build', join(app, 'app.contract'), '-o', plan]);
-  return compiled(r, plan);
+  return compiled(buildPlan(join(app, 'app.contract'), plan), plan);
 }
 
 /** The last compile's errors, which a line that needed the plan says. */
@@ -825,8 +824,7 @@ function restylePlan(dir, design = null) {
   writeFileSync(join(app, 'app.contract'), readFileSync(join(LIBRARY_GATE, 'app.contract')));
   writeFileSync(join(app, 'app.tamber'), design ?? readFileSync(join(LIBRARY_GATE, 'app.tamber')));
   const plan = join(dir, 'library-gate.plan');
-  const r = run('cargo', ['run', '-q', '-p', 'contract', '--', 'build', join(app, 'app.contract'), '-o', plan]);
-  return compiled(r, plan);
+  return compiled(buildPlan(join(app, 'app.contract'), plan), plan);
 }
 
 /** Each case through the design server on a copy of library-gate: `propose`
@@ -1067,7 +1065,7 @@ export function mutationFails(dir, host = 'linux', drive = undefined) {
     writeFileSync(join(app, 'app.contract'), readFileSync(join(LIBRARY_GATE, 'app.contract')));
     writeFileSync(join(app, 'app.tamber'), tamber);
     const out = join(dir, name, 'library-gate.plan');
-    const r = run('cargo', ['run', '-q', '-p', 'contract', '--', 'build', join(app, 'app.contract'), '-o', out]);
+    const r = buildPlan(join(app, 'app.contract'), out);
     if (!r.ok) throw new Error(`the mutated library-gate did not compile (${name}): ${r.out.slice(-400)}`);
     return out;
   };
