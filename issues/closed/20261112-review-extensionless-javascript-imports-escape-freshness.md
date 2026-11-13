@@ -1,6 +1,7 @@
 # Edits to extensionless JavaScript imports pass the build freshness check
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** `moduleGraph` follows a relative import to every file the bundler may resolve it to, JavaScript extensions and index files included, and scans `.jsx` for imports, so an edit to such a file makes the build stale.
 **Systems:** scripts/agent-launch.mjs, scripts/agent-build.mjs
 **Author:** Codex
 **Date:** 2026-11-12

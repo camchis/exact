@@ -30,11 +30,13 @@ export function moduleGraph(dir, manifest) {
     let isFile = false; try { isFile = statSync(file).isFile(); } catch {}
     if (seen.has(at) || !isFile) continue;
     seen.add(at); graph.add(file);
-    if (!/\.(tsx?|[cm]?js)$/.test(file)) continue;
+    if (!/\.(tsx?|[cm]?jsx?)$/.test(file)) continue;
     for (const [, , spec] of readFileSync(file, 'utf8').matchAll(SPECIFIER)) {
       if (!spec.startsWith('.')) continue;
       const base = resolve(dirname(at), spec), stem = base.replace(/\.(m?js|jsx)$/, '');
-      queue.push(base, ...['.ts', '.tsx', '.d.ts', '.json'].map(end => base + end), ...['index.ts', 'index.tsx', 'index.d.ts'].map(index => resolve(base, index)), ...['.ts', '.tsx', '.mts', '.d.ts'].map(end => stem + end));
+      // Each file the bundler or TypeScript may resolve it to: an extension added, an index file, a `.ts` its `.js` names.
+      const ends = ['.ts', '.tsx', '.d.ts', '.js', '.jsx', '.mjs', '.cjs', '.json'];
+      queue.push(base, ...ends.map(end => base + end), ...ends.map(end => resolve(base, 'index' + end)), ...['.ts', '.tsx', '.mts', '.d.ts'].map(end => stem + end));
     }
   }
   return graph;

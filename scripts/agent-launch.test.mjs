@@ -1426,3 +1426,17 @@ test('a backend flag keeps its source through child builds and an environment ov
   env.EXACT_BACKEND_ORIGIN = 'https://other.example';
   expect(backendOriginSelection('.', env)).toEqual({ origin: 'https://other.example', source: 'EXACT_BACKEND_ORIGIN' });
 });
+
+test('an import without an extension reaches its JavaScript file, a directory its index, and both what they import', async () => {
+  const { notBuildInput } = await import('./agent-launch.mjs');
+  const dir = realpathSync(mkdtempSync(join(tmpdir(), 'exact-module-graph-')));
+  try {
+    const files = {
+      'app.ts': "import { a } from './helper';\nimport { b } from './helpers';\nimport c from './view';\n", 'helper.js': "export { d } from './deep';\n",
+      'deep.mjs': 'export const d = 1;\n', 'helpers/index.js': "import './more/x';\n", 'helpers/more/x.cjs': '', 'view.jsx': "import './y';\n", 'y.js': '', 'unused.js': '',
+    };
+    for (const [name, text] of Object.entries(files)) { mkdirSync(dirname(join(dir, name)), { recursive: true }); writeFileSync(join(dir, name), text); }
+    const input = notBuildInput(dir);
+    expect(Object.keys(files).filter(name => input(join(dir, name)))).toEqual(['unused.js']);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
