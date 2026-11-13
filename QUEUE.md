@@ -1447,12 +1447,14 @@ sits on that list carries the trade it would take.
   Done when the screen shows the verified head's time and tampering refuses
   the head. Prove one hosted Interview release on the directory origin or
   AppDrop; D6a install pages and D6b local development installs are built.
-- **Continuous release loop: bundle-only deploy rows** (LLP 1030.003 §6 Q2;
-  Charlie, 2026-10-22). Make `scripts/deploy.mjs` classify against a signed
-  head's cohort using `push.mjs`'s path. Done when a Linux publisher updates
-  an existing iOS stream without an Apple bake and reports a binary change
-  as needing a binary. AppDrop is the remote tester-install lane; TestFlight
-  is later. EAS Hosting is dropped; EAS as builder waits for a Mac-less publisher.
+- **Continuous release loop: bundle-only deploys on a device** (LLP 1030.003 §6 Q2;
+  Charlie, 2026-10-22). `scripts/deploy.mjs` classifies against a signed head's cohort
+  and a Linux publisher's deploy of an existing iOS stream needs no Apple bake (tests
+  stand in for the builds). Left: install an iOS build, deploy a bundle-only change
+  from a real Linux machine to its origin, and watch the installed app apply it; then
+  a native source change, reported as needing a binary. AppDrop is the remote
+  tester-install lane; TestFlight is later. EAS Hosting is dropped; EAS as builder
+  waits for a Mac-less publisher.
 
 - Native development URL latency: Charlie observes about one second for Update Lab Contract edits on the physical iPhone while localhost clients update almost immediately (2026-09-14). Notification already uses SSE. `PlanURL` now fetches up to four verified payloads concurrently after the envelope; it still creates a fresh URLSession per fetch and refetches unchanged payloads. A physical-phone sample measured envelope 56.5 ms, payload fetches 1,347.8 ms, and prepare/commit 32.1 ms (`target/update-lab-phone-timing.json`). Payload fetching dominates this sample; isolate connection setup versus transfer, then consider a shared session and verified reuse by digest. Preserve byte limits, complete-generation validation and failed-candidate retention.
 
