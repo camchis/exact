@@ -2826,14 +2826,13 @@ that output plays (a change then interrupts other apps' audio). The driver's fro
 skips preparation and opens no surface output. With `EXACT_AGENT_TIMING=platform`,
 preparation runs, but the driver drops `exact:audio` requests, so they do not
 raise the prepared ambient session.
-On the web, the sound output sets the Audio Session API's type where supported:
+On the web, page initialization sets the Audio Session API's type where supported:
 `"ambient"` and `"playback"` pass through, and `"playback-mix"` maps to `"ambient"`: the
 [W3C draft](https://w3c.github.io/audio-session/)
 has no mixing playback type. This preserves other apps' audio but obeys the
-ring/silent switch in WebKit. Without a `sound` declaration or a command or
-sequence that initializes sound output, the browser keeps `auto`: `video`,
-`audio` and GPU audio alone do not apply this setting. `data-audio-session`
-keeps the manifest's value.
+ring/silent switch in WebKit. The policy applies to `video`, `audio` and GPU audio
+without a `sound` declaration or an `AudioContext`. Without `audio_session`, the
+browser keeps `auto`. `data-audio-session` keeps the manifest's value.
 The Mac has no session. A development run with `EXACT_SOUND_CHECK=1` taps the
 engine's main mixer and journals (and prints) how far each onset after a
 silence reached the speaker from its time.

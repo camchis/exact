@@ -2,7 +2,7 @@ import { asyncContext, bundleOptions, developmentLocalNetwork, lowered, packageC
 import { writeCrawlerFiles } from '../web/crawl.mjs';
 import { bakeWatchEnv, hatchWords, injectedProfiles, moduleDirectory, resolveApp, webAppManifest } from '../../scripts/app.mjs';
 import { webIconLinks, webThemeColors } from '../../scripts/app-icons.mjs';
-import { webCspFile, webHead } from '../../scripts/web-head.mjs';
+import { webAudioSession, webCspFile, webHead } from '../../scripts/web-head.mjs';
 import { fileIdentity, resourceIdentities } from '../apple/assets.mjs';
 import { launchModules } from '../../scripts/launch-modules.mjs';
 import { installedFileDependencies } from '../../scripts/file-dependencies.mjs';
@@ -921,6 +921,7 @@ writeFileSync(resolve(gen, 'page-style.json'), JSON.stringify(analyze(base + css
 // The app's part of the render server's CSP (LLP 1048.000 D11), which it reads at start.
 const cspFile = webCspFile(manifest);
 if (cspFile) writeFileSync(resolve(gen, 'csp.json'), cspFile);
+if (manifest.audio_session) cpSync(resolve(root, 'host/web/audio-session.js'), resolve(out, 'audio-session.js'));
 // app.json's `host.web.head` goes after the sheet, where no search for the shell's places (its sheet, preloads and
 // title) can find a tag in an entry's text; every page composed over the shell keeps it (LLP 1048.000 D3).
 writeFileSync(resolve(out, 'index.html'), `<!doctype html>
@@ -932,7 +933,7 @@ writeFileSync(resolve(out, 'index.html'), `<!doctype html>
 ${colorSchemeMeta(interfaceStyle(manifest))}${icon}
 ${preloads}<style>${base}${css}</style>
 ${webHead(manifest)}<div id="exact-root"${manifest.audio_session ? ` data-audio-session="${manifest.audio_session}"` : ''}></div>
-${args.includes('--inline') ? `<script type="module">${readFileSync(resolve(out, 'app.js'), 'utf8').replaceAll('</script', '<\\/script')}</script>` : '<script type="module" src="./app.js"></script>'}
+${webAudioSession(manifest)}${args.includes('--inline') ? `<script type="module">${readFileSync(resolve(out, 'app.js'), 'utf8').replaceAll('</script', '<\\/script')}</script>` : '<script type="module" src="./app.js"></script>'}
 `);
 if (production && !opt('--plan')) {
   // No bake, so no envelope to link: the web manifest written above, as a bake's page links it.
