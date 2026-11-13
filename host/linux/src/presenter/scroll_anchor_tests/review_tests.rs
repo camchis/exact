@@ -30,7 +30,10 @@ fn a_reader_sample_can_fold_the_header_without_invalidating_the_next_sample() {
             attach(&mut p);
         }
         let rev = p.reader_under(200., 60., 1.)[5] as u32;
-        assert_eq!(p.reader_scrolled(port, (0., 10.), rev), Some((0., 10.)));
+        assert_eq!(
+            p.reader_sample(port, (0., 10.), rev),
+            Some(((0., 10.), (0., 10.)))
+        );
         if attached {
             attach(&mut p);
         }
@@ -710,4 +713,324 @@ fn input_that_only_moves_the_pending_model_completes_after_acknowledgement() {
         let order = p.host.runner().slot("order").unwrap().as_str().unwrap();
         assert_eq!(order, "s610;e;", "input={input} deferred={deferred:?}");
     }
+}
+
+#[cfg(not(windows))]
+fn completion_source() -> String {
+    let mut source = source(false)
+        .replace("  action fold", "  state footer = 0\n  state order = \"\"\n  state endedAt = 0\n  action moved(x: number, y: number)\n    order = `${order}s${y};`\n  action ended\n    order = `${order}e;`\n    endedAt = performanceNow()\n  action fold")
+        .replace("header = 0", "header = 0\n    footer = 248\n    order = \"\"")
+        .replace("testId=\"port\"", "testId=\"port\" id=\"port\" scroll=moved scrollend=ended");
+    source.push_str("      box height=footer\n");
+    source
+}
+
+#[cfg(not(windows))]
+fn order(p: &Presenter<()>) -> &str {
+    p.host.runner().slot("order").unwrap().as_str().unwrap()
+}
+
+#[cfg(not(windows))]
+#[test]
+fn input_cancelling_a_pending_anchor_correction_still_completes() {
+    for input in ["wheel", "command", "reader", "feed"] {
+        let mut p = boot_source(&completion_source());
+        let port = named(&p, "port");
+        p.scroll_to(port, (0., 648.)).unwrap();
+        attach(&mut p);
+        assert_eq!(p.pump(0.), None);
+        let rev = p.reader_under(200., 60., 1.)[5] as u32;
+        fold(&mut p);
+        let stale = p.display_frame().unwrap();
+        match input {
+            "wheel" => p.wheel_at(200., 200., 0., 48.),
+            "command" => {
+                p.scroll_element_by(&[Value::str("port"), Value::Number(0.), Value::Number(48.)])
+            }
+            "reader" => {
+                assert_eq!(
+                    p.reader_sample_at(port, (0., 48.), rev, 5000.),
+                    Some((0., 48.))
+                );
+            }
+            _ => assert!(p.scroll_by(port, 48.)),
+        }
+        assert!(p.display_complete(&stale));
+        assert_eq!(p.clock(5050.).1, None);
+        assert_eq!(order(&p), "", "input={input}");
+        assert_eq!(p.scroll_of(port).1, 648.);
+        attach(&mut p);
+        assert_eq!(p.clock(5050.).1, None);
+        assert_eq!(order(&p), if input == "reader" { "" } else { "e;" });
+        assert_eq!(p.clock(5099.).1, None);
+        assert_eq!(p.clock(5100.).1, None);
+        assert_eq!(order(&p), "e;", "input={input}");
+        assert_eq!(
+            p.host.runner().slot("endedAt"),
+            Some(&Value::Number(if input == "reader" {
+                5100.
+            } else {
+                5050.
+            }))
+        );
+        assert_eq!(p.clock(6000.).1, None);
+        assert_eq!(order(&p), "e;");
+        assert_eq!(p.scroll_end_due(), None);
+        p.wheel_at(200., 200., 0., -10.);
+        assert!(p.pending_model_scroll(port).is_none());
+        assert_eq!(p.clock(6000.).1, None);
+        assert_eq!(order(&p), "e;s638;e;");
+    }
+}
+
+#[cfg(not(windows))]
+#[test]
+fn pending_anchor_reader_samples_keep_the_shell_deadline_and_one_fling_completion() {
+    for preceding in [false, true] {
+        for acknowledged_at in [5075., 5200.] {
+            let mut p = boot_source(&completion_source());
+            let port = named(&p, "port");
+            p.scroll_to(port, (0., if preceding { 638. } else { 648. }))
+                .unwrap();
+            attach(&mut p);
+            assert_eq!(p.pump(0.), None);
+            let rev = p.reader_under(200., 60., 1.)[5] as u32;
+            if preceding {
+                assert_eq!(
+                    p.reader_sample_at(port, (0., 10.), rev, 5000.),
+                    Some((0., 10.))
+                );
+            }
+            fold(&mut p);
+            assert_eq!(
+                p.reader_sample_at(port, (0., 10.), rev, 5050.),
+                Some((0., 10.))
+            );
+            assert_eq!(p.reader_sample_at(port, (0., 0.), rev, 5080.), None);
+            assert_eq!(p.host.now(), 0.);
+            assert_eq!(p.clock(acknowledged_at).1, None);
+            assert_eq!(order(&p), "", "preceding={preceding}");
+            attach(&mut p);
+            assert_eq!(p.pump(acknowledged_at), None);
+            assert_eq!(p.clock(acknowledged_at.max(5149.)).1, None);
+            assert_eq!(
+                order(&p),
+                if acknowledged_at < 5150. {
+                    "s610;"
+                } else {
+                    "s610;e;"
+                }
+            );
+            assert_eq!(p.clock(acknowledged_at.max(5150.)).1, None);
+            assert_eq!(order(&p), "s610;e;", "preceding={preceding}");
+            assert_eq!(
+                p.host.runner().slot("endedAt"),
+                Some(&Value::Number(acknowledged_at.max(5150.)))
+            );
+            assert_eq!(p.clock(6000.).1, None);
+            assert_eq!(order(&p), "s610;e;");
+            assert_eq!(p.scroll_end_due(), None);
+        }
+    }
+}
+
+#[cfg(not(windows))]
+#[test]
+fn input_moving_both_anchor_offsets_waits_to_dispatch_scroll() {
+    for (input, deferred) in [
+        ("wheel", None),
+        ("command", None),
+        ("reader", None),
+        ("feed", None),
+        ("wheel", Some(false)),
+        ("wheel", Some(true)),
+    ] {
+        let mut p = boot_source(&completion_source());
+        let port = named(&p, "port");
+        p.scroll_to(port, (0., 400.)).unwrap();
+        attach(&mut p);
+        assert_eq!(p.pump(0.), None);
+        let rev = p.reader_under(200., 60., 1.)[5] as u32;
+        fold(&mut p);
+        p.set_deferred_collections(deferred.is_some());
+        match input {
+            "wheel" => p.wheel_at(200., 200., 0., 10.),
+            "command" => {
+                p.scroll_element_by(&[Value::str("port"), Value::Number(0.), Value::Number(10.)])
+            }
+            "reader" => {
+                assert_eq!(
+                    p.reader_sample_at(port, (0., 10.), rev, 5000.),
+                    Some((0., 10.))
+                );
+            }
+            _ => assert!(p.scroll_by(port, 10.)),
+        }
+        assert_eq!(p.scroll_of(port).1, 410.);
+        assert_eq!(p.collection_paint_scroll().unwrap()[&port].1, 362.);
+        if deferred == Some(false) {
+            assert!(p.run_deferred_collections());
+        }
+        assert_eq!(p.clock(5050.).1, None);
+        assert_eq!(order(&p), "", "input={input} deferred={deferred:?}");
+        attach(&mut p);
+        if deferred == Some(true) {
+            assert!(p.run_deferred_collections());
+        }
+        assert_eq!(p.pump(5050.), None);
+        assert_eq!(
+            order(&p),
+            if input == "reader" {
+                "s362;"
+            } else {
+                "s362;e;"
+            }
+        );
+        assert_eq!(p.clock(5100.).1, None);
+        assert_eq!(order(&p), "s362;e;", "input={input} deferred={deferred:?}");
+        assert_eq!(p.clock(6000.).1, None);
+        assert_eq!(order(&p), "s362;e;");
+        assert_eq!(p.scroll_end_due(), None);
+    }
+}
+
+#[cfg(not(windows))]
+#[test]
+fn a_reader_sample_clamped_in_the_anchor_model_keeps_the_shell_deadline() {
+    for (start, preceding) in [(30., false), (30., true), (48., false), (48., true)] {
+        let mut p = boot_source(&completion_source());
+        let port = named(&p, "port");
+        p.scroll_to(port, (0., if preceding { 38. } else { 48. }))
+            .unwrap();
+        attach(&mut p);
+        assert_eq!(p.pump(0.), None);
+        let rev = p.reader_under(200., 60., 1.)[5] as u32;
+        if preceding {
+            assert_eq!(
+                p.reader_sample_at(port, (0., 10.), rev, 4950.),
+                Some((0., 10.))
+            );
+        }
+        fold(&mut p);
+        assert_eq!(p.collection_paint_scroll().unwrap()[&port].1, 0.);
+        if start < 48. {
+            assert_eq!(
+                p.reader_sample_at(port, (0., start - 48.), rev, 4975.),
+                Some((0., 0.))
+            );
+        }
+        assert_eq!(
+            p.reader_sample_at(port, (0., -10.), rev, 5000.),
+            Some((0., 0.))
+        );
+        assert_eq!(p.scroll_of(port).1, start - 10.);
+        assert_eq!(p.collection_paint_scroll().unwrap()[&port].1, 0.);
+        assert_eq!(p.reader_sample_at(port, (0., 0.), rev, 5050.), None);
+        assert_eq!(p.reader_sample_at(port, (0., 10.), rev + 1, 5075.), None);
+        assert_eq!(p.host.now(), 0.);
+        assert_eq!(p.clock(5050.).1, None);
+        assert_eq!(order(&p), "", "preceding={preceding}");
+        attach(&mut p);
+        assert_eq!(p.pump(5050.), None);
+        assert_eq!(order(&p), "s0;", "preceding={preceding}");
+        assert_eq!(p.clock(5099.).1, None);
+        assert_eq!(order(&p), "s0;", "preceding={preceding}");
+        assert_eq!(p.clock(5100.).1, None);
+        assert_eq!(order(&p), "s0;e;", "preceding={preceding}");
+        assert_eq!(p.host.runner().slot("endedAt"), Some(&Value::Number(5100.)));
+        assert_eq!(p.clock(6000.).1, None);
+        assert_eq!(order(&p), "s0;e;");
+        assert_eq!(p.scroll_end_due(), None);
+    }
+}
+
+#[cfg(not(windows))]
+#[test]
+fn a_fold_after_a_reader_sample_leaves_its_completion_due() {
+    let mut p = boot_source(&completion_source());
+    let port = named(&p, "port");
+    p.scroll_to(port, (0., 400.)).unwrap();
+    attach(&mut p);
+    assert_eq!(p.pump(0.), None);
+    let rev = p.reader_under(200., 60., 1.)[5] as u32;
+    assert_eq!(
+        p.reader_sample_at(port, (0., 10.), rev, 5000.),
+        Some((0., 10.))
+    );
+    fold(&mut p);
+    assert!(p.pending_model_scroll(port).is_some());
+    let folded = p.display_frame().unwrap();
+    assert_eq!(p.scroll_end_due(), Some(5100.));
+    assert_eq!(p.clock(5100.).1, None);
+    assert_eq!(order(&p), "e;");
+    assert_eq!(p.host.runner().slot("endedAt"), Some(&Value::Number(5100.)));
+    assert!(p.display_complete(&folded));
+    assert_eq!(p.pump(5200.), None);
+    assert_eq!(order(&p), "e;s362;");
+    assert_eq!(p.scroll_end_due(), None);
+}
+
+#[cfg(not(windows))]
+#[test]
+fn an_app_scroll_after_acknowledged_anchoring_leaves_a_reader_completion_due() {
+    let source = completion_source()
+        .replace(
+            "  action fold",
+            "  state top = 0\n  action jump\n    top = 100\n  action fold",
+        )
+        .replace("scroll=moved", "scrollTop=top scroll=moved")
+        .replace("press=fold", "press=fold dblclick=jump");
+    let mut p = boot_source(&source);
+    let port = named(&p, "port");
+    p.scroll_to(port, (0., 400.)).unwrap();
+    attach(&mut p);
+    assert_eq!(p.pump(0.), None);
+    fold(&mut p);
+    attach(&mut p);
+    assert_eq!(p.pump(0.), None);
+    assert!(p.pending_model_scroll(port).is_none());
+    assert_eq!(order(&p), "s352;");
+    let rev = p.reader_under(200., 60., 1.)[5] as u32;
+    assert_eq!(
+        p.reader_sample_at(port, (0., 10.), rev, 5000.),
+        Some((0., 10.))
+    );
+    assert_eq!(order(&p), "s352;s362;");
+    let row = named(&p, "row20");
+    assert_eq!(p.host.dispatch_at(row, Event::Dblclick, p.host.now()), None);
+    assert_eq!(p.after_commit(), None);
+    assert!(p.pending_model_scroll(port).is_some());
+    let jump = p.display_frame().unwrap();
+    assert_eq!(p.scroll_end_due(), Some(5100.));
+    assert_eq!(p.clock(5100.).1, None);
+    assert_eq!(order(&p), "s352;s362;e;");
+    assert_eq!(p.host.runner().slot("endedAt"), Some(&Value::Number(5100.)));
+    assert!(p.display_complete(&jump));
+    assert_eq!(p.clock(5200.).1, None);
+    assert_eq!(order(&p), "s352;s362;e;s100;e;");
+    assert_eq!(p.scroll_end_due(), None);
+}
+
+#[cfg(not(windows))]
+#[test]
+fn superseding_a_correction_at_the_input_offset_still_sends_its_scroll() {
+    let mut p = boot_source(&completion_source());
+    let port = named(&p, "port");
+    p.scroll_to(port, (0., 400.)).unwrap();
+    attach(&mut p);
+    assert_eq!(p.pump(0.), None);
+    fold(&mut p);
+    p.wheel_at(200., 200., 0., 10.);
+    assert_eq!(p.scroll_of(port).1, 410.);
+    assert_eq!(p.collection_paint_scroll().unwrap()[&port].1, 362.);
+    let superseded = p.display_frame().unwrap();
+    assert_eq!(p.scroll_to(port, (0., 410.)), Some((0., 410.)));
+    assert!(p.pending_model_scroll(port).is_none());
+    assert!(p.display_complete(&superseded));
+    assert_eq!(p.clock(p.host.now() + 100.).1, None);
+    assert_eq!(order(&p), "s410;e;");
+    attach(&mut p);
+    assert_eq!(p.clock(p.host.now() + 100.).1, None);
+    assert_eq!(order(&p), "s410;e;");
+    assert_eq!(p.scroll_end_due(), None);
 }

@@ -54,6 +54,9 @@ pub(super) struct State {
     interaction: Option<ViewId>,
     authored_scroll: Option<bool>,
     scroll_events: VecDeque<(ViewId, NodeKey)>,
+    /// Scrollers whose input moved an anchor-corrected model ([`Presenter::owe_scroll`]): the
+    /// offset the reader last saw reported, `None` when an earlier move's event was still queued.
+    owed_scrolls: BTreeMap<ViewId, (NodeKey, Option<(f32, f32)>)>,
     /// The list's own positions a reader's move carries onto its next input sequence.
     carried: BTreeMap<ViewId, ModelScroll>,
     /// The host runs a scroll's collection pass itself, after the frame it
@@ -659,9 +662,15 @@ impl<D: DataSource> Presenter<D> {
     // Browser scroll events are coalesced per event-loop turn. Report the
     // current acknowledged position, never an unpresented model target.
     pub(super) fn dispatch_authored_scroll(&mut self) -> Option<String> {
+        self.release_owed_scrolls();
         let events = std::mem::take(&mut self.collection.scroll_events);
         let mut error = None;
         for (view, key) in events {
+            // The offset the event would report is not yet shown.
+            if self.scroll_owed(view) {
+                self.collection.scroll_event(view, key);
+                continue;
+            }
             if self.host.kernel().node(view).is_none_or(|n| n.key != key)
                 || self.host.route_visibility(view).0
                 || (self.host.route_visibility(view).1 && !self.tracks_scroll_end(view))
@@ -682,6 +691,13 @@ impl<D: DataSource> Presenter<D> {
             error = error.or(result).or(after);
         }
         error
+    }
+
+    pub(super) fn anchor_scroll_pending(&self, view: ViewId) -> bool {
+        self.collection
+            .cursors
+            .get(&view)
+            .is_some_and(|c| c.anchored && c.model_scroll.is_some())
     }
 
     pub(super) fn pending_model_scroll(&self, view: ViewId) -> Option<ModelScroll> {
@@ -903,6 +919,9 @@ impl<D: DataSource> Presenter<D> {
     }
 
     fn collection_scroll_turn(&mut self, view: ViewId, owned_edge: bool, moved: bool) {
+        // A superseded correction's input may still owe its event: queued, it is
+        // folded into this move's own below.
+        self.release_owed_scrolls();
         if moved {
             self.collection.scroll_events.retain(|(id, _)| *id != view);
         }
@@ -922,9 +941,9 @@ impl<D: DataSource> Presenter<D> {
             .runner()
             .handlers_of(view)
             .contains(&EventKind::Scroll);
-        // Input that only moves the model gets its event when the picture is
-        // acknowledged. Collection work still runs for that input below.
-        let mut error = if authored && moved {
+        // Input carrying an anchor correction gets its event when the corrected
+        // picture is acknowledged. Collection work still runs below.
+        let mut error = if authored && moved && !self.scroll_owed(view) {
             let event = self.scroll_event(view);
             self.host.dispatch_at(view, event, self.host.now())
         } else {

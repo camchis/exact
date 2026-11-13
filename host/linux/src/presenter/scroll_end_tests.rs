@@ -1,6 +1,8 @@
 use super::*;
 use exact_runner::{DataError, Value};
 
+mod reader_model_tests;
+
 #[derive(Default)]
 struct NoData;
 impl DataSource for NoData {

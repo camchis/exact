@@ -67,14 +67,14 @@ impl<D: DataSource + Default> CanvasHost<D> {
         let _s = Section::begin(c"exact scroll");
         let s = self.scale;
         self.p.hold_collections(self.prefetching);
-        let went = self.p.reader_scrolled(id, (dx / s, dy / s), rev);
+        let at = self.now();
+        let went = self.p.reader_sample_at(id, (dx / s, dy / s), rev, at);
         self.p.hold_collections(false);
-        let Some((_, down)) = went.filter(|w| *w != (0.0, 0.0)) else {
+        let Some((_, down)) = went else {
             return;
         };
         self.scrolled = self.prefetching;
-        self.scrolled_at = self.now();
-        self.p.scroll_end_reader_sampled(id, self.scrolled_at);
+        self.scrolled_at = at;
         if down != 0.0 && id != PAGE {
             if self.feed != Some(id) {
                 self.feed = Some(id);

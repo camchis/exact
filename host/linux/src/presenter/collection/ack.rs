@@ -77,6 +77,7 @@ impl<D: DataSource> Presenter<D> {
                 self.collection.cursors.remove(&view);
             }
         }
+        self.release_owed_scrolls();
         self.finish_collection_scroll_ends();
     }
 

@@ -59,6 +59,7 @@ impl<D: DataSource> Presenter<D> {
             self.dirty |= cursor.model_scroll.is_some();
             cursor.advance();
         }
+        self.release_owed_scrolls();
     }
 
     pub(in crate::presenter) fn live_scroll_max(&self, view: ViewId) -> f32 {
@@ -101,7 +102,7 @@ impl<D: DataSource> Presenter<D> {
             return Some(0.);
         }
         cursor.advance();
-        if self.display.attached() && top != next.1 {
+        if self.display.attached() && (top != next.1 || next == from) {
             let mut acknowledged = next;
             cursor.model_offset(
                 cursor.key?,
@@ -113,9 +114,57 @@ impl<D: DataSource> Presenter<D> {
             if let Some(pending) = &mut cursor.model_scroll {
                 pending.rebase = top - next.1;
             }
+            if self.anchor_scroll_pending(view) {
+                self.owe_scroll(view, from);
+            }
         }
         self.dirty = true;
         Some(top - corrected)
+    }
+
+    /// Input moved `view`'s anchor-corrected model, which only its picture shows: the input
+    /// offset never is. Its `scroll` waits for that picture's acknowledgement, or for the
+    /// correction to be superseded, so it reports what the reader sees.
+    fn owe_scroll(&mut self, view: ViewId, from: (f32, f32)) {
+        if view == PAGE {
+            return;
+        }
+        let Some(key) = self.host.kernel().node(view).map(|n| n.key) else {
+            return;
+        };
+        let queued = self.has_pending_scroll(view);
+        self.collection.scroll_events.retain(|(id, _)| *id != view);
+        let owed = self
+            .collection
+            .owed_scrolls
+            .entry(view)
+            .or_insert((key, Some(from)));
+        if queued {
+            owed.1 = None;
+        }
+    }
+
+    pub(in crate::presenter) fn scroll_owed(&self, view: ViewId) -> bool {
+        self.collection.owed_scrolls.contains_key(&view) && self.anchor_scroll_pending(view)
+    }
+
+    /// Queue the `scroll` each acknowledged or superseded correction's input owed, at the offset
+    /// now shown; none where that offset is the one the reader last saw reported.
+    pub(in crate::presenter) fn release_owed_scrolls(&mut self) {
+        let released: Vec<_> = self
+            .collection
+            .owed_scrolls
+            .keys()
+            .copied()
+            .filter(|view| !self.anchor_scroll_pending(*view))
+            .collect();
+        for view in released {
+            let (key, from) = self.collection.owed_scrolls.remove(&view).unwrap();
+            if from != Some(self.scroll_of(view)) {
+                self.collection.scroll_event(view, key);
+                self.executor.notify();
+            }
+        }
     }
 
     pub(in crate::presenter) fn rebase_clamped_anchor(

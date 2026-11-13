@@ -353,7 +353,7 @@ impl<D: DataSource> Presenter<D> {
         to: (f32, f32),
         completion: Completion,
         relative: Option<(f32, f32)>,
-    ) -> Option<(f32, f32)> {
+    ) -> Option<((f32, f32), (f32, f32))> {
         if !to.0.is_finite() || !to.1.is_finite() {
             return None;
         }
@@ -374,8 +374,9 @@ impl<D: DataSource> Presenter<D> {
         let moved = relative
             .and_then(|by| self.anchor_input(id, s.offset, if s.axes.1 { by.1 } else { 0. }, next));
         if next == s.offset && moved.is_none_or(|dy| dy == 0.) {
-            return Some(next);
+            return Some((next, (0., 0.)));
         }
+        let movement = (next.0 - s.offset.0, moved.unwrap_or(next.1 - s.offset.1));
         if completion == Completion::Reader {
             if let Some((_, accepted)) = self.reader.tracked.get_mut(&id) {
                 // A scroll handler may rebase this position before dispatch returns.
@@ -398,7 +399,7 @@ impl<D: DataSource> Presenter<D> {
         if let Some(error) = self.refresh_transform_geometry() {
             self.host.log(error);
         }
-        Some(next)
+        Some((next, movement))
     }
 
     /// The reader moved scroller `id` by `by`, knowing revision `rev` of
@@ -406,6 +407,36 @@ impl<D: DataSource> Presenter<D> {
     /// it knew the app had moved the scroller (dropped), or for a scroller
     /// it was never told of.
     pub fn reader_scrolled(&mut self, id: ViewId, by: (f32, f32), rev: u32) -> Option<(f32, f32)> {
+        self.reader_sample(id, by, rev)
+            .map(|(acknowledged, _)| acknowledged)
+    }
+
+    /// Accept and stamp a shell sample if either offset moves. Return the
+    /// model's movement for prefetching; acknowledged movement alone is no travel.
+    #[cfg(any(target_os = "android", all(test, not(windows))))]
+    pub(crate) fn reader_sample_at(
+        &mut self,
+        id: ViewId,
+        by: (f32, f32),
+        rev: u32,
+        at: f64,
+    ) -> Option<(f32, f32)> {
+        let (acknowledged, model) = self.reader_sample(id, by, rev)?;
+        if acknowledged == (0., 0.) && model == (0., 0.) {
+            return None;
+        }
+        self.scroll_end_reader_sampled(id, at);
+        Some(model)
+    }
+
+    /// The acknowledged delta and the input's movement in the model. The shell
+    /// stamps actual movement even before it is acknowledged.
+    pub(crate) fn reader_sample(
+        &mut self,
+        id: ViewId,
+        by: (f32, f32),
+        rev: u32,
+    ) -> Option<((f32, f32), (f32, f32))> {
         self.person_scrolls += 1;
         self.restore_scroll_anchors();
         if !self.reader.tracked.contains_key(&id) {
@@ -419,13 +450,13 @@ impl<D: DataSource> Presenter<D> {
             return None;
         }
         let from = s.offset;
-        let to = self.scroll_to_completion(
+        let (to, movement) = self.scroll_to_completion(
             id,
             (from.0 + by.0, from.1 + by.1),
             Completion::Reader,
             Some(by),
         )?;
-        Some((to.0 - from.0, to.1 - from.1))
+        Some(((to.0 - from.0, to.1 - from.1), movement))
     }
 
     /// An agent's phased wheel supplies one reader sample on the existing clock.

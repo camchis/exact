@@ -98,9 +98,9 @@ impl<D: DataSource> Presenter<D> {
         before: (f32, f32),
         completion: Completion,
     ) {
-        if self.scroll_of(view) == before {
-            self.scroll_end_requested(view, before, completion);
-        } else {
+        // Input can move only the pending model, including back to the
+        // acknowledged offset. Its completion still belongs to this input.
+        if self.scroll_of(view) != before || self.pending_model_scroll(view).is_some() {
             self.scroll_end_moved(view, completion);
         }
     }
@@ -313,7 +313,7 @@ impl<D: DataSource> Presenter<D> {
         self.scroll_end
             .pending
             .iter()
-            .filter(|(id, _)| !self.scroll_end_frame_blocked(**id))
+            .filter(|(id, _)| !self.scroll_end_blocked(**id))
             .filter_map(|(id, p)| {
                 if p.kind == Completion::Reader && self.scroll_end.held.contains(id) {
                     None
@@ -329,7 +329,7 @@ impl<D: DataSource> Presenter<D> {
                 self.scroll_end
                     .completed
                     .iter()
-                    .filter(|(view, _, _)| !self.scroll_end_frame_blocked(*view))
+                    .filter(|(view, _, _)| !self.scroll_end_blocked(*view))
                     .map(|(_, _, due)| *due),
             )
             .reduce(f64::min)
@@ -402,6 +402,12 @@ impl<D: DataSource> Presenter<D> {
             .is_some_and(|ids| ids.iter().any(|(id, _)| *id == view))
     }
 
+    /// A completion waits while a deferred frame or an anchor correction's picture holds
+    /// its scroll's `scroll` ([`Self::owe_scroll`]).
+    fn scroll_end_blocked(&self, view: ViewId) -> bool {
+        self.scroll_end_frame_blocked(view) || self.scroll_owed(view)
+    }
+
     pub(super) fn deliver_scroll_ends(&mut self) -> Option<String> {
         if self.scroll_end.pending.is_empty() && self.scroll_end.completed.is_empty() {
             return None;
@@ -423,7 +429,7 @@ impl<D: DataSource> Presenter<D> {
             .pending
             .iter()
             .filter_map(|(id, p)| {
-                (self.scroll_end_finished(*id, p) && !self.scroll_end_frame_blocked(*id))
+                (self.scroll_end_finished(*id, p) && !self.scroll_end_blocked(*id))
                     .then_some((*id, *p))
             })
             .collect();
@@ -439,7 +445,7 @@ impl<D: DataSource> Presenter<D> {
         }
         for _ in 0..self.scroll_end.completed.len() {
             let end = self.scroll_end.completed.pop_front().unwrap();
-            if self.scroll_end_frame_blocked(end.0) || end.2 > self.host.now() {
+            if self.scroll_end_blocked(end.0) || end.2 > self.host.now() {
                 self.scroll_end.completed.push_back(end);
             } else {
                 self.scroll_end.delivering.push_back((end.0, end.1));

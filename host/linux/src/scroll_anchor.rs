@@ -192,7 +192,12 @@ fn bounds(kernel: &Kernel, node: NodeRef<'_>, scroller: ViewId) -> Option<(f32, 
         transform = space::mul3(&local, &transform);
         at = n.parent;
     }
-    space::mapped_bounds(&transform, (f.x, f.y, f.width, f.height))
+    let bounds = crate::placement::clipped_bounds(
+        &transform,
+        [[0., 0., 1.]; 2],
+        (f.x, f.y, f.width, f.height),
+    );
+    (bounds.2 > 0. && bounds.3 > 0.).then_some(bounds)
 }
 
 fn select(kernel: &Kernel, nodes: &[ViewId], scroller: ViewId, port: [f32; 4]) -> Option<NodeKey> {
@@ -331,4 +336,43 @@ impl Anchor {
                 - self.y,
         )
     }
+}
+
+#[cfg(test)]
+#[test]
+fn an_anchor_crossing_the_viewer_keeps_its_visible_half() {
+    let source = r#"component App
+  view
+    scroll testId="port" width=400 height=400
+      box height=48
+      box perspective=100 perspective-origin="50% 0" height=200
+        box testId="anchor" width=400 height=200 rotate="y 75deg"
+      box height=1000
+"#;
+    let (p, error) = crate::presenter::Presenter::boot_with(
+        &crate::test_plan(source),
+        (),
+        (400., 400.),
+        1.,
+        std::path::PathBuf::new(),
+        crate::presenter::PainterChoice::Cpu,
+    )
+    .unwrap();
+    assert_eq!(error, None);
+    let kernel = p.host().kernel();
+    let key = kernel.find_by_test_id("anchor")[0];
+    let node = kernel.node_by_key(key).unwrap();
+    let port = kernel
+        .node_by_key(kernel.find_by_test_id("port")[0])
+        .unwrap()
+        .id;
+    let f = node.frame;
+    let h = space::mapping(kernel, &node, &Presented::from_style(node.style));
+    assert!(space::mapped_bounds(&h, (f.x, f.y, f.width, f.height)).is_none());
+    let clipped =
+        crate::placement::clipped_bounds(&h, [[0., 0., 1.]; 2], (f.x, f.y, f.width, f.height));
+    assert!(clipped.2 > 0. && clipped.3 > 0.);
+    let anchor = capture(kernel, &p.host().roots(), port, (0., 100.), (400., 400.)).unwrap();
+    assert_eq!(anchor.key, key);
+    assert_eq!(anchor.y, clipped.1);
 }
