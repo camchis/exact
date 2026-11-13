@@ -1114,19 +1114,8 @@ impl Em<'_> {
             let _ = write!(self.out, "{register}({e});");
         }
         self.element_extras(&parts.tag, &e, &attrs, &parts.props);
-        // An ordinary scroller's `scrollFollowEnd`, constant or bound (follow.js); a list's is list.js's.
-        let bound_follow = row
-            .bindings
-            .iter()
-            .map(|b| plan.binding(b))
-            .any(|b| b.kind == BindingKind::Prop && b.id == PropId::ScrollFollowEnd as u16);
-        if !virtualized && (bound_follow || parts.props.get("scrollFollowEnd").is_some()) {
-            self.follow = true;
-            if let Some(v) = parts.props.get("scrollFollowEnd") {
-                let p = self.uses.rt("P");
-                let v = serde_json::to_string(v).unwrap();
-                let _ = write!(self.out, "{p}({e},\"scrollFollowEnd\",()=>{v});");
-            }
+        if !virtualized {
+            self.end_follow(i, &e, parts.props.get("scrollFollowEnd"));
         }
         // Its surface's inputs, named or positional (LLP 1009 D2).
         if let Some(sf) = row.surface {
