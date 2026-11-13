@@ -1,6 +1,7 @@
 # Refreshing Convex live drops in-flight mutations
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** 837b742ed made `Sync.connecting` end a connection still open as its close would, settling its mutations and actions; `live()` now also closes the socket it replaces.
 **Systems:** packages/convex
 **Severity:** P2
 **Author:** Grok 4.7
