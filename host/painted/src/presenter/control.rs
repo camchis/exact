@@ -173,7 +173,7 @@ impl<D: DataSource> Presenter<D> {
         }
         // A select's press opens its menu (D7).
         if node.props.str(PropId::Type) == Some("select") {
-            self.open_menu(id);
+            self.open_menu(id, false);
             return true;
         }
         // A radio checks, and only checks (x2apps survey #2).

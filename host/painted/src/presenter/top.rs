@@ -2,7 +2,8 @@
 //! confirmation and a menu are separate windows of the platform's, with
 //! their content painted here. On Android an alert-shaped `alertdialog` is
 //! Material 3's basic dialog in a `Dialog` window and a menu popover is
-//! Material 3's menu in a `PopupWindow` (`host/android/README.md`).
+//! Material 3's menu in a `PopupWindow` (`host/android/README.md`), as a
+//! select's options are (`top/select.rs`).
 //!
 //! **Who has one.** A shell that makes windows says so
 //! ([`Presenter::serve_windows`]: the Canvas host's reader, as it boots).
@@ -48,6 +49,7 @@ mod input;
 mod invoke;
 pub(super) mod look;
 mod overlay;
+mod select;
 pub(crate) mod shape;
 pub use look::Target;
 use look::{Inputs, Layout};
@@ -309,8 +311,11 @@ impl<D: DataSource> Presenter<D> {
     }
 
     /// What `pop` is to the top layer, shown modally or as a popover: an
-    /// alert, a menu, or nothing it shows.
+    /// alert, a menu, or nothing it shows. A select is its options' menu.
     fn surface_plan(&self, pop: ViewId, modal: bool) -> Option<Plan> {
+        if self.is_select(pop) {
+            return self.select_plan(pop);
+        }
         let runner = self.host.runner();
         let pressed = |id: ViewId| runner.handlers_of(id).contains(&EventKind::Press);
         let kernel = self.host.kernel();
@@ -360,6 +365,20 @@ impl<D: DataSource> Presenter<D> {
             window,
             room: window.1 - margins.0 - margins.1,
         }
+    }
+
+    /// `plan` measured for `pop` in the look of this host's top layer.
+    fn measure_surface(&mut self, plan: &Plan, pop: ViewId, inputs: &Inputs) -> Layout {
+        let measure = if self.top.overlay.enabled {
+            Layout::desktop
+        } else {
+            Layout::of
+        };
+        let mut layout = measure(&mut self.text.borrow_mut(), plan, pop, inputs);
+        if let Some(width) = self.select_width(pop) {
+            layout.widen(width.min(inputs.window.0));
+        }
+        layout
     }
 
     /// Where the open menu hangs, in the window's points: the point a
@@ -448,6 +467,36 @@ impl<D: DataSource> Presenter<D> {
             self.host.log(format!("{what} \"{name}\" refused: {why}"));
             return false;
         };
+        self.open_surface((id, key), plan, modal, (invoker, point), now_ms);
+        // Alerts need an initial action even when a pointer or a response
+        // opens them. TV surfaces also start at their first row (LLP 1115.001.003 D3).
+        let desktop_alert = self.top.overlay.enabled
+            && self
+                .top
+                .open
+                .as_ref()
+                .is_some_and(|open| open.kind == SurfaceKind::Alert);
+        if self.remote() || desktop_alert {
+            self.surface_step(false);
+        }
+        self.queue_toggle(key, true);
+        self.surface_changed();
+        true
+    }
+
+    /// Open `plan`, what `id` (its node's `key`) is, as the surface, opened
+    /// by `invoker` or at `point`: the surface open closes, the pointer's
+    /// contact ends, and the new one is measured and placed. The focus
+    /// moves in, and the page's node loses it, but a select keeps it, as a
+    /// combobox does while its listbox is open.
+    fn open_surface(
+        &mut self,
+        (id, key): (ViewId, NodeKey),
+        plan: Plan,
+        modal: bool,
+        (invoker, point): (Option<ViewId>, Option<(f32, f32)>),
+        now_ms: f64,
+    ) {
         let restore = self
             .replace_surface(invoker, now_ms)
             .and_then(|key| self.host.kernel().node_by_key(key).map(|n| n.id));
@@ -455,18 +504,14 @@ impl<D: DataSource> Presenter<D> {
         if let Err(e) = self.pointer_cancel(now_ms) {
             self.host.log(e);
         }
-        // The focus moves in: the page's node loses it.
-        if let Some(e) = self.set_focus(None, now_ms) {
-            self.host.log(e);
+        if !self.is_select(id) {
+            if let Some(e) = self.set_focus(None, now_ms) {
+                self.host.log(e);
+            }
         }
         let serial = self.next_surface_serial();
         let inputs = self.surface_inputs();
-        let measure = if self.top.overlay.enabled {
-            Layout::desktop
-        } else {
-            Layout::of
-        };
-        let layout = measure(&mut self.text.borrow_mut(), &plan, id, &inputs);
+        let layout = self.measure_surface(&plan, id, &inputs);
         self.top.open = Some(Open {
             serial,
             revision: 0,
@@ -498,20 +543,6 @@ impl<D: DataSource> Presenter<D> {
             open.anchor = anchor;
         }
         self.place_surface();
-        // Alerts need an initial action even when a pointer or a response
-        // opens them. TV surfaces also start at their first row (LLP 1115.001.003 D3).
-        let desktop_alert = self.top.overlay.enabled
-            && self
-                .top
-                .open
-                .as_ref()
-                .is_some_and(|open| open.kind == SurfaceKind::Alert);
-        if self.remote() || desktop_alert {
-            self.surface_step(false);
-        }
-        self.queue_toggle(key, true);
-        self.surface_changed();
-        true
     }
 
     /// Close the previous surface and carry its original focus return target.
@@ -604,6 +635,10 @@ impl<D: DataSource> Presenter<D> {
 
     /// Row `index` chosen; `pressed`, where a pointer chose it, in the page.
     fn choose(&mut self, index: usize, now_ms: f64, pressed: Option<(f32, f32)>) {
+        if let Some(select) = self.select_surface() {
+            self.choose_option(select, index, now_ms);
+            return;
+        }
         let Some(open) = &self.top.open else {
             return;
         };
@@ -738,6 +773,9 @@ impl<D: DataSource> Presenter<D> {
         }
         if self.overlay_scroll_key(name) {
             return true;
+        }
+        if let Some(taken) = self.select_surface_key(name, now_ms) {
+            return taken;
         }
         match name {
             "Escape" => {
@@ -1018,19 +1056,16 @@ impl<D: DataSource> Presenter<D> {
         };
         let inputs = self.surface_inputs();
         let anchor = self.surface_anchor();
+        let again = (self.top.open.as_ref()).is_some_and(|o| plan != o.plan || inputs != o.inputs);
+        let layout = again.then(|| self.measure_surface(&plan, pop, &inputs));
         let Some(open) = self.top.open.as_mut() else {
             return;
         };
         open.epoch = epoch;
-        if plan != open.plan || inputs != open.inputs {
-            let measure = if self.top.overlay.enabled {
-                Layout::desktop
-            } else {
-                Layout::of
-            };
+        if let Some(layout) = layout {
             // The focus follows its row's node, not its index.
             let focused = (open.focused).and_then(|i| open.layout.targets.get(i).map(|t| t.node));
-            open.layout = measure(&mut self.text.borrow_mut(), &plan, pop, &inputs);
+            open.layout = layout;
             (open.plan, open.inputs) = (plan, inputs);
             open.pressed = None;
             open.hovered = None;
@@ -1084,9 +1119,11 @@ impl<D: DataSource> Presenter<D> {
 
     /// Report the shell's frame in viewport points and whether it opened
     /// modally. A popover leaves the document reachable to structural reads.
-    /// Native alerts, as on Apple, report no authored geometry.
+    /// Native alerts, as on Apple, report no authored geometry, and a
+    /// select's menu is no authored node's.
     pub(super) fn report_top_layer(&mut self) {
-        let Some(open) = &self.top.open else {
+        let shown = self.top.open.as_ref().filter(|o| !self.is_select(o.node));
+        let Some(open) = shown else {
             // An open authored popover is the page's own subtree, drawn at its
             // box (alert.rs): reads see it, as the web's do.
             let frames: Vec<_> = self.alert_popover_frame().into_iter().collect();

@@ -1,6 +1,7 @@
 # A select's menu on the painted hosts reaches no assistive technology, and is no platform popup on Android or Windows
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** Where a shell presents the top layer (Android's windows, Windows' overlays) a select's menu opens as the top layer's menu, a listbox of its options to assistive technology (`presenter/top/select.rs`); desktop Linux keeps the painted menu, whose rows `access_tree` tells.
 **Progress:** The accessibility part landed: a select is `EXPANDABLE`, and while
 its menu is open the presenter's tree is the select, `EXPANDED`, over a listbox
 of the options that show (`presenter/access/menu.rs`), the chosen one selected;
