@@ -1,6 +1,7 @@
 # Closing a painted popover mutates the open set while it is enumerated
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** Not a defect: a Swift `Dictionary` is a value, so each `for … in agentOpen` loop iterates its own copy and `drop`'s removals copy on write; nothing traps, and an outer popover's nested chain closes with it (run on the iOS simulator with three nested painted popovers, closed by `drop`, by a children op and by destroy).
 **Systems:** host/apple
 **Severity:** P1
 **Author:** Grok 4.7
