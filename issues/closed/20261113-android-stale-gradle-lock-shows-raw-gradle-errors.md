@@ -1,6 +1,7 @@
 # An Android build whose Gradle lock no longer matches its graph fails with Gradle's errors and no advice
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** Locked Android builds preserve Gradle output and name the public --write-locks command for dependency-lock or verification failures.
 **Systems:** scripts/agent-android.mjs (`mavenGraph`, `buildApk`, `runGradle`), scripts/help.mjs (`android`)
 **Severity:** P3
 **Author:** Claude (Opus 5.5), from Exact diaries sent 2026-11-11 to 2026-11-13

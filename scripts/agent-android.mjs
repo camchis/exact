@@ -748,12 +748,36 @@ export function jvmOptions(value = '', name = 'the JVM options') {
   return words;
 }
 
+/** Relay Gradle's progress unchanged and add lock advice only after a dependency failure. Runs in a child Bun. */
+async function gradleWithAdvice(command, args, advice) {
+  const { spawn } = await import('node:child_process');
+  const child = spawn(command, args, { stdio: ['inherit', 'pipe', 'pipe'] });
+  let dependencyFailure = false;
+  for (const [source, destination] of [[child.stdout, process.stdout], [child.stderr, process.stderr]]) {
+    let tail = '';
+    source.on('data', chunk => {
+      destination.write(chunk);
+      const text = tail + chunk.toString('utf8');
+      dependencyFailure ||= /dependency verification failed|dependency lock state|strict dependency locking/i.test(text.replace(/\x1b\[[0-9;]*m/g, ''));
+      tail = text.slice(-256);
+    });
+  }
+  const result = await new Promise(resolve => {
+    child.once('error', error => { console.error(`could not start Gradle (${command}): ${error.message}`); resolve({ code: 1 }); });
+    child.once('close', (code, signal) => resolve({ code, signal }));
+  });
+  if (result.code && dependencyFailure) console.error(advice);
+  if (result.signal) process.kill(process.pid, result.signal);
+  else process.exitCode = result.code ?? 1;
+}
+
 /** Gradle in the reader with `args`, under `options` (its `env` names the JDK): whether it succeeded. A Gradle that
  * could not be started is said so. */
-export function runGradle(args, options, platform = process.platform, { studio, run = spawnSync } = {}) {
+export function runGradle(args, options, platform = process.platform, { studio, run = spawnSync, lockAdvice } = {}) {
   const env = androidJavaEnv(options.env, platform, studio) ?? options.env;
   const [command, ...prefix] = gradleWrapper(platform, env);
-  const gradle = run(command, [...prefix, ...args], { cwd: READER, stdio: 'inherit', ...options, env });
+  const invocation = lockAdvice ? [process.execPath, ['--no-env-file', '-e', `await (${gradleWithAdvice})(...JSON.parse(process.argv[1]))`, JSON.stringify([command, [...prefix, ...args], lockAdvice])]] : [command, [...prefix, ...args]];
+  const gradle = run(...invocation, { cwd: READER, stdio: 'inherit', ...options, env });
   if (gradle.error) console.error(`could not start Gradle (${command}): ${gradle.error.message}`);
   return gradle.status === 0;
 }
@@ -975,7 +999,7 @@ export function buildApk(app, env, profile, writeLocks = false, bundle = false) 
     assembled = runGradle(['--no-watch-fs', ...(env.CI || graph.env.GRADLE_USER_HOME ? ['--no-daemon'] : []), bundle ? ':app:bundleRelease' : ':app:assembleRelease', `-Papp=${app.name}`, `-PappDir=${app.manifest.game ? app.workspace : app.dir}`,
       `-PexactDevelopment=${development ? '1' : '0'}`,
       `-PappBuildDir=${dirs.app}`, `-PcanvasBuildDir=${dirs.canvas}`, `-PndkPath=${env.ANDROID_NDK_HOME}`, '--project-cache-dir', dirs.cache, `-Pkotlin.project.persistent.dir=${dirs.kotlin}`,
-      ...gpuArgs, ...(icons.icon ? [`-PappIcon=${icons.icon}`] : []), ...(icons.banner ? [`-PappBanner=${icons.banner}`] : []), ...(launch ? [`-PappTheme=${launch}`] : []), ...compose, ...extensionArgs(app, out, config, bound), ...graph.args], { env: { ...env, ANDROID_HOME: androidSdk(env), ...graph.env } });
+      ...gpuArgs, ...(icons.icon ? [`-PappIcon=${icons.icon}`] : []), ...(icons.banner ? [`-PappBanner=${icons.banner}`] : []), ...(launch ? [`-PappTheme=${launch}`] : []), ...compose, ...extensionArgs(app, out, config, bound), ...graph.args], { env: { ...env, ANDROID_HOME: androidSdk(env), ...graph.env } }, process.platform, { lockAdvice: maven.length && !writeLocks ? `${app.name}: Gradle locks or verification metadata do not match its dependencies; for an intended graph change, run ${androidLockCommand(app)}, then review and commit gradle.lockfile and gradle-verification.xml` : null });
     if (assembled) graph.kept();
   } finally {
     graph.done();
@@ -1021,7 +1045,7 @@ export function mavenCoordinates(app, bound) {
   return [...versions.values()].map(v => v.coordinate).sort();
 }
 
-function mavenLocksPresent(app, maven) {
+export function mavenLocksPresent(app, maven) {
   if (!maven.length || ['gradle.lockfile', 'gradle-verification.xml'].every(file => existsSync(resolve(app.dir, file)))) return true;
   console.error(`${app.name}: its modules or own Kotlin name Maven libraries (${maven.join(', ')}); before compiling, write gradle.lockfile and gradle-verification.xml by running ${androidLockCommand(app)}, and keep them with the app`);
   return false;

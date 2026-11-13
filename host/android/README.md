@@ -680,7 +680,8 @@ and bound implementations' coordinates (`-Pmaven`), and the graph is held by Gra
   from the app's `gradle-verification.xml`. Gradle reads that file only from the reader's `gradle/`, so the build
   copies it to `gradle/verification-metadata.xml` for the run and takes it away after (ignored by Git), and passes
   `--dependency-verification=strict`. `gradle.properties` leaves verification off for every other build.
-- **Written** once, and again when the app's or a module's coordinates change:
+- **Written** once, and again when the app's or a module's coordinates or the reader's graph changes
+  (adding a date picker brings Compose):
   in the repository directory, `bun scripts/agent-android.mjs build <app> --apk --write-locks` (Gradle's `--write-locks` and
   `--write-verification-metadata sha256`); the app keeps both files with its source. They are written in a Gradle
   user home of their own with nothing resolved in it, as a fresh machine's is: from a warm cache Gradle fetches fewer
@@ -690,7 +691,8 @@ and bound implementations' coordinates (`-Pmaven`), and the graph is held by Gra
   modules or own Kotlin name libraries is refused before Gradle runs. The refusal and `exact add` name the directory and
   command: `in <app dir>: bun exact.mjs android --write-locks` when the app has its own launcher, otherwise
   the repository directory and command above, with `EXACT_APP_DIR` set to the app's directory unless it is
-  `apps/<app>`.
+  `apps/<app>`. A locked build that fails dependency locking or verification names this command;
+  review the dependency change and both regenerated files before committing them.
 
 An app with no Maven libraries resolves as before, unlocked and unverified. Two such builds at once on one checkout
 would share the placed verification file. A library that is not on those repositories stays LLP 1133.001 D9's pinned
