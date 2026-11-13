@@ -77,6 +77,8 @@ class Files : ContentProvider() {
          * Null for a file outside the app's data directory, or a link.
          */
         fun writableUri(context: Context, f: File): Uri? {
+            // Before anything is emptied: a file elsewhere is left as it is.
+            if (!inside(context, f.canonicalFile)) return null
             if (!openForWrite(f)) return null
             return uri(context, f) ?: run { endWrite(f); null }
         }
