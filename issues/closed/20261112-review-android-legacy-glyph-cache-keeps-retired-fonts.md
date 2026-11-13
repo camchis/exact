@@ -1,6 +1,7 @@
 # Android's legacy glyph cache keeps every retired font and outline
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The cache holds each face weakly by identity, so a retired reader's faces and their outlines are collected, and keeps only each face's 2,048 most recently drawn outlines beside the existing 128 images, whose keys no longer keep a face alive.
 **Systems:** host/android/canvas/src/main/java/dev/exact/canvas/LegacyGlyphs.kt, host/android/canvas/src/main/java/dev/exact/canvas/ExactView.kt
 **Author:** Codex
 **Date:** 2026-11-12
