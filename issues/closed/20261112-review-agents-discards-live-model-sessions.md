@@ -1,6 +1,7 @@
 # The Agents app abandons live on-device model sessions when changing models or retrying
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** Changing the model, retrying and deleting go through one release() that destroys the conversation's on-device session, and a session that finishes being made for a conversation that no longer wants it is destroyed rather than adopted.
 **Systems:** Agents (`apps/agents/app.ts`), language-model session ownership
 **Author:** Codex
 **Date:** 2026-11-12
