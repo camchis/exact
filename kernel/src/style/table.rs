@@ -153,7 +153,7 @@ pub(crate) fn apply(arena: &NodeArena, slot: u32, s: &mut taffy::style::Style) {
     let Some(table) = table else {
         return;
     };
-    let env = arena.env();
+    let env = &*arena.env_of(slot);
     match part {
         Part::Table => {
             s.display = taffy::style::Display::Grid;

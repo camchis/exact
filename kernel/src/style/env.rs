@@ -335,15 +335,19 @@ pub struct Env {
     /// own ([`crate::Kernel::set_root_font_size`]), which the next commit
     /// writes here; [`crate::Kernel::set_env`] keeps it.
     pub root_font_size: f32,
-    /// What `var(--exact-safe-area-inset-<edge>)` reads (LLP 1123 D9), top
-    /// right bottom left: the session root's, the insets of the area the
-    /// document covers, set apart from `env()` by a host whose document
-    /// covers its view while `env()` is 0 (iOS under `viewport-fit=auto`
-    /// with a native primary container, D1);
-    /// [`crate::Kernel::set_root_local_insets`]. `None`: the safe-area
-    /// insets. Inside a content owner the owner's own stand in its place
-    /// where a node's lengths are resolved ([`crate::Kernel::set_local_insets`]);
-    /// [`crate::Kernel::set_env`] keeps it.
+    /// The session root's `--exact-safe-area-inset-*` (LLP 1123 D9), top
+    /// right bottom left: the insets of the area the document covers, set
+    /// apart from `env()` by a host whose document covers its view while
+    /// `env()` is 0 (iOS under `viewport-fit=auto` with a native primary
+    /// container, D1); [`crate::Kernel::set_root_local_insets`]. `None`: the
+    /// safe-area insets. [`crate::Kernel::set_env`] keeps it.
+    pub root_local: Option<[f32; 4]>,
+    /// What `var(--exact-safe-area-inset-<edge>)` reads at one node, top
+    /// right bottom left: set only in an environment made for that node
+    /// (`NodeArena::env_of`, [`crate::Kernel::env_of`]), since the value
+    /// differs from box to box (an owner's, an author's override). The
+    /// document's environment has none, and a local inset resolved against
+    /// it is a caller's mistake ([`Env::local_inset`]).
     pub local: Option<[f32; 4]>,
 }
 
@@ -375,14 +379,31 @@ impl Env {
             regions: None,
             titlebar_area: None,
             root_font_size: crate::style::relative::MEDIUM,
+            root_local: None,
             local: None,
         }
     }
 
     /// `var(--exact-safe-area-inset-<edge>)`'s value (LLP 1123 D9): the
-    /// local inset this environment carries, else the safe-area inset.
+    /// node's this environment was made for. One with none is the
+    /// document's, whose length would read the session root's inset under a
+    /// route's bar: a debug build stops there, naming the per-node resolver;
+    /// a release build reads the session root's.
     pub fn local_inset(&self, edge: Edge) -> f32 {
+        debug_assert!(
+            self.local.is_some(),
+            "var(--exact-safe-area-inset-{}) resolved against the document's environment: \
+             resolve a box's lengths with NodeArena::env_of or Kernel::env_of",
+            edge.name()
+        );
         self.local
+            .map_or_else(|| self.root_inset(edge), |l| l[edge as usize])
+    }
+
+    /// The session root's local inset at `edge` (LLP 1123 D9): the host's,
+    /// else the safe-area inset.
+    pub fn root_inset(&self, edge: Edge) -> f32 {
+        self.root_local
             .map_or_else(|| self.inset(edge), |l| l[edge as usize])
     }
 
@@ -410,6 +431,9 @@ impl Env {
             .is_none_or(crate::ButtonFonts::is_valid)
             && Edge::ALL.iter().all(|e| self.inset(*e).is_finite())
             && self.local.is_none_or(|l| l.iter().all(|v| v.is_finite()))
+            && self
+                .root_local
+                .is_none_or(|l| l.iter().all(|v| v.is_finite()))
             && self
                 .regions
                 .is_none_or(|r| r.iter().flatten().all(|v| v.is_finite()))

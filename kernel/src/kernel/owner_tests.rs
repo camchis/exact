@@ -207,7 +207,6 @@ fn the_term_parses_writes_back_and_crosses_the_wire() {
     }
     let mut env = Env::new(1.0, 2.0, 3.0, 4.0);
     let at = |text: &str, env: &Env| Dimension::parse_calc(text).unwrap().at_basis(env, 0.0);
-    assert_eq!(at("var(--exact-safe-area-inset-left)", &env), 4.0);
     env.local = Some([10.0, 20.0, 30.0, 40.0]);
     assert_eq!(at("var(--exact-safe-area-inset-left)", &env), 40.0);
     assert_eq!(
@@ -271,7 +270,7 @@ fn overrides_resolve_their_dependencies_and_reject_cycles() {
         (bottom, &to_left[..]),
     ];
     k.apply(0, 3, &[style(5, &cycle)]).unwrap();
-    let root = Edge::ALL.map(|e| k.env().local_inset(e));
+    let root = Edge::ALL.map(|e| k.env().root_inset(e));
     let got = k.local_insets(5).unwrap();
     assert_eq!(got[0], root[0], "top and left read each other: unset");
     assert_eq!(got[3], root[3]);
@@ -338,17 +337,45 @@ fn an_authored_inset_is_what_its_subtree_reads() {
     k.apply(0, 5, &[style(3, &[(bottom, plus)])]).unwrap();
     assert_eq!(k.local_insets(3).unwrap()[2], 35.0, "the node's own top");
     k.apply(0, 6, &[style(5, &[(bottom, plus)])]).unwrap();
-    let root = k.env().local_inset(Edge::Top);
+    let root = k.env().root_inset(Edge::Top);
     assert_eq!(k.local_insets(5).unwrap()[2], root + 5.0, "the parent's");
     // One that reads itself is a cycle: unset, so inherited
     let cycle = "calc(var(--exact-safe-area-inset-top) + 1px)";
     k.apply(0, 7, &[style(5, &[(top, cycle)])]).unwrap();
-    assert_eq!(
-        k.local_insets(5).unwrap()[0],
-        k.env().local_inset(Edge::Top)
-    );
+    assert_eq!(k.local_insets(5).unwrap()[0], k.env().root_inset(Edge::Top));
     // A percentage is no length a custom property of `<length>` takes
     let mut props = StyleProps::default();
     let pct = StyleValue::Text("10%".into());
     assert!(props.set_dynamic(top, &pct).is_err());
+}
+
+/// The document's environment has no local insets: a reader that resolves
+/// a box's length against it, not the box's own (`NodeArena::env_of`),
+/// stops in a debug build instead of reading the session root's under a
+/// route's bar.
+#[test]
+#[cfg(debug_assertions)]
+#[should_panic(expected = "resolved against the document's environment")]
+fn a_local_inset_read_against_the_documents_environment_stops() {
+    let k = page();
+    let length = Dimension::parse_calc("var(--exact-safe-area-inset-top)").unwrap();
+    let _ = length.at_basis(k.arena.env(), 0.0);
+}
+
+/// The per-node resolver, for a box whose lengths read none, is the
+/// document's, and for one that reads one carries its insets.
+#[test]
+fn the_node_resolver_carries_a_boxs_insets_only_where_it_reads_them() {
+    let mut k = page();
+    k.set_local_insets(2, Some([106.0, 0.0, 0.0, 0.0])).unwrap();
+    let slot = |k: &Kernel, id| k.arena.slot_of(id).unwrap();
+    let route = k.arena.env_of(slot(&k, 2)).local;
+    assert!(route.is_none(), "the route reads none");
+    let reader = k.arena.env_of(slot(&k, 3)).local;
+    assert_eq!(reader, Some([106.0, 0.0, 0.0, 0.0]));
+    assert_eq!(
+        k.env_of(2).local,
+        Some([106.0, 0.0, 0.0, 0.0]),
+        "a host's always does"
+    );
 }

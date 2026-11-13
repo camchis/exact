@@ -370,7 +370,8 @@ impl Kernel {
         };
         // A section's percentage margin is of the list's content box
         let basis = crate::svg::scene::content_box(self, &self.node(view)?).2;
-        authored_space(&mut list, &shown, self.arena().env(), basis);
+        let env = self.arena().env_of(self.node(view)?.key.index);
+        authored_space(&mut list, &shown, &env, basis);
         Some(list)
     }
 
@@ -663,8 +664,8 @@ pub(crate) fn apply_margins(arena: &NodeArena, slot: u32, s: &mut taffy::style::
         // Its widest, the card less its insets, moves with its inset.
         if let crate::style::Dimension::Calc(percent, points) = arena.style(slot).max_width {
             if !written.has(StyleId::MaxWidth) {
-                s.max_size.width =
-                    crate::style::Dimension::Calc(percent, points - by).floor_lpa(arena.env());
+                s.max_size.width = crate::style::Dimension::Calc(percent, points - by)
+                    .floor_lpa(&arena.env_of(slot));
             }
         }
     } else if !content && !control && !written.has(StyleId::PaddingLeft) {

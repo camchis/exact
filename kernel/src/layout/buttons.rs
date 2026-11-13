@@ -130,9 +130,11 @@ impl LayoutTree {
             if changed || retry {
                 record.provisional = false;
                 let mut request = record.request.clone();
-                request
-                    .style
-                    .resolve_geometry(arena.env(), record.parent_width, arena.frame(slot));
+                request.style.resolve_geometry(
+                    &arena.env_of(slot),
+                    record.parent_width,
+                    arena.frame(slot),
+                );
                 if let Some(answer) = record.answer(request, measurer) {
                     if !answer.is_valid() {
                         return Err(LayoutError::InvalidButtonMeasure(arena.local_id(slot)));

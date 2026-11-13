@@ -646,7 +646,7 @@ impl<D: DataSource> Presenter<D> {
             .scroll_bounds(kernel, self.host.content_region(), &node, None);
         let border = node
             .computed_style(exact_kernel::StyleMask::EMPTY)
-            .border_widths_in(&kernel.env());
+            .border_widths_in(&kernel.env_of(id));
         // Chrome 151: arrows move 40 CSS px; Page and Space move 87.5% of
         // clientHeight (200 -> 175, 400 -> 350, 669 -> 585, 800 -> 700).
         let page = (node.frame.height - border[0] - border[2]).max(0.) * 0.875;
