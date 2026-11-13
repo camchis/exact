@@ -84,15 +84,21 @@ export function scrollFollowers(positionContexts, schedule = (fn, ms) => setTime
       owned: null,
       children: []
     };
+    // Where the port is, before a commit changes the content and on a
+    // `scroll`. ResizeObserver settles a changed geometry before a queued scroll
+    // notification is allowed to change whether the reader follows the end.
+    s.observed = () => {
+      if (el.scrollHeight === s.height && el.clientHeight === s.port) {
+        rememberScroll(s);
+      }
+    };
+    // Only a move renews an authored scroll's quiet interval: a commit that
+    // moves nothing does not hold the follow off.
     s.scrolled = () => {
       if (s.owned) {
         quiet(s);
       }
-      // ResizeObserver settles a changed geometry before a queued scroll
-      // notification is allowed to change whether the reader follows the end.
-      if (el.scrollHeight === s.height && el.clientHeight === s.port) {
-        rememberScroll(s);
-      }
+      s.observed();
     };
     s.ended = () => release(s);
     s.observer = new ResizeObserver(() => {

@@ -30,7 +30,7 @@ function apply(batch) {
   host.listSelection?.before();
   prepareContexts(batch);
   for (const s of followedScrolls.values()) {
-    s.scrolled();
+    s.observed();
   }
   const focusCommands = [];
   const collectionOp = batch.ops?.find((op) => op.op === "collections");

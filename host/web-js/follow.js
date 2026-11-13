@@ -8,8 +8,14 @@ import { After, Before, Hosts, PropHooks, clock } from "./rt.js";
 import { liveById, scrollFollowers } from "./navigation.js";
 
 /** Installs the follow over the runtime's hooks; returns the follower table and the commit's settle, for tests. */
-export function endFollow(rt, nav, styleOf = (e) => getComputedStyle(e)) {
-  const F = nav.scrollFollowers(() => {});
+export function endFollow(rt, nav, styleOf = (e) => getComputedStyle(e), timers = []) {
+  // A page rendered ahead of time (render.mjs, main-server.js) has no ResizeObserver and nothing to follow: the
+  // prop is taken and does nothing there; the page follows once it boots in the browser.
+  if (typeof ResizeObserver === "undefined") {
+    rt.PropHooks.scrollFollowEnd = (e) => !e.$list;
+    return null;
+  }
+  const F = nav.scrollFollowers(() => {}, ...timers);
   // This commit's authored scrolls: the element moved and its behaviour (`smooth` settles at its `scrollend`).
   let authored = [], queued = false;
   const settle = () => {
@@ -19,12 +25,13 @@ export function endFollow(rt, nav, styleOf = (e) => getComputedStyle(e)) {
         if (behavior === "instant" || (behavior === "auto" && styleOf(s.el).scrollBehavior !== "smooth")) F.release(s);
       }
     }
-    for (const s of F.followedScrolls.values()) {
-      if (s.el.$list) F.followScroll(s.el, false);
+    for (const s of [...F.followedScrolls.values()]) {
+      // A scroller the commit removed (its branch, its route) is let go, with what it holds.
+      if (s.el.$list || !s.el.isConnected) F.followScroll(s.el, false);
       else F.settleFollow(s);
     }
   };
-  rt.Before.push(() => { for (const s of F.followedScrolls.values()) s.scrolled(); });
+  rt.Before.push(() => { for (const s of F.followedScrolls.values()) s.observed(); });
   const queue = () => { if (!queued) { queued = true; queueMicrotask(settle); } };
   rt.After.push(queue);
   rt.PropHooks.scrollFollowEnd = (e, v) => {

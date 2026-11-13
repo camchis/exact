@@ -20,7 +20,12 @@ function setup({ height = 1000, port = 100, top = 900, smooth = false } = {}) {
   };
   const revealed = [];
   const rt = { After: [], Before: [], Hosts: { scrollIntoView: (...a) => revealed.push(a) }, PropHooks: {}, clock: { agent: false } };
-  const { F } = endFollow(rt, { scrollFollowers, liveById: (id) => (id === "target" ? target : null) }, (e) => e.style);
+  // A hand-driven clock for the follower's quiet interval.
+  const timers = new Map();
+  let now = 0, next = 0;
+  const schedule = (fn, ms) => { timers.set(++next, [now + ms, fn]); return next; };
+  const advance = (ms) => { now += ms; for (const [t, [at, fn]] of [...timers]) if (at <= now) { timers.delete(t); fn(); } };
+  const { F } = endFollow(rt, { scrollFollowers, liveById: (id) => (id === "target" ? target : null) }, (e) => e.style, [schedule, (t) => timers.delete(t)]);
   /** One commit: its props, then its commands; resolves once the follow has settled. */
   const commit = async ({ props = {}, grow = 0, commands = [] } = {}) => {
     for (const f of rt.Before) f();
@@ -33,7 +38,7 @@ function setup({ height = 1000, port = 100, top = 900, smooth = false } = {}) {
     await Promise.resolve();
   };
   const scroll = (to) => { el.scrollTop = to; heard.scroll(); };
-  return { el, F, commit, scroll, heard, revealed };
+  return { el, F, commit, scroll, heard, revealed, advance };
 }
 
 test("a follower at its end follows content that grows; one away from it does not", async () => {
@@ -74,5 +79,27 @@ test("a virtualized list's follow is list.js's", async () => {
   const s = setup();
   s.el.$list = {};
   await s.commit({ props: { scrollFollowEnd: "true" } });
+  expect(s.F.followedScrolls.size).toBe(0);
+});
+
+test("a smooth scroll that moves nothing releases the scroller after the quiet interval, whatever commits come", async () => {
+  const s = setup();
+  await s.commit({ props: { scrollFollowEnd: "true" } });
+  // Already at its target: the browser scrolls nothing and sends no scrollend.
+  await s.commit({ commands: [["target", "end", "nearest", "smooth"]] });
+  const followed = s.F.followedScrolls.get(s.el);
+  expect(followed.owned).not.toBe(null);
+  for (let i = 0; i < 5; i++) { await s.commit(); s.advance(100); }
+  expect(followed.owned).toBe(null);
+  await s.commit({ grow: 100 });
+  expect(s.el.scrollTop).toBe(1000);
+});
+
+test("a scroller a commit removed is let go", async () => {
+  const s = setup();
+  await s.commit({ props: { scrollFollowEnd: "true" } });
+  expect(s.F.followedScrolls.size).toBe(1);
+  s.el.isConnected = false;
+  await s.commit();
   expect(s.F.followedScrolls.size).toBe(0);
 });
