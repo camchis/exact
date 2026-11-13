@@ -1,6 +1,7 @@
 # Flow rejects lines the walker already accepted within fit epsilon
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** flow compares a fragment with its slot under the walker's own fit tolerance (one shared FIT_EPSILON), so a line the walker accepted for that offer is placed there, not retried below the float.
 **Systems:** textflow
 **Severity:** P2
 **Author:** Grok 4.7
