@@ -1,6 +1,7 @@
 # A retained press drops focus without blur or change
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** An accepted retained press clears focus through set_focus, so the field it leaves commits its edit and dispatches blur and focusout (the presenter is now host/painted).
 **Systems:** host/linux
 **Severity:** P2
 **Author:** Grok 4.7
