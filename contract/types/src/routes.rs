@@ -2,18 +2,12 @@
 
 use super::*;
 
-pub(super) fn declare(file: &File, shapes: &mut Shapes) -> Result<(), TypeError> {
-    let Some(routes) = &file.routes else {
-        return Ok(());
-    };
-    if file.components.is_empty() {
-        return err(
-            "analyze-routes-not-root",
-            "`routes` belongs to the app's root file",
-            routes.span,
-        );
-    }
-    let mut table = exact_route::Table {
+/// The router's table of the routes the author declared, unchecked: what a
+/// location is matched against at run time (`Table::matches`), so what a
+/// location written elsewhere (the manifest's `share_target.action`) is
+/// checked against too.
+pub fn table(routes: &contract_syntax::RoutesDecl) -> exact_route::Table {
+    exact_route::Table {
         routes: routes
             .rows
             .iter()
@@ -25,7 +19,21 @@ pub(super) fn declare(file: &File, shapes: &mut Shapes) -> Result<(), TypeError>
                 notfound: r.notfound,
             })
             .collect(),
+    }
+}
+
+pub(super) fn declare(file: &File, shapes: &mut Shapes) -> Result<(), TypeError> {
+    let Some(routes) = &file.routes else {
+        return Ok(());
     };
+    if file.components.is_empty() {
+        return err(
+            "analyze-routes-not-root",
+            "`routes` belongs to the app's root file",
+            routes.span,
+        );
+    }
+    let mut table = table(routes);
     if let Err(e) = table.check() {
         let id = match e.code.as_str() {
             "route-duplicate" => "route-duplicate",
