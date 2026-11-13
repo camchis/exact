@@ -1,6 +1,7 @@
 # A crop drag does not count as an active photo gesture
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** A crop drag goes through track on both Apple hosts, so it counts in active from began to ended and no other gesture's or the wheel's settle runs under it; its own end settles.
 **Systems:** apps/photo-editor
 **Severity:** P2
 **Author:** Grok 4.7
