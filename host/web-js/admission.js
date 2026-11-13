@@ -167,7 +167,7 @@ export function fetchHostAsset(input, init = {}) {
 
 export function createRequestExecutor(appId, sourceSet, readBody = response => response.arrayBuffer()) {
   let storage = null;
-  return async req => {
+  return async (req, signal) => {
     const admitted = scopedGrantSet(sourceSet, req.scope);
     const why = grantError(admitted);
     if (why) return { failed: 2, message: why };
@@ -180,7 +180,7 @@ export function createRequestExecutor(appId, sourceSet, readBody = response => r
       // Its ceiling bounds the read inside `fetchWith` too, so an oversized body that never ends is refused, not awaited.
       // It goes out as the asking commit's origin (LLP 1133.036 D6): one it does not carry is not taken for the app's.
       const init = { method: req.method, headers: req.headers, cache: req.forced && req.cache !== 'no-store' ? 'reload' : req.cache, mode: req.mode, body: ['GET', 'HEAD'].includes(req.method) ? undefined : req.raw,
-        ...(req.maxResponseBytes != null ? { exactIndependentHttp: { maxResponseBytes: req.maxResponseBytes } } : {}) };
+        signal, ...(req.maxResponseBytes != null ? { exactIndependentHttp: { maxResponseBytes: req.maxResponseBytes } } : {}) };
       const response = await fetchWith(admitted, req.url, init, null, redirectOf(req.url, init), within, req.origin ?? UNATTRIBUTED);
       return { status: response.status, headers: [...response.headers], body: new Uint8Array(await readBody(response, req.maxResponseBytes)) };
     } catch (error) {

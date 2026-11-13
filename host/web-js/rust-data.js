@@ -123,7 +123,8 @@ export async function install(data, sources, load = p => fetchHostAsset(p).then(
       // (refused as the native seam refuses it: before the turn's writes apply)
       const pollRefusal = longPoll && longPollRefusal({ url, longPoll, stream: true }, method, n ? 'x' : '');
       if (pollRefusal) throw new Error(pollRefusal);
-      return { req: { method, url, headers, cache, ...(prefetch ? { prefetch: true } : {}), body: text.decode(body), raw: body, http, maxResponseBytes: http === 'ordered' ? undefined : Number(http.split(':')[1]), scope: scoped ? scope : null, stream: tag >= 9, socket: tag === 11, protocols, longPoll } };
+      // `cancel`: a read, which the commit that lets its ticket go aborts (request-send.js); a write runs to its end.
+      return { req: { method, url, headers, cache, ...(prefetch ? { prefetch: true } : {}), body: text.decode(body), raw: body, http, maxResponseBytes: http === 'ordered' ? undefined : Number(http.split(':')[1]), scope: scoped ? scope : null, stream: tag >= 9, cancel: tag < 9 && /^(GET|HEAD)$/i.test(method), socket: tag === 11, protocols, longPoll } };
     }
     // Storage work (LLP 1027.001 D2): a portable request the host runs
     // through the web host's own `storage-request.js`, under its scope.
@@ -294,13 +295,14 @@ export async function install(data, sources, load = p => fetchHostAsset(p).then(
   // its messages names its socket for `parse`. A mutation's socket has no mapper to send, and only listens.
   const run = createRequestExecutor(data.appId ?? meta[0], rustGrantSet, boundedHttpBody);
   data.fetch = (req, message, controller) => {
-    if (!req.stream) return run(req);
+    if (!req.stream) return run(req, controller?.signal);
     let socket = null;
     const protocol = req.socket && controller.resource ? { socket: transport => {
       socket = { transport, controller, id: idOf(controller.owner), ticket: controller.ticket, name: controller.streamName, unsent: 0 };
       sockets.add(socket); controller.socket = transport;
     } } : undefined;
-    return streamed(req, rustGrantSet, m => message(socket ? { ...m, socket } : m), controller, undefined, protocol).then(o => {
+    // A long poll's reply that is no event (LLP 1016.000 D8) is counted by the reader (`replied`) and lands nothing.
+    return streamed(req, rustGrantSet, m => { if (!req.longPoll || m.event !== 'exact:reply') message(socket ? { ...m, socket } : m); }, controller, undefined, protocol).then(o => {
       sockets.delete(socket);
       if (o.close) rt.journal.push(`t=${rt.clock.now} socket close: ${o.close.code} ${o.close.reason} (${controller.streamName})`);
       return o.close ? { closed: o.close } : o.kind ? { failed: o.kind, message: text.decode(o.body) }

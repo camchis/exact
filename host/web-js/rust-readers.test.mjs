@@ -197,7 +197,7 @@ test("a Rust source's store read reaches rt.js whether its call answers or fails
   writeFileSync(resolve(dir, 'admission-data.js'), `import {createGrantSet} from './admission.js';export const rustGrantSet=createGrantSet(${JSON.stringify(set)}),tsGrantSet=createGrantSet(${JSON.stringify(normalized(''))});\n`);
   writeFileSync(resolve(dir, 'rt-link.js'), 'export const rt = {};\n');
   const memory = new WebAssembly.Memory({ initial: 1 }), out = 32768;
-  let output = new Uint8Array(), read = false, fails = false, unknown = false, socket = false, writes = false, cache, preload, prefetch = false, abi = 9;
+  let output = new Uint8Array(), read = false, fails = false, unknown = false, socket = false, writes = false, cache, preload, prefetch = false, method = 'GET', abi = 9;
   const scopes = [];
   const response = fill => {
     const bytes = [], u8 = value => bytes.push(value), u32 = value => bytes.push(value & 255, value >>> 8 & 255, value >>> 16 & 255, value >>> 24 & 255);
@@ -226,7 +226,7 @@ test("a Rust source's store read reaches rt.js whether its call answers or fails
           w.u32(0); w.u8(0); w.string('');
           if (prefetch) w.u8(14);
           if (preload !== undefined) { w.u8(13); w.string(preload); }
-          if (socket) { if (cache !== undefined) { w.u8(12); w.string(cache); } w.u8(11); w.u32(1 << 20); w.u8(0); w.string(''); w.string('GET'); w.string('wss://api.example/book'); w.u32(0); w.u32(0); w.u32(0); } else if (unknown) { w.u8(2); w.string('reader'); } else if (fails) { w.u8(3); w.string('nothing kept'); } else { if (cache !== undefined) { w.u8(12); w.string(cache); } w.u8(1); w.u8(0); w.string(''); w.string('GET'); w.string('https://api.example/me'); w.u32(0); w.u32(0); }
+          if (socket) { if (cache !== undefined) { w.u8(12); w.string(cache); } w.u8(11); w.u32(1 << 20); w.u8(0); w.string(''); w.string('GET'); w.string('wss://api.example/book'); w.u32(0); w.u32(0); w.u32(0); } else if (unknown) { w.u8(2); w.string('reader'); } else if (fails) { w.u8(3); w.string('nothing kept'); } else { if (cache !== undefined) { w.u8(12); w.string(cache); } w.u8(1); w.u8(0); w.string(''); w.string(method); w.string('https://api.example/me'); w.u32(0); w.u32(0); }
         });
       }
       else throw new Error(`unexpected logic call ${code}`);
@@ -261,6 +261,13 @@ test("a Rust source's store read reaches rt.js whether its call answers or fails
       }
     }
     prefetch = false;
+    // A read is one the commit that lets its ticket go aborts (request-send.js); a write runs to its end.
+    preload = undefined; cache = undefined;
+    for (const [verb, cancel] of [['GET', true], ['head', true], ['POST', false], ['DELETE', false]]) {
+      method = verb;
+      expect(data.answer('reader', [], store).req.cancel).toBe(cancel);
+    }
+    method = 'GET';
     preload = 'Bad';
     expect(() => data.answer('reader', [], store)).toThrow('invalid preload HTTP result');
     preload = undefined;
@@ -276,7 +283,7 @@ test("a Rust source's store read reaches rt.js whether its call answers or fails
     expect(data.threwRead()).toBe(true);
     // A Rust source's two-way socket (LLP 1016.003) is a stream that says so (rust-socket.test.mjs).
     [read, fails, socket] = [false, false, true];
-    expect(data.answer('reader', [], store).req).toMatchObject({ stream: true, socket: true, url: 'wss://api.example/book' });
+    expect(data.answer('reader', [], store).req).toMatchObject({ stream: true, socket: true, cancel: false, url: 'wss://api.example/book' });
     cache = 'reload';
     expect(() => data.answer('reader', [], store)).toThrow('invalid cached HTTP result');
     cache = undefined; socket = false;
@@ -318,6 +325,56 @@ test("a Rust source's store read reaches rt.js whether its call answers or fails
   }
 });
 
+
+// A Rust long poll's reply that is no event (LLP 1016.000 D8): the reader counts it, and rust-data.js lands nothing of it.
+test("a Rust long poll's reply that is no event reaches no message", async () => {
+  const dir = mkdtempSync(resolve(tmpdir(), 'exact-rust-poll-'));
+  for (const name of ['rust-data.js', 'admission.js']) {
+    const source = readFileSync(resolve(ROOT, 'host/web-js', name), 'utf8').replace(/'\.\.\/web\/([a-z-]+\.js)'/g, "'./$1'");
+    writeFileSync(resolve(dir, name), source);
+  }
+  for (const name of ['grant-admission.js', 'faults.js', 'navigation.js', 'address-space.js']) writeFileSync(resolve(dir, name), hostFixtureFile(resolve(ROOT, 'host/web', name)));
+  writeFileSync(resolve(dir, 'http-body.js'), `export const boundedHttpBody = r => r.arrayBuffer(), longPollRefusal = () => null;
+export function streamed(req, _grants, message) {
+  const m = (event, data) => ({ event, id: '', data, coalesced: 0 });
+  message(m('exact:reply', '{"seq":1}'));
+  message(m('', 'event'));
+  return Promise.resolve({ kind: 2, body: new TextEncoder().encode('ended') });
+}\n`);
+  writeFileSync(resolve(dir, 'admission-data.js'), `import {createGrantSet} from './admission.js';export const rustGrantSet=createGrantSet(${JSON.stringify(normalized(''))}),tsGrantSet=rustGrantSet;\n`);
+  writeFileSync(resolve(dir, 'rt-link.js'), 'export const rt = {};\n');
+  const memory = new WebAssembly.Memory({ initial: 1 }), out = 32768;
+  let output = new Uint8Array();
+  const exports = {
+    memory, exact_logic_abi: () => 9, exact_logic_create: () => 1, exact_logic_alloc: () => 0, exact_logic_dealloc() {},
+    exact_logic_output: () => out, exact_logic_output_len: () => output.length,
+    exact_logic_call(_session, pointer) {
+      const code = new Uint8Array(memory.buffer)[pointer + 4], bytes = [];
+      const u32 = v => bytes.push(v & 255, v >>> 8 & 255, v >>> 16 & 255, v >>> 24 & 255), string = v => { const e = new TextEncoder().encode(v); u32(e.length); bytes.push(...e); };
+      u32(9);
+      if (code === 0) { bytes.push(0); string('test.rust'); string(''); } else bytes.push(0, 0, 3);
+      output = Uint8Array.from(bytes); new Uint8Array(memory.buffer, out, output.length).set(output);
+      return 0;
+    },
+  };
+  const instantiate = WebAssembly.instantiate;
+  WebAssembly.instantiate = async () => ({ instance: { exports } });
+  try {
+    const module = await import(pathToFileURL(resolve(dir, 'rust-data.js')).href);
+    const data = { q: [] };
+    await module.install(data, {}, async () => new ArrayBuffer(0));
+    const heard = {};
+    for (const longPoll of [undefined, { cursor: 'since', from: 'seq', sameCursorEvent: false }]) {
+      const messages = [];
+      await data.fetch({ method: 'GET', url: 'https://api.example/poll', stream: true, longPoll }, m => messages.push(m.event), new AbortController());
+      heard[longPoll ? 'longPoll' : 'stream'] = messages;
+    }
+    expect(heard).toEqual({ stream: ['exact:reply', ''], longPoll: [''] });
+  } finally {
+    WebAssembly.instantiate = instantiate;
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
 
 test('a forced Rust resource keeps forcing parser-created requests and tickets after a stream message', async () => {
   const { stageHostGlue, bundleHostModule, localImports } = await import('./glue.mjs');
