@@ -1332,17 +1332,17 @@ function settleBuild(dist) {
 }
 
 /** The files of the app in `app` that a build of it into `out` reads: its files at any depth, but for what builds and
- * tools write (`out` and what is kept beside it, dependencies, dot directories but `.env`s, generated types, test
- * reports). `newest`: the latest modification time among them. `digest`: of their paths, which a build's receipt
- * records as `sources`, so that a file come or gone since the build is a change whatever its time; it names no file. */
+ * tools write (`out` and what is kept beside it, dependencies, Cargo's target directory, `target` or `CARGO_TARGET_DIR`
+ * as resolveApp takes it, dot directories but `.env`s, generated types, test reports). `newest`: the latest modification
+ * time among them. `digest`: of their paths, which a build's receipt records as `sources`, so that a file come or gone
+ * since the build is a change whatever its time; it names no file. */
 export function appSources(app, out) {
-  const SKIP = new Set(['node_modules', 'target', 'test-results', 'playwright-report']);
-  const paths = [];
-  let newest = 0;
+  const SKIP = new Set(['node_modules', 'target', 'test-results', 'playwright-report']), cargo = process.env.CARGO_TARGET_DIR ? resolve(process.env.CARGO_TARGET_DIR) : null;
+  let paths = [], newest = 0;
   const walk = (dir) => {
     for (const e of readdirSync(dir, { withFileTypes: true })) {
       const path = resolve(dir, e.name);
-      if (SKIP.has(e.name) || (e.name.startsWith('.') && !e.name.startsWith('.env')) || e.name.endsWith('.d.ts') || path === out || path.startsWith(`${out}.`)) continue;
+      if (SKIP.has(e.name) || path === cargo || (e.name.startsWith('.') && !e.name.startsWith('.env')) || e.name.endsWith('.d.ts') || path === out || path.startsWith(`${out}.`)) continue;
       if (e.isDirectory()) walk(path);
       else if (e.isFile()) { paths.push(relative(app, path).split(sep).join('/')); newest = Math.max(newest, statSync(path).mtimeMs); }
     }
