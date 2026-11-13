@@ -1,6 +1,7 @@
 # The web placement omits a child's clip planes
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The web placement writes the two clip rows into a 16-float output, and the GPU glue clips the placed DOM child to them with a clip-path polygon.
 **Systems:** gpu, host/web
 **Severity:** P3
 **Author:** Grok 4.7
