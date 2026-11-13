@@ -64,6 +64,7 @@
         tag: 2,
         kind: kind,
         code: e && e.code,
+        bakeWarning: e && e.bakeWarning === true,
         failure: failureCode(e),
         reason: reason,
         message: String(message),

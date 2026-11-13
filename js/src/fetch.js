@@ -141,6 +141,7 @@
           if (!e || typeof e !== "object") e = new Error(String(e));
           e.kind = "Unavailable";
           e.code = "bake";
+          e.bakeWarning = true;
         }
         return e;
       }
