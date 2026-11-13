@@ -1,4 +1,5 @@
 //! An app-local Win32 presenter: Contract state and kernel frames become real HWNDs.
+use crate::sizing;
 use exact_kernel::{Kernel, Offer, PropId};
 use exact_plan::{Plan, Value};
 use exact_runner::{ControlValue, Event, Runner, Viewport};
@@ -77,14 +78,43 @@ unsafe extern "system" fn procedure(hwnd: HWND, msg: u32, w: WPARAM, l: LPARAM) 
         WM_GETMINMAXINFO => {
             let info = unsafe { &mut *(l as *mut MINMAXINFO) };
             let scale = unsafe { GetDpiForWindow(hwnd) } as f32 / 96.;
-            info.ptMinTrackSize = POINT {
-                x: (760. * scale) as i32,
-                y: (710. * scale) as i32,
-            };
+            let work = unsafe { work_area(hwnd) }
+                .map_or((i32::MAX, i32::MAX), |[l, t, r, b]| (r - l, b - t));
+            let (x, y) = sizing::size(sizing::LEAST, scale, work);
+            info.ptMinTrackSize = POINT { x, y };
         }
         _ => return unsafe { DefWindowProcW(hwnd, msg, w, l) },
     }
     0
+}
+
+/// The work area (left, top, right, bottom) of the monitor nearest `hwnd`
+/// ([GetMonitorInfoW](https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getmonitorinfow)).
+unsafe fn work_area(hwnd: HWND) -> Option<[i32; 4]> {
+    let mut info = MONITORINFO {
+        cbSize: std::mem::size_of::<MONITORINFO>() as u32,
+        ..Default::default()
+    };
+    let monitor = unsafe { MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST) };
+    if unsafe { GetMonitorInfoW(monitor, &mut info) } == 0 {
+        return None;
+    }
+    let r = info.rcWork;
+    Some([r.left, r.top, r.right, r.bottom])
+}
+
+/// Sizes the new window for its monitor's DPI, which `CreateWindowExW`'s
+/// size does not know, within the monitor's work area.
+unsafe fn open_at_dpi(hwnd: HWND) {
+    let Some(work) = (unsafe { work_area(hwnd) }) else {
+        return;
+    };
+    let scale = unsafe { GetDpiForWindow(hwnd) } as f32 / 96.;
+    let (w, h) = sizing::size(sizing::OPEN, scale, (work[2] - work[0], work[3] - work[1]));
+    let mut r = RECT::default();
+    unsafe { GetWindowRect(hwnd, &mut r) };
+    let (x, y) = sizing::inside((r.left, r.top), (w, h), work);
+    unsafe { SetWindowPos(hwnd, null_mut(), x, y, w, h, SWP_NOZORDER | SWP_NOACTIVATE) };
 }
 
 struct Control {
@@ -841,14 +871,15 @@ pub fn run() {
             WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN,
             CW_USEDEFAULT,
             CW_USEDEFAULT,
-            1040,
-            860,
+            sizing::OPEN.0 as i32,
+            sizing::OPEN.1 as i32,
             null_mut(),
             menu,
             instance,
             null(),
         );
         assert!(!hwnd.is_null());
+        open_at_dpi(hwnd);
         let mut app = App::boot(hwnd);
         app.create();
         let keys = [
