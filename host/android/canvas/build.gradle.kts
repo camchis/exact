@@ -22,6 +22,7 @@ android {
             "../../../packages/geolocation/android", "../../../packages/geolocation/test",
             "../../../packages/text-detection/android", "../../../packages/text-detection/test",
             "../../../packages/media-capture/android", "../../../packages/media-capture/test",
+            "../../../packages/motion/android", "../../../packages/motion/test",
             "../../../packages/local-auth/android", "../../../packages/local-auth/test",
             "../../../packages/passkeys/android", "../../../packages/passkeys/test",
             "../../../packages/payments/android", "../../../packages/payments/test",
