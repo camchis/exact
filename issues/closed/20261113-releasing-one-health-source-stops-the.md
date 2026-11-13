@@ -1,6 +1,7 @@
 # Releasing one Health source stops the other observers
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** Each observer query keeps the sources that read its type, and releasing a source stops only the queries no other live source still needs.
 **Systems:** packages/health
 **Severity:** P2
 **Author:** Grok 4.7
