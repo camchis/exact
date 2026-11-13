@@ -1,6 +1,7 @@
 # An Apple language-model abort leaves its platform session marked current
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** When the response generating aborts or fails, end drops the session's Foundation Models session before the next queued call begins, so the next prompt rebuilds it from the transcript.
 **Systems:** packages/language-model/apple/LanguageModel.swift, packages/language-model/apple/LanguageModelApple.swift
 **Author:** Codex
 **Date:** 2026-11-12

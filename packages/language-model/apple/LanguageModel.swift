@@ -283,6 +283,10 @@ public final class LanguageModelModule: ExactPackage {
         if begun { r.turn.reply = r.text } else { s.queue.removeAll { $0.response === r } }
         r.contextUsage = counted(s)
         r.task?.cancel()
+        // Foundation Models keeps no aborted or failed reply, and a cancelled
+        // generation may still be unwinding in its session: the next prompt
+        // builds another from the transcript, which holds this turn.
+        if begun, state != "complete" { s.platform = nil }
         if begun { s.responding = nil }
         s.ended.append(r.id)
         // An ended response is kept until its session has ended eight newer (D6).
