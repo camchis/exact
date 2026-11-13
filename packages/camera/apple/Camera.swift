@@ -116,6 +116,7 @@ public final class CameraModule: ExactPackage {
     public func destroy(_ done: @escaping () -> Void) {
         for v in views.values { v.sub?.leave() }
         views = [:]
+        if cameraAppUp { endCameraApp("the session ended") }
         done()
     }
 
@@ -270,9 +271,36 @@ public final class CameraModule: ExactPackage {
 
     /// Whether the system's camera UI is up, or asked for, for a call: one at a time.
     private var cameraAppUp = false
+    /// The runner's number for that call, which a `cancel` names.
+    private var cameraAppRequest: Int?
+    /// Moved when the call ends unanswered (let go, or the session's end): an answer to the camera's permission asked
+    /// before then shows nothing.
+    private var cameraAppTurn = 0
     #if os(iOS)
     private var cameraAppDelegate: CameraAppDelegate?
+    private weak var cameraAppPicker: UIImagePickerController?
+    /// What the camera app reads of the platform; a test stands in for a camera and its permission.
+    static var cameraAppPlatform = CameraAppPlatform()
     #endif
+
+    /// The send let go (LLP 1133.016 D15 item 2): its camera UI goes, and nothing answers.
+    public func cancel(_ request: Int) {
+        guard cameraAppUp, request == cameraAppRequest else { return }
+        endCameraApp("let go")
+    }
+
+    /// The camera app's call ends unanswered: the picker is dismissed and a pending permission's answer ignored.
+    private func endCameraApp(_ why: String) {
+        cameraAppTurn += 1
+        cameraAppUp = false
+        cameraAppRequest = nil
+        #if os(iOS)
+        cameraAppDelegate = nil
+        cameraAppPicker?.presentingViewController?.dismiss(animated: true)
+        cameraAppPicker = nil
+        #endif
+        say("camera app: \(why)")
+    }
 
     /// The photo the person takes and keeps in the system's camera UI (`UIImagePickerController` with `.camera`), as
     /// `takePhoto` answers one; `tap` is the agent's on the runner's sheet.
@@ -290,24 +318,28 @@ public final class CameraModule: ExactPackage {
             return reply(Self.photo(path: path, data: data))
         }
         #if os(iOS)
+        let platform = Self.cameraAppPlatform
         // The simulator has none (Apple: "test your camera app on actual devices").
-        guard UIImagePickerController.isSourceTypeAvailable(.camera) else {
+        guard platform.available() else {
             say("camera app: this device has no camera")
             return reply(["error": "NotFoundError"])
         }
         // Without the key iOS ends the app at the camera's first use; the `device.camera` line writes it.
-        guard Bundle.main.object(forInfoDictionaryKey: "NSCameraUsageDescription") != nil else {
+        guard platform.described() else {
             say("camera app: the app has no NSCameraUsageDescription")
             return reply(["error": "NotAllowedError", "message": "iOS shows the camera's purpose: grant `device.camera <purpose>`"])
         }
-        switch AVCaptureDevice.authorizationStatus(for: .video) {
+        cameraAppRequest = context.request
+        switch platform.status() {
         case .authorized: showCameraApp(args, origin: origin, reply)
         case .notDetermined:
             cameraAppUp = true
-            AVCaptureDevice.requestAccess(for: .video) { granted in
-                DispatchQueue.main.async { [self] in
-                    cameraAppUp = false
-                    if granted { showCameraApp(args, origin: origin, reply) } else { reply(["error": "NotAllowedError"]) }
+            let turn = cameraAppTurn
+            platform.ask { [weak self] granted in
+                DispatchQueue.main.async {
+                    guard let self, turn == self.cameraAppTurn else { return }
+                    self.cameraAppUp = false
+                    if granted { self.showCameraApp(args, origin: origin, reply) } else { reply(["error": "NotAllowedError"]) }
                 }
             }
         default:
@@ -321,7 +353,10 @@ public final class CameraModule: ExactPackage {
 
     #if os(iOS)
     private func showCameraApp(_ args: [String: Any], origin: String, _ reply: @escaping ([String: Any]) -> Void) {
-        guard let top = Self.topController() else { return reply(["error": "InvalidStateError", "message": "no window to show the camera in"]) }
+        // The session's own window, key or not (LLP 1133.027 D17 item 3), and what it presents now.
+        var top = context.presentation?.rootViewController
+        while let presented = top?.presentedViewController { top = presented }
+        guard let top else { return reply(["error": "InvalidStateError", "message": "no window to show the camera in"]) }
         let picker = UIImagePickerController()
         picker.sourceType = .camera
         picker.mediaTypes = ["public.image"]
@@ -330,20 +365,24 @@ public final class CameraModule: ExactPackage {
         case "environment" where UIImagePickerController.isCameraDeviceAvailable(.rear): picker.cameraDevice = .rear
         default: break
         }
-        let delegate = CameraAppDelegate { [self] result in
+        let delegate = CameraAppDelegate { [weak self] result in
+            guard let self else { return }
             cameraAppDelegate = nil
+            cameraAppPicker = nil
             cameraAppUp = false
+            cameraAppRequest = nil
             switch result {
             case .failure(let failure):
                 say("camera app: \(failure.code == "AbortError" ? "cancelled" : failure.code)")
                 reply(["error": failure.code])
             case .success(let data):
                 guard let (path, url) = place(args, "jpg") else { return reply(["error": "UnknownError"]) }
-                DispatchQueue.global(qos: .userInitiated).async {
+                DispatchQueue.global(qos: .userInitiated).async { [weak self] in
                     let ok = (try? data.write(to: url)) != nil
-                    DispatchQueue.main.async { [self] in
+                    DispatchQueue.main.async {
+                        guard let self else { return }
                         guard ok else { return reply(["error": "UnknownError"]) }
-                        took(path, data, track: nil, origin: origin)
+                        self.took(path, data, track: nil, origin: origin)
                         reply(Self.photo(path: path, data: data))
                     }
                 }
@@ -351,16 +390,10 @@ public final class CameraModule: ExactPackage {
         }
         picker.delegate = delegate
         cameraAppDelegate = delegate
+        cameraAppPicker = picker
         cameraAppUp = true
         say("camera app shown")
         top.present(picker, animated: true)
-    }
-
-    static func topController() -> UIViewController? {
-        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
-        var top = scenes.flatMap(\.windows).first { $0.isKeyWindow }?.rootViewController
-        while let presented = top?.presentedViewController { top = presented }
-        return top
     }
     #endif
 
@@ -512,6 +545,14 @@ final class PhotoOutput: NSObject {
 }
 
 #if os(iOS)
+/// What the camera app reads of the platform: a camera, the usage key, the camera's permission, and asking for it.
+struct CameraAppPlatform {
+    var available: () -> Bool = { UIImagePickerController.isSourceTypeAvailable(.camera) }
+    var described: () -> Bool = { Bundle.main.object(forInfoDictionaryKey: "NSCameraUsageDescription") != nil }
+    var status: () -> AVAuthorizationStatus = { AVCaptureDevice.authorizationStatus(for: .video) }
+    var ask: (@escaping (Bool) -> Void) -> Void = { AVCaptureDevice.requestAccess(for: .video, completionHandler: $0) }
+}
+
 /// The system camera UI's delegate: the kept photo as JPEG with the camera's metadata, or the person's cancel, once.
 final class CameraAppDelegate: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
     private var done: ((Result<Data, PhotoFailure>) -> Void)?

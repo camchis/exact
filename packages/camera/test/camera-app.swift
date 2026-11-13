@@ -3,7 +3,10 @@
 // there with `simctl spawn`, since the simulator has no camera to show the UI
 // with. The picker's `info` for a photo taken with the phone held upright (the
 // sensor's pixels landscape, the image `.right`) becomes a JPEG whose `Photo`
-// is portrait; `info` with no image is `UnknownError`.
+// is portrait; `info` with no image is `UnknownError`. With a camera and its
+// permission stood in for (`CameraModule.cameraAppPlatform`), a call let go
+// or a session ended while the permission is asked shows and answers nothing
+// when the answer comes, and keeps no module alive.
 import ExactPackage
 import Foundation
 import ImageIO
@@ -43,6 +46,31 @@ struct CameraAppTest {
         delegate.finish(.failure(PhotoFailure("AbortError")))
         delegate.finish(.failure(PhotoFailure("UnknownError")))
         check("a cancel is AbortError, answered once", answers == ["AbortError"], "\(answers)")
+
+        // A call let go, or a session ended, while the camera's permission is asked: its late answer shows nothing
+        // and answers nothing, the module is not kept alive by it, and the next call asks again.
+        var asked: [(Bool) -> Void] = []
+        CameraModule.cameraAppPlatform = CameraAppPlatform(available: { true }, described: { true }, status: { .notDetermined }, ask: { asked.append($0) })
+        var replies: [[String: Any]] = []
+        weak var released: CameraModule?
+        do {
+            let context = ExactPackageContext(agent: false, session: "s", changed: { _ in }, log: { _ in }, now: { 0 }, tracks: ExactTracks())
+            let module = CameraModule(context: context)
+            context.request = 7
+            module.later("takePhotoWithCameraApp", [:], preferred: nil) { replies.append($0) }
+            module.cancel(7)
+            context.request = 8
+            module.later("takePhotoWithCameraApp", [:], preferred: nil) { replies.append($0) }
+            check("after a cancel the next call asks again", asked.count == 2 && replies.isEmpty, "\(asked.count) asked, \(replies)")
+            var ended = false
+            module.destroy { ended = true }
+            check("the session's end lets the asked call go", ended, "destroy did not finish")
+            released = module
+        }
+        for answer in asked { answer(true) }
+        RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+        check("a permission answered after the call was let go shows nothing and answers nothing", replies.isEmpty, "\(replies)")
+        check("and keeps no module alive", released == nil, "the module is retained")
         exit(failed ? 1 : 0)
     }
 }

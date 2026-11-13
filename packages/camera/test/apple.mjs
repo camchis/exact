@@ -66,12 +66,15 @@ if (hosts.length === 0 || hosts.includes('ios')) {
     resolve(root, 'host/apple/modules/ExactPackage.swift'), '-o', join(out, 'libExactPackage.a'));
   swiftc('-swift-version', '5', '-I', out, '-L', out, '-lExactPackage', join(packages, 'camera/apple/Camera.swift'), join(packages, 'camera/apple/Viewfinder.swift'),
     join(here, 'camera-app.swift'), '-o', join(out, 'camera-app'));
-  const r = spawnSync('xcrun', ['simctl', 'spawn', sim ?? 'booted', join(out, 'camera-app')], { encoding: 'utf8' }), lines = r.stdout.trim().split('\n');
+  // The simulator the drive uses, booted and waited for (host/apple/devices.mjs, as build.mjs chooses it).
+  const { simulator } = await import(resolve(root, 'host/apple/devices.mjs'));
+  const device = simulator(sim);
+  const r = spawnSync('xcrun', ['simctl', 'spawn', device.udid, join(out, 'camera-app')], { encoding: 'utf8' }), lines = r.stdout.trim().split('\n');
   for (const line of lines) {
     const [verdict, where, ...name] = line.split(' ');
     if (verdict === 'PASS' || verdict === 'FAIL') check(where, name.join(' '), verdict === 'PASS', line);
   }
-  if (r.status !== 0 && !lines.some((l) => l.startsWith('FAIL '))) check('apple-camera-app', 'runs to its end on a booted simulator', false, `${r.status ?? r.signal}: ${r.stderr}`);
+  if (r.status !== 0 && !lines.some((l) => l.startsWith('FAIL '))) check('apple-camera-app', `runs to its end on ${device.name}`, false, `${r.status ?? r.signal}: ${r.stderr}`);
   rmSync(out, { recursive: true, force: true });
 }
 
