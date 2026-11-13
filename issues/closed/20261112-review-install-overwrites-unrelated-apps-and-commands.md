@@ -1,6 +1,7 @@
 # Installing an app overwrites unrelated bundles and command targets
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** `install` and `uninstall` replace or remove a bundle only when it carries the app's bundle identifier and a command only when it is the file `install` wrote, refusing links and anything else unchanged; a new bundle is staged and checked before it is renamed into place, and the shim is renamed over its path.
 **Systems:** scripts/exact.mjs, macOS installation
 **Author:** Codex
 **Date:** 2026-11-12

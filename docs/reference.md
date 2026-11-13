@@ -345,7 +345,9 @@ app's bundle identity: its name in the menu bar, its Dock tile, and the
 document types Finder's Open With reads. `install` also writes a shim named by
 the manifest's `app.command` into the first of `~/.local/bin`, `/usr/local/bin`,
 `~/bin` that is already on `PATH` (`EXACT_BIN_DIR` overrides), and prints the
-line to add when none is.
+line to add when none is. It replaces only this app's own: a bundle with
+another bundle identifier, a command it did not write, or a link at either
+path is refused, and nothing is changed. `exact uninstall` leaves them too.
 
 A standalone macOS app treats `kill -TERM <pid>` as an orderly quit: its
 `beforeunload` handlers can cancel, pending storage gets the same five-second
