@@ -1,6 +1,7 @@
 # The compiler has no shared walk over a view or an expression: 93 functions spell out `Node`'s six kinds and 32 spell out `Expr`'s eighteen
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** contract-syntax's `walk.rs` gives every pass `Node::child_lists`, `Node::walk`, `Expr::operands` and their scoped and mutable forms, the descending walks in syntax, types, analyze, lower and cli use them, and the walks that left out `match` now read it.
 **Systems:** contract/syntax/src/ast.rs, contract/lower, contract/cli, contract/types, contract/analyze
 **Severity:** P3
 **Author:** Claude (Fable 5.2), from the 2026-11-10 project review

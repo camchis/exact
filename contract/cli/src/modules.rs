@@ -720,19 +720,11 @@ fn surfaces(file: &File) -> Vec<String> {
                     }
                     walk(children, out);
                 }
-                Node::Use { children, .. } => walk(children, out),
-                Node::Each { body, .. } => walk(body, out),
-                Node::When {
-                    then, otherwise, ..
-                } => {
-                    walk(then, out);
-                    walk(otherwise, out);
+                node => {
+                    for list in node.child_lists() {
+                        walk(list, out);
+                    }
                 }
-                Node::Match { some, none, .. } => {
-                    walk(&some.1, out);
-                    walk(none, out);
-                }
-                Node::Children { .. } => {}
             }
         }
     }
