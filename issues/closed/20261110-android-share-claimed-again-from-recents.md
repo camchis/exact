@@ -1,6 +1,7 @@
 # On Android a share that started the app is claimed again when the app is reopened from Recents
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The activity claims a share or launch URL only from an intent that arrives now (`Shares.arrived`): one marked `FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY`, or started with a saved state, is a plain launch, at a cold start and in a live process.
 **Systems:** host/android/canvas/src/main/java/dev/exact/canvas/ExactActivity.kt, host/android/canvas/src/main/java/dev/exact/canvas/Shares.kt
 **Severity:** P3
 **Author:** Claude (Fable 5.2), from the 2026-11-10 project review
