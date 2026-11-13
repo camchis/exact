@@ -3582,6 +3582,11 @@ bare-plan host fixtures. The driver supports `ios --device [--phone <name|udid>]
 the phone connects outward to a temporary Mac-side port with a per-launch token.
 Use a trusted LAN, allow local networking, and keep the app visible;
 `EXACT_AGENT_HOST` overrides the Mac IPv4 address. The carrier is not encrypted.
+The first launch of each bundle id can raise Apple's Local Network prompt. Allow
+it on the phone; the driver cannot answer it, and a prompt left by another app
+can also keep this launch inactive. `No route to host` or `waiting for foreground`
+can mean that prompt is waiting. Unlock the phone before launching. Startup
+failures retain devicectl's lock diagnostics and say when the app printed nothing.
 Android APK drives (`bun exact.mjs agent android`, or `agent.mjs android --reader`) check and wake the screen, dismiss an insecure keyguard, and refuse a secure lock screen: unlock the device and retry; a readiness timeout includes the observed screen state.
 
 The dev page's **Open in native…** link offers an installed-client action and
