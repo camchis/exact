@@ -12,7 +12,7 @@ import { Docs, Head, head, markDocument, projectRoots, openTabs, unopened, tp } 
 let Paint; export function usePaint(pass) { Paint = pass; } export { conforms, eq, equal, Refusal, Failed }; // the compiler installs `Paint` only when a plan can layer boxes
 import * as Ov from "./overlay.js"; import { beatAfter } from "./beat.js"; import { heldAsks, heldReplies, Open, closeLetGo } from "./held.js"; export { heldAsks, heldReplies }; // optimistic writes shown over answers (the runner's writes.rs)
 export const writeRecords = () => Ov.Writes.list.map(w => ({ id: w.id, mutation: w.m.name, landed: !!w.landed })); // the agent's `state.writes`
-let Media = null; export function useMedia(m) { Media = m; } let Nav = null; export function useNavigation(n) { Nav = n; } // media.js only where a plan has a `video` or `audio`; navigation.js's `navigation` (the history, the stacks, the app bar) only where a plan has routes or a back control, handed over by the router (router.js `navigationRoots`): a plan without either never links it (LLP 1047.002 D1)
+let Media = null; export function useMedia(m) { Media = m; } let Traversal = null; export function useTraversal(f) { Traversal = f; } // media.js only where a plan has a `video` or `audio`; router.js's `traversal` only where a plan has routes or a back control (router.js `navigationRoots`): a plan without either never links it (LLP 1047.002 D1)
 let Links = null; export function useLinks(l) { Links = l; } // links.js only where a plan binds a link's `href`, `rel` or `target` (LLP 1047.002 D1)
 // The JS runtime is imported by name, so a bundle carries only what its generated plan uses.
 // Semantics kept from the runner (LLP 1005 §6):
@@ -226,7 +226,7 @@ export function commit(f, what = "commit", finished) {
     Sched?.scan(true, changed); // a free queue's waiting send is due (LLP 1092 D3)
     return true;
   };
-  return Sh && ok && !Nav?.traversing ? Sh.commit(tail, Queue, inflight, After) : tail(); // a history traversal lands at once (navigation.js `traversing`)
+  return Sh && ok && !Traversal?.() ? Sh.commit(tail, Queue, inflight, After) : tail(); // a Back or Forward is mirrored to the history first, and one the browser animated cuts (router.js `traversal`)
 }
 /** A commit made again after a write ended or the source became ready (the runner's `commit_again`). Refused while reads are
  * owed (a reconciling ask), they fail, keeping what they show, before a commit publishes it; a refusal of that leaves nothing owed. */

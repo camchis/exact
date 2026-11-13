@@ -665,7 +665,7 @@ function commit(op) {
     globalThis.exact?.fragment?.forget(cursor);
   }
 }
-function popped({ j, state, url }) {
+function popped({ j, state, url, ua }) {
   const entry = written[j];
   const owned = entry && state?.exact === j && state.id === entry.id && state.url === entry.url;
   const target = owned ? entry.url : url;
@@ -676,7 +676,7 @@ function popped({ j, state, url }) {
   // control pressed (disabled, or closedby="none", refuses), else the runner's `back` from the visit the entry left (LLP 1115 D5), however routes are keyed. Any other entry unheard (Forward, or more than one away) is the runner's own `go` there (LLP 1115.000 D4.3). An entry given to `navigate` at the URL already shown, which this page did not write or which holds the visit shown, is accepted though nothing changed: a `replace` can give the only entry a reload wrote the URL of the one beneath it, and refusing would hold Back there. An earlier visit at that URL is still refused: accepting it would leave the visits after it on the stack.
   const step = owned && j === cursor - 1 && entry.id !== written[cursor]?.id, beneath = step && selected > 0 && routes[selected - 1].getAttribute("navigationKey") === String(entry.id);
   let back = beneath && !!backControl(nav), own = false, why = null;
-  pop = {};
+  pop = { ua };
   try {
     if (back) {
       why = pressBack(nav);
@@ -749,10 +749,10 @@ const settled = () => {
 export const navigation = {
   personScrolls: 0,
   // the person's scrolls (`byPerson`) from the page's start: one after a navigation asked a fragment's scroll cancels it (fragment.js, LLP 1153 D5)
-  /** A Back or Forward being dispatched (`popped`): its commit must land before `popped` judges it, so a tree update that
-  * would wait for a view transition (shared.js) runs at once instead; its flight is forgone. */
+  /** The Back or Forward being dispatched (`popped`), else null: `ua` when the browser animated it (`hasUAVisualTransition`).
+  * A commit made then mirrors its router at once, before a view transition may defer its tree update (router.js `traversal`). */
   get traversing() {
-    return pop !== null;
+    return pop;
   },
   /** `dispatch(location)` is false when no `navigate` handler heard it; `back(id)` is the runner's own `back` from visit `id`, `goTo(location)` its own `go`. */
   connect(hostRoot, dispatch, journal, back = null, goTo = null, matchesRoute = () => false, waitForActivation = false) {
@@ -811,7 +811,8 @@ export const navigation = {
       queue.push({
         j,
         state: event.state,
-        url: launchLocation()
+        url: launchLocation(),
+        ua: event.hasUAVisualTransition
       });
       if (echo !== null) {
         const pending = echo;
@@ -933,13 +934,14 @@ export const navigation = {
     }
     return new Promise((resolve) => {
       const timer = setTimeout(finish, 1e3);
+      // Once the traversal's tree update has run, which a view transition defers (shared.js `afterCommit`).
       function finish() {
         clearTimeout(timer);
         waiters.delete(finish);
-        resolve({
+        (globalThis.exact?.afterCommit ?? ((run) => run()))(() => resolve({
           history: delta,
           delivery: "platform"
-        });
+        }));
       }
       waiters.add(finish);
       history.go(delta);

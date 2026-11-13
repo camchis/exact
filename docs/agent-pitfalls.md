@@ -1843,8 +1843,8 @@ price: answers arrive `Later`, outside the action's transaction (LLP 1027.002 D1
   content (`for e in t.stack`) destroys nothing on a push. Keep each route's `navigationKey`
   column mounted (the host's Back needs the route beneath) and put its content under
   `if inApp or e.id == top(nav).id`: in a browser the card leaves as the product arrives, and
-  `shared.js` runs a view transition. A Back or Forward lands at once, without the flight
-  (`issues/20261103-web-history-traversal-forgoes-shared-element-flight.md`).
+  `shared.js` runs a view transition. A Back or Forward flies too, unless the browser
+  animated it itself (`hasUAVisualTransition`: a phone browser's swipe back can).
 
 - **`pages=` on a `render=build` route renders no pages in an app without a Rust render
   entry.** A route `product "/product/:id" render=build pages=productPages()` compiles, and
