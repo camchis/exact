@@ -1,6 +1,7 @@
 # `@exact/oauth`'s refusal of a plain-http origin does not name the option, and no guide says how to sign in on a device against a development identity server
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** OAuth HTTPS refusals identify the configuration option; the guides explain trusted HTTPS and simulator loopback for development.
 **Systems:** packages/oauth/index.ts, docs/contract-for-agents.md (Sign-in providers), docs/recipes/oauth.md
 **Severity:** P3
 **Author:** Claude (Opus 5.5), from Exact diaries sent 2026-11-11 to 2026-11-13

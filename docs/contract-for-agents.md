@@ -1465,6 +1465,14 @@ next `open` asks for the token again and sends it as the first message.
 The token never enters the URL, subprotocols or a Contract answer. Adapt the
 message and refusal handling to the service; do not retry indefinitely.
 
+**Development identity servers.** `issuer`, every `endpoints` URL and each
+`apis` origin require HTTPS, except loopback (`localhost`, `127.0.0.1` or
+`[::1]`). A refusal names the option, such as `endpoints.token` or `apis[2]`.
+For a phone reaching your Mac over the LAN, serve the identity server and API
+through HTTPS with a certificate the phone trusts, or an HTTPS tunnel. A
+simulator can use the Mac's loopback server. Development builds keep this
+HTTPS rule; they have no insecure-origin switch.
+
 **Parameters chosen at the press.** Keep provider defaults in
 `authorizationParams`; pass a login hint, connection or account-choice prompt
 with the sign-in itself:

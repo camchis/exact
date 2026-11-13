@@ -246,8 +246,12 @@ export function oauth(config: OAuthConfig): OAuthProvider {
     throw new TypeError('oauth: give issuer (for discovery) or endpoints.authorization and endpoints.token');
   }
   if (!Array.isArray(config.apis)) throw new TypeError('oauth: apis lists the origins that receive the access token, such as ["https://api.example.com"]');
-  for (const url of [config.issuer, config.endpoints?.authorization, config.endpoints?.token, config.endpoints?.revocation, ...config.apis]) {
-    if (url) secure(url, 'oauth');
+  for (const [option, url] of [
+    ['issuer', config.issuer], ['endpoints.authorization', config.endpoints?.authorization],
+    ['endpoints.token', config.endpoints?.token], ['endpoints.revocation', config.endpoints?.revocation],
+    ...config.apis.map((url, i) => [`apis[${i}]`, url]),
+  ]) {
+    if (url) secure(url, `oauth: ${option}`);
   }
   // The callback is compared whole with where the provider sends the person, its query and fragment the reply's
   if (config.callback !== undefined && !sessionCallback(config.callback)) {

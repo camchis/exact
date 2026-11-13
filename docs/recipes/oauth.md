@@ -2,8 +2,9 @@
 
 `@exact/oauth` handles PKCE in the system browser, token requests, refresh
 and sign-out. Install it in the app's directory with
-`EXACT_APP_DIR=$PWD bun <exact2>/scripts/exact.mjs add oauth`. Each provider's
-settings, and tests against a fake provider: `bun exact.mjs docs sign-in providers`.
+`EXACT_APP_DIR=$PWD bun <exact2>/scripts/exact.mjs add oauth`.
+Devices need trusted HTTPS or a tunnel; simulators can use loopback HTTP.
+Provider settings and fake-provider tests: `bun exact.mjs docs sign-in providers`.
 
 ```ts
 import { oauth } from '@exact/oauth';

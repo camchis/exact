@@ -107,3 +107,20 @@ test('per-sign-in params refuse every package-owned field before consuming the p
   expect(opened).toBe(true);
   expect((await signing).code).toBe('cancelled');
 });
+
+test('HTTPS refusals name the configuration option and allow loopback development servers', () => {
+  const insecure = 'http://192.168.1.5:8080';
+  const cases: [string, OAuthConfig][] = [
+    ['issuer', { ...config, issuer: insecure }],
+    ...(['authorization', 'token', 'revocation'] as const).map(name => [
+      `endpoints.${name}`, { ...config, endpoints: { ...config.endpoints, [name]: insecure } },
+    ] as [string, OAuthConfig]),
+    ['apis[2]', { ...config, apis: ['https://one.example', 'https://two.example', insecure] }],
+  ];
+  for (const [option, value] of cases) {
+    expect(() => oauth(value)).toThrow(`oauth: ${option}: ${insecure} is not HTTPS`);
+  }
+  for (const origin of ['http://127.0.0.1:8080', 'http://localhost:8080', 'http://[::1]:8080', 'https://dev.example']) {
+    expect(() => oauth({ ...config, issuer: origin, endpoints: { authorization: `${origin}/authorize`, token: `${origin}/token`, revocation: `${origin}/revoke` }, apis: [origin] })).not.toThrow();
+  }
+});
