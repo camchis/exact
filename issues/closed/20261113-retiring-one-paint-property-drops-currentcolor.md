@@ -1,6 +1,7 @@
 # Retiring one paint property drops currentcolor sides
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** A retired paint property now leaves the node's other currentcolor sides recorded, so the next color change still has them follow the presented color.
 **Systems:** kernel
 **Severity:** P3
 **Author:** Grok 4.7
