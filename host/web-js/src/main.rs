@@ -34,6 +34,8 @@ mod measures_tests;
 mod modes;
 #[cfg(test)]
 mod modes_tests;
+#[cfg(test)]
+mod module_tests;
 mod paint;
 #[cfg(test)]
 mod paint_tests;
