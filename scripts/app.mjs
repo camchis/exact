@@ -891,8 +891,7 @@ export const HOST_DEV = 'host-dev';
 /** The Linux host an agent drives: the app's development executable, or
  * another binary of its Linux crate (`<app>-render`). */
 export const linuxBinary = (app, bin = app.crate('linux')) => resolve(app.target, HOST_DEV, bin);
-/** The command that builds it. An app outside this repo gets the root's
- * profiles on the command line, as its Apple build does (injectedProfiles). */
+/** The command that builds it. An app outside this repo gets the root's profiles on the command line, as its Apple build does (injectedProfiles). */
 export const linuxBuild = (app, bin = null) => ['cargo', 'build', ...injectedProfiles(app), '--profile', HOST_DEV, '-p', app.crate('linux'), ...(bin ? ['--bin', bin] : [])];
 /** What an iOS bundle's root holds beside the executable, which a name the same but for case would collide with
  * (expo/exact-build#89): its own files and folders, the static trees (`APPLE_STATIC_TREES`), localizations and icons. */
