@@ -2095,7 +2095,16 @@ wait for the module's storage; `clock +N` names what is left (`background`,
 beside `inflight`), and `state.background` counts what landed and failed.
 Every failed storage operation, every unhandled rejection and every `console`
 line of the module reaches `logs` (`storage failed: …`, `data: unhandled
-rejection: …`, `console: …`). Storage is refused, with its line, during module
+rejection: …`, `console: …`). Native data modules provide no browser-style global error hook (`onerror`,
+`onunhandledrejection`, `addEventListener` or `reportError`). Browser listeners
+can run in the web targets' data-module realms, but feature-detected
+registrations are skipped natively. Exact installs its own Hermes rejection
+tracker before hardening the native realm; replacing that tracker is not
+supported. To report an answer's errors to a service, catch synchronous throws
+and awaited rejections inside `answer` or the source function, and report them
+while the answer is still in flight and `fetch` is allowed. Uncaught answer
+errors reach the runner as failures with a message and a classified failure
+code; arbitrary application `error.code` values are not generally preserved. Storage is refused, with its line, during module
 evaluation (no answer has begun) and at bake; `fetch` and `native.call` are
 refused in background work, which no answer waits for (a `fetch` belongs in an
 answer). A storage or `fetch` call made when no answer is in flight is refused
