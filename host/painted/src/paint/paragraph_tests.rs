@@ -1009,3 +1009,41 @@ fn a_clipping_text_keeps_its_own_glyphs_inside_its_padding_box() {
     assert!(ink(20..70) > 0, "the text paints inside its box");
     assert_eq!(ink(70..300), 0, "no glyph past the box's right edge");
 }
+
+/// Where a box's room is drawn: its sides are its paragraph's start and end,
+/// so in a left-to-right paragraph an `rtl` box's `padding-right` is the gap
+/// after its text, as in Chrome, not one before it.
+#[test]
+fn a_boxs_padding_is_on_its_side_in_its_paragraph() {
+    let xs = |box_style: &str| {
+        let p = fixture(&format!(
+            "      text testId=\"paragraph\" font-size=16\n        text \"12\"{box_style}\n        text \"The\"\n"
+        ));
+        let kernel = p.host().kernel();
+        let node = kernel
+            .node_by_key(kernel.find_by_test_id("paragraph")[0])
+            .unwrap();
+        let mut spec = text_spec(&node.computed_style(StyleMask::INHERITED), "");
+        spec.runs = node
+            .text_runs()
+            .iter()
+            .map(crate::text::Run::from_kernel)
+            .collect();
+        let paragraph = p.text().borrow_mut().paragraph(&spec, None);
+        paragraph
+            .layout_runs()
+            .flat_map(|r| r.glyphs.iter().map(|g| (g.start, g.x)).collect::<Vec<_>>())
+            .collect::<Vec<_>>()
+    };
+    let at = |glyphs: &[(u32, f32)], byte: u32| glyphs.iter().find(|g| g.0 == byte).unwrap().1;
+    let bare = xs("");
+    let padded = xs(" direction=\"rtl\" padding-right=5");
+    assert!(
+        (at(&padded, 0) - at(&bare, 0)).abs() < 0.05,
+        "no gap before it"
+    );
+    assert!(
+        (at(&padded, 2) - at(&bare, 2) - 5.0).abs() < 0.05,
+        "{bare:?} {padded:?}"
+    );
+}

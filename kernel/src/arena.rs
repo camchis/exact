@@ -712,6 +712,7 @@ impl NodeArena {
         if scale != 1.0 {
             for run in &mut out[start..] {
                 run.style = run.style.scaled(scale);
+                run.edges = run.edges.scaled(scale);
             }
         }
     }

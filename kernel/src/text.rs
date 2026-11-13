@@ -369,6 +369,14 @@ impl InlineEdges {
     pub fn is_empty(self) -> bool {
         self.start == 0.0 && self.end == 0.0
     }
+
+    /// At `scale` of its size: a fitted paragraph's (LLP 1116.001 D1.4).
+    pub fn scaled(self, scale: f32) -> Self {
+        Self {
+            start: self.start * scale,
+            end: self.end * scale,
+        }
+    }
 }
 
 impl<'a> TextRun<'a> {

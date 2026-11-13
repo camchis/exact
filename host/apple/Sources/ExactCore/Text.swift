@@ -29,8 +29,7 @@ extension Run {
         run.size = CGFloat(Float(size) * scale)
         run.lineHeight = lineHeight.map { CGFloat(Float($0) * scale) }
         run.letterSpacing = CGFloat(Float(letterSpacing) * scale)
-        run.inlineStart = CGFloat(Float(inlineStart) * scale)
-        run.inlineEnd = CGFloat(Float(inlineEnd) * scale)
+        // Its boxes' room and reach come from the kernel at its scale.
         return run
     }
 }

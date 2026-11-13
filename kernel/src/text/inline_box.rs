@@ -240,7 +240,10 @@ fn makes_run(arena: &NodeArena, slot: u32) -> bool {
 }
 
 /// An inline box's padding and border, and its margin, on each inline side,
-/// as its taffy style resolves them, start and end by its direction.
+/// as its taffy style resolves them, start and end by its paragraph's
+/// direction, in which hosts lay its runs out: a box's own `direction`
+/// reorders nothing without `unicode-bidi`, so its `padding-right` is on
+/// its right in a left-to-right paragraph.
 fn box_sides(arena: &NodeArena, slot: u32) -> (crate::text::InlineEdges, crate::text::InlineEdges) {
     use crate::generated::StyleId;
     use crate::text::InlineEdges;
@@ -270,7 +273,11 @@ fn box_sides(arena: &NodeArena, slot: u32) -> (crate::text::InlineEdges, crate::
         length(style.margin.left.into_raw()),
         length(style.margin.right.into_raw()),
     );
-    let sides = |a: f32, b: f32| match arena.computed_source(slot, StyleId::Direction).direction {
+    let paragraph = arena.measure_owner(slot);
+    let sides = |a: f32, b: f32| match arena
+        .computed_source(paragraph, StyleId::Direction)
+        .direction
+    {
         crate::Direction::Rtl => InlineEdges { start: b, end: a },
         _ => InlineEdges { start: a, end: b },
     };
@@ -282,10 +289,11 @@ impl crate::NodeRef<'_> {
     /// from its text at its first run and its last: what its background
     /// covers beside its glyphs (`TextRun::edges` is the room its line gives
     /// it, margins included). Zero for any other node.
+    /// At its paragraph's fit scale, as its runs are (LLP 1116.001 D1.4).
     pub fn inline_background_reach(&self) -> crate::InlineEdges {
         if !self.arena.is_inline_run(self.slot) {
             return crate::InlineEdges::default();
         }
-        background_reach(self.arena, self.slot)
+        background_reach(self.arena, self.slot).scaled(self.arena.fit_scale(self.slot))
     }
 }

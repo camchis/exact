@@ -46,7 +46,19 @@ fn style(id: u32, style: &[(StyleId, &str)]) -> Op {
 /// "1" (4) and "2" (5), then "The" (6). `outer` styles the box, `inner` the
 /// "1" in it.
 fn verse(outer: &[(StyleId, &str)], inner: &[(StyleId, &str)]) -> Kernel {
+    verse_in(&[], "400px", outer, inner)
+}
+
+/// `verse` with `paragraph` styling the paragraph, in a column `width` wide.
+fn verse_in(
+    paragraph: &[(StyleId, &str)],
+    width: &str,
+    outer: &[(StyleId, &str)],
+    inner: &[(StyleId, &str)],
+) -> Kernel {
     let mut k = Kernel::with_monospace();
+    let mut own = vec![(StyleId::FontSize, "16px")];
+    own.extend_from_slice(paragraph);
     let ops = vec![
         create(1, NodeType::View),
         create(2, NodeType::Text),
@@ -60,13 +72,13 @@ fn verse(outer: &[(StyleId, &str)], inner: &[(StyleId, &str)]) -> Kernel {
         style(
             1,
             &[
-                (StyleId::Width, "400px"),
+                (StyleId::Width, width),
                 (StyleId::Display, "flex"),
                 (StyleId::FlexDirection, "column"),
                 (StyleId::AlignItems, "flex-start"),
             ],
         ),
-        style(2, &[(StyleId::FontSize, "16px")]),
+        style(2, &own),
         style(3, outer),
         style(4, inner),
         Op::SetChildren {
@@ -201,10 +213,18 @@ fn a_boxs_background_reaches_its_padding_and_the_boxes_inside_it() {
     assert_eq!(reach(6), NONE);
 }
 
+/// Start and end are the paragraph's, in which hosts lay its runs out: in
+/// a right-to-left paragraph a box's right side is its start, before its
+/// first run; a box's own `direction` reorders nothing without
+/// `unicode-bidi`, so in a left-to-right paragraph its right side is still
+/// after its last run, as Chrome puts `<span dir=rtl style="padding-right:
+/// 5px">12</span>The`'s gap between "2" and "The".
 #[test]
-fn right_to_left_its_right_side_is_its_start() {
-    let k = verse(
-        &[(StyleId::Direction, "rtl"), (StyleId::PaddingRight, "5px")],
+fn its_sides_are_the_paragraphs_start_and_end() {
+    let k = verse_in(
+        &[(StyleId::Direction, "rtl")],
+        "400px",
+        &[(StyleId::PaddingRight, "5px")],
         &[],
     );
     assert_eq!(
@@ -212,6 +232,49 @@ fn right_to_left_its_right_side_is_its_start() {
         InlineEdges {
             start: 5.0,
             end: 0.0
+        }
+    );
+    let k = verse(
+        &[(StyleId::Direction, "rtl"), (StyleId::PaddingRight, "5px")],
+        &[],
+    );
+    assert_eq!(
+        edges(&k),
+        [
+            NONE,
+            InlineEdges {
+                start: 0.0,
+                end: 5.0
+            },
+            NONE
+        ]
+    );
+}
+
+/// A fitted paragraph's runs are at its scale (LLP 1116.001 D1.4), and the
+/// room beside them with them: what a host measures is what it paints.
+#[test]
+fn a_fitted_paragraphs_room_is_at_its_scale() {
+    let k = verse_in(
+        &[(StyleId::Fit, "shrink"), (StyleId::WhiteSpace, "nowrap")],
+        "10px",
+        &[(StyleId::PaddingRight, "10px")],
+        &[],
+    );
+    let node = k.node(2).unwrap();
+    assert_eq!(node.fit_scale(), 0.5);
+    assert_eq!(
+        edges(&k)[1],
+        InlineEdges {
+            start: 0.0,
+            end: 5.0
+        }
+    );
+    assert_eq!(
+        k.node(3).unwrap().inline_background_reach(),
+        InlineEdges {
+            start: 0.0,
+            end: 5.0
         }
     );
 }

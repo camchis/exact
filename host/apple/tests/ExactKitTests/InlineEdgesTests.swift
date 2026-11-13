@@ -42,6 +42,9 @@ final class InlineEdgesTests: XCTestCase {
         let first = engine.paragraph(spec([run("1", start: 6), run("The")]), width: .infinity)
         XCTAssertEqual(first.width, plain.width + 6, accuracy: 0.05)
         XCTAssertEqual(spec([run("1", start: 6)]).firstLineIndent, 6)
+        // A fitted paragraph's room comes from the kernel at its scale, as
+        // its measure request's does: the run's scaling leaves it.
+        XCTAssertEqual(run("1", start: 2, end: 4).scaled(0.5).inlineEnd, 4)
     }
 
     /// Where a line breaks right before a run with a start, the room starts
