@@ -4611,6 +4611,25 @@ does. The core has fixed
 storage for up to 16 collectors per UI thread and does no per-callback allocation;
 these bounds do not substitute for measuring whole-hook overhead on real devices.
 
+### Startup marks of any build: `EXACT_OBSERVE_LOG=1`
+
+An Apple app launched with `EXACT_OBSERVE_LOG=1` prints its startup measurement to stderr once launch
+has settled, in a release build too. The one `observe: startup` line has the launch type (`cold`,
+`warm`), how the first tree booted (`baked`), how time to interactive ended, Observe's metrics, and each
+mark in ms from process start (`main`, `didFinishLaunching`, `boot`, `commit`, `present`, `interactive`
+…). The metrics are `timeToFirstRender` (the first vsync after the first tree's commit) and
+`timeToInteractive`, both from `didFinishLaunching`, and `coldLaunchTime` or `warmLaunchTime`. On a
+simulator, give the variable to the app through `simctl`'s prefix and read its console:
+
+```sh
+SIMCTL_CHILD_EXACT_OBSERVE_LOG=1 xcrun simctl launch --console-pty <udid> <bundle id>
+```
+
+On macOS, set it in the executable's environment. The painted hosts (Linux) print a line of their own
+marks under it. These are the host's clocks, in process: quick to repeat when comparing two builds, but
+no screen's measurement (a video, `XCTApplicationLaunchMetric`). A simulator's numbers move by about
+10 ms between batches with the Mac's load, so compare builds in interleaved rounds of several launches.
+
 ### Compact frame-health reports on physical devices
 
 Run an Apple app on a connected phone with `bun host/apple/build.mjs --device --run`.
