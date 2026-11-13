@@ -1,6 +1,7 @@
 # The Android recorder paints an SVG shape's fill before its stroke whatever `paint-order` says, and drops `stroke-miterlimit`
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The recorder writes a shape's fill and stroke in its `paint-order`, and `STROKE` carries the miter limit after the join, which the reader sets as `Paint.strokeMiter` (and counts in a stroke's bounds and its icon cache key).
 **Systems:** host/linux/src/canvas.rs, host/android/canvas (Player.kt)
 **Severity:** P3
 **Author:** Claude (Fable 5.2), from the 2026-11-10 project review

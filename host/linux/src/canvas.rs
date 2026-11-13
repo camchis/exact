@@ -33,7 +33,8 @@
 //!   fontique synthesized (a face with neither axis)
 //! - `11 IMAGE_DEF id w h` — fetch its pixels with [`CanvasHost::image`]
 //! - `12 IMAGE_FREE id`
-//! - `13 STROKE color width cap join n (tag coords…)×n` — caps/joins as SVG (0 butt/miter, 1 round, 2 square/bevel)
+//! - `13 STROKE color width cap join miter n (tag coords…)×n` — caps/joins as SVG (0 butt/miter, 1 round,
+//!   2 square/bevel), `miter` the miter limit (`stroke-miterlimit`)
 //! - `14 IMAGE_RRECT id dst(x y w h) region(x y w h) radii×8` — the picture mapped to `dst`, drawn
 //!   only over `region` with those corner radii (a clip-free rounded image; `clip.rs`)
 //! - `26 ANIMATED id len utf8-path(padded to 4)` — after `IMAGE_DEF`: the picture is a GIF's or
