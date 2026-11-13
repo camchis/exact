@@ -1,6 +1,7 @@
 # A contact hold seeks the clock past canvas sensor samples
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** A contact hold seeks the clock a display frame at a time while a canvas has a sensor input, posting each frame's samples and stepping the worlds before the next, as the agent's `clock` does.
 **Systems:** host/linux
 **Severity:** P2
 **Author:** Grok 4.7
