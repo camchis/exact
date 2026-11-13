@@ -1511,6 +1511,28 @@ Generated declarations are build artifacts, not files to commit. A development
 build writes them beside `app.ts` for an editor: the web build and the native
 development bake both do.
 
+For a mixed Rust/TypeScript app, annotate the map as `TypeScriptSources` and
+the dispatcher as `TypeScriptAnswer`, imported from the same declaration:
+
+```ts
+import type { TypeScriptSources, TypeScriptAnswer } from './app.contract.d.ts';
+const sources: TypeScriptSources = { greeting: () => 'Hello' };
+export const answer: TypeScriptAnswer = (source, args, store, storage, native) =>
+  sources[source](args, store, storage, native);
+```
+
+The app's `build_mixed_with` bake derives these types from its `rust_sources`
+argument; no ownership list goes in `app.json` or TypeScript. Every remaining
+provider is required. Run `bun exact.mjs contract build app.contract` to obtain
+the narrowed declaration beside `app.ts`: its TypeScript check runs the app's
+Cargo bake, which writes the declaration before checking `app.ts`, even if
+the check fails. Native bakes use it too, and a development producer keeps
+the roster from the previous bake's `rustSources` receipt. Rebuild after
+changing Rust ownership. `Sources`, `Source`, `Args` and `Result` still
+describe every app-owned source, including Rust's.
+Standalone `contract types` has no composer and treats every app-owned source
+as TypeScript's; for a TypeScript-only app the two provider types are equivalent.
+
 Development builds also expose `resourceStatus`: opaque request and displayed-answer
 generations, the last successful generation, pending status, and `displayed`
 (`fallback`, `current`, `retained`). `argumentsEqual` compares full arguments using
@@ -3549,7 +3571,8 @@ platform under `platforms.<platform>.placement`; `EXACT_TYPESCRIPT_PLACEMENT`
 and `EXACT_RUST_PLACEMENT` override a bake for a measurement. A change is a new
 compatibility id, never an update. `build_mixed_with` bakes a mixed app through
 its own composer, so a resource only Rust owns needs no TypeScript placeholder;
-the development producer keeps such a resource's last Cargo-baked value.
+the development producer keeps such a resource's last Cargo-baked value and
+the composer's ownership roster for the generated TypeScript provider types.
 
 Native module clients can supply a `Module` factory to `exact_apple::host!`
 (the sixth argument) and apply an `ExactGeneration` containing an `ExactModule`
