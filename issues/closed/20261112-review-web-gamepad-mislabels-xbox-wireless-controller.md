@@ -1,6 +1,7 @@
 # Web gamepad labels an Xbox Wireless Controller as PlayStation
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The web's name fallback checks each family's own name before Sony's generic "Wireless Controller", so "Xbox Wireless Controller" without a vendor id is Xbox with A, B, X and Y.
 **Systems:** Gamepad web implementation
 **Author:** Codex
 **Date:** 2026-11-12
