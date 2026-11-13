@@ -1,6 +1,7 @@
 # Reopening Apple's last session installs duplicate wake delivery observers
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** `ExactExtensions` keeps the token of its one `exact.wakes.due` observer and adds it only when it has none, so a module made after the last one ended reuses it and a due offer reaches the live module's adapter once.
 **Systems:** host/apple/modules/ExactExtensions.swift, host/apple/modules/ExactNativeModule.swift
 **Author:** Codex
 **Date:** 2026-11-12
