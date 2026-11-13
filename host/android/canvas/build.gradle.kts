@@ -27,6 +27,7 @@ android {
             "../../../packages/passkeys/android", "../../../packages/passkeys/test",
             "../../../packages/payments/android", "../../../packages/payments/test",
             "../../../packages/recording/android", "../../../packages/recording/test",
+            "../../../packages/speech-recognition/android", "../../../packages/speech-recognition/test",
         ))
     }
 }
