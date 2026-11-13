@@ -12,6 +12,7 @@ import { browserMissing, reloadPlaywrightPage } from './agent-playwright.mjs';
 import { need, notApplicable } from './coverage.mjs';
 import { typeCommand } from './agent-keys.mjs';
 import { render, stateOp } from './agent-inspect.mjs';
+import { parseStep } from '../host/web-js/conform-steps.mjs';
 
 for (const engine of ['chromium', 'firefox', 'webkit']) {
   need(engine, await browserMissing(engine))(`a Playwright reload keeps the current entry and its Back and Forward entries (${engine})`, async () => {
@@ -46,6 +47,153 @@ for (const engine of ['chromium', 'firefox', 'webkit']) {
       await page.goBack();
       assert.equal(new URL(page.url()).pathname, '/');
     } finally { await browser.close(); await server.stop(true); }
+  }, 30000);
+
+  need(engine, await browserMissing(engine))(`keys keep browser ownership and ordinary focus delivery (${engine})`, async () => {
+    const server = Bun.serve({ hostname: '127.0.0.1', port: 0, fetch: () => new Response(`<!doctype html>
+      <div id="exact-root" data-boot-ms="1">
+        <button id="button">Press</button><input id="field" value="abc">
+        <iframe id="guest" srcdoc="<input id='inside'>"></iframe>
+        <canvas id="world" tabindex="0" width="10" height="10"></canvas>
+      </div><script>
+        const elements = ['button', 'field', 'guest', 'world'].map(id => document.getElementById(id));
+        globalThis.requests = []; globalThis.presses = []; globalThis.keys = [];
+        elements[0].onclick = e => presses.push(e.isTrusted);
+        elements[1].onkeydown = e => keys.push([e.key, e.isTrusted]);
+        globalThis.exact = { ready: Promise.resolve(), views: new Map(elements.map((el, i) => [i + 1, el])),
+          gpu: { wantsInput: id => id === 4 },
+          async agentSettled(req) {
+            requests.push(req);
+            if (req.op === 'layout') return { nodes: elements.map((el, i) => {
+              const b = el.getBoundingClientRect(); return { id: i + 1, x: b.x, y: b.y, w: i === 3 ? 0 : b.width, h: i === 3 ? 0 : b.height };
+            }) };
+            if (req.op === 'type') return req.id === 2 ? {} : { guest: true };
+            if (req.op === 'focus') { const el = this.views.get(req.id); el.focus(); return { ok: document.activeElement === el }; }
+            return {};
+          }
+        };
+      </script>`, { headers: { 'content-type': 'text/html' } }) });
+    let s;
+    try {
+      s = await open({ host: 'web', browser: engine === 'chromium' ? 'chrome' : engine, url: server.url.href });
+      const c = s.carrier;
+      await c.input(1, 'key', { key: 'Enter' });
+      await c.input(2, 'key', { key: 'ArrowRight' });
+      let world;
+      try { world = (await c.input(4, 'key', { key: 'ArrowLeft' })).delivery; }
+      catch (e) { world = e.message; }
+      const held = await c.input(3, 'key', { key: 'Shift', phase: 'down' });
+      await held.release?.();
+      // An ordinary iframe key still belongs to its guest bridge.
+      const guest = await c.input(3, 'key', { key: 'Enter' });
+      const observed = await c.evaluate(`JSON.parse(JSON.stringify({ presses, keys, requests: requests.filter(r => ['type', 'focus'].includes(r.op)) }))`);
+      assert.deepEqual({ ...observed, world, guest: guest.guest }, {
+        presses: [true], keys: [['ArrowRight', true]], world: 'platform', guest: true,
+        requests: [{ op: 'type', id: 2, key: 'ArrowRight' }, { op: 'focus', id: 2, select: false },
+          { op: 'focus', id: 4, world: true }, { op: 'type', id: 3, key: 'Enter' }],
+      });
+    } finally { await s?.close(); await server.stop(true); }
+  }, 30000);
+
+  need(engine, await browserMissing(engine))(`a wheel reports its pointer move and honours its point (${engine})`, async () => {
+    const server = Bun.serve({ hostname: '127.0.0.1', port: 0, fetch: () => new Response(`<!doctype html>
+      <div id="exact-root" data-boot-ms="1"><div id="port" style="position:fixed;left:20px;top:200px;width:220px;height:160px;overflow:auto"><div style="height:1000px">Scroll</div></div></div>
+      <script>
+        const port = document.getElementById('port'); globalThis.wheels = []; globalThis.enters = 0; globalThis.moves = 0; globalThis.reveals = 0;
+        port.onpointerenter = () => enters++;
+        port.onpointermove = () => moves++;
+        port.addEventListener('wheel', e => { wheels.push([e.clientX, e.clientY, e.deltaX, e.deltaY, e.isTrusted]); e.preventDefault(); }, { passive: false });
+        globalThis.exact = { ready: Promise.resolve(), views: new Map([[1, port]]), async agentSettled(req) {
+          if (req.op === 'tree') return { nodes: [{ id: 1, type: 'View', depth: 0, props: { testId: 'port' }, children: [] }] };
+          if (req.op === 'reveal') { reveals++; return { scrolled: false }; }
+          const b = port.getBoundingClientRect(); return req.op === 'layout' ? { nodes: [{ id: 1, x: b.x, y: b.y, w: b.width, h: b.height }] } : {};
+        } };
+      </script>`, { headers: { 'content-type': 'text/html' } }) });
+    let s;
+    try {
+      s = await open({ host: 'web', browser: engine === 'chromium' ? 'chrome' : engine, url: server.url.href });
+      const reply = await s.tap('port', { wheel: [3, 12], at: [30, 40] });
+      assert.deepEqual(await s.carrier.evaluate('wheels'), [[50, 240, 3, 12, true]]);
+      assert.deepEqual(reply.at, [50, 240]);
+      assert.deepEqual(reply.hovered, engine === 'chromium' ? undefined : [50, 240]);
+      assert.equal(await s.carrier.evaluate('enters'), engine === 'chromium' ? 0 : 1);
+      await s.carrier.evaluate('wheels.length = 0; moves = 0');
+      await parseStep('wheel port 12 3', { hoverWheel: true }).run(s);
+      assert.deepEqual(await s.carrier.evaluate('({ moves, wheels })'), { moves: 1, wheels: [[130, 280, 3, 12, true]] });
+      await s.carrier.evaluate(`
+        wheels.length = 0; moves = 0;
+        port.style.width = '100px';
+        port.onpointermove = () => { moves++; port.style.width = '120px'; };
+      `);
+      await parseStep('wheel port 12 3', { hoverWheel: true }).run(s);
+      assert.deepEqual(await s.carrier.evaluate('({ moves, wheels })'), { moves: 1, wheels: [[70, 280, 3, 12, true]] });
+      assert.equal(await s.carrier.evaluate('port.getBoundingClientRect().width'), 120);
+      assert.equal(await s.carrier.evaluate('reveals'), 2);
+      await s.carrier.evaluate(`wheels.length = 0; port.onwheel = e => { globalThis.controlWheel = e.ctrlKey; };`);
+      await s.tap('port', { hover: true, wheel: [0, -20], at: [30, 40], modifiers: 'Control' });
+      assert.deepEqual(await s.carrier.evaluate('wheels'), [[50, 240, 0, -20, true]]);
+      assert.equal(await s.carrier.evaluate('controlWheel'), true);
+    } finally { await s?.close(); await server.stop(true); }
+  }, 30000);
+
+  need(engine, await browserMissing(engine))(`a hover wheel outside the viewport moves the pointer off a hovered control (${engine})`, async () => {
+    const server = Bun.serve({ hostname: '127.0.0.1', port: 0, fetch: () => new Response(`<!doctype html>
+      <style>body { margin: 0; height: 3000px; }</style>
+      <div id="exact-root" data-boot-ms="1"><button id="control" style="position:fixed;left:20px;top:20px;width:120px;height:40px">Hover</button>
+        <div id="low" style="position:fixed;left:20px;top:880px;width:200px;height:100px"></div></div>
+      <script>
+        const control = document.getElementById('control'), low = document.getElementById('low');
+        globalThis.leaves = 0; control.onpointerleave = () => leaves++;
+        globalThis.exact = { ready: Promise.resolve(), views: new Map([[1, control], [2, low]]), async agentSettled(req) {
+          if (req.op === 'tree') return { nodes: [{ id: 1, type: 'View', depth: 0, props: { testId: 'control' }, children: [] },
+            { id: 2, type: 'View', depth: 0, props: { testId: 'low' }, children: [] }] };
+          if (req.op === 'reveal') return { scrolled: false };
+          return req.op === 'layout' ? { viewport: { w: innerWidth, h: innerHeight }, nodes: [control, low].map((el, i) => {
+            const b = el.getBoundingClientRect(); return { id: i + 1, x: b.x, y: b.y, w: b.width, h: b.height };
+          }) } : {};
+        } };
+      </script>`, { headers: { 'content-type': 'text/html' } }) });
+    let s;
+    try {
+      s = await open({ host: 'web', browser: engine === 'chromium' ? 'chrome' : engine, url: server.url.href });
+      await s.tap('control', { hover: true });
+      assert.equal(await s.carrier.evaluate('control.matches(":hover")'), true);
+      const reply = await s.tap('low', { hover: true, wheel: [0, 40] });
+      assert.ok(reply.at[1] >= 900);
+      assert.deepEqual(reply.hovered, engine === 'chromium' ? undefined : reply.at);
+      assert.deepEqual(await s.carrier.evaluate('({ hover: control.matches(":hover"), leaves, scrolled: scrollY })'),
+        { hover: false, leaves: 1, scrolled: 40 });
+    } finally { await s?.close(); await server.stop(true); }
+  }, 30000);
+
+  need(engine, await browserMissing(engine))(`a hover wheel reaches a wrapped inline fragment (${engine})`, async () => {
+    const server = Bun.serve({ hostname: '127.0.0.1', port: 0, fetch: () => new Response(`<!doctype html>
+      <div id="exact-root" data-boot-ms="1"><p style="font:20px/60px monospace"><span id="wrapped">first fragment<br>second fragment</span></p></div>
+      <script>
+        const wrapped = document.getElementById('wrapped'); globalThis.events = [];
+        for (const type of ['pointermove', 'wheel']) document.addEventListener(type, e => {
+          events.push([type, e.target.id, Math.floor(e.clientX), Math.floor(e.clientY), e.isTrusted]);
+          if (type === 'wheel') e.preventDefault();
+        }, { passive: false });
+        globalThis.exact = { ready: Promise.resolve(), views: new Map([[1, wrapped]]), async agentSettled(req) {
+          if (req.op === 'tree') return { nodes: [{ id: 1, type: 'Text', depth: 0, props: { testId: 'wrapped' }, children: [] }] };
+          const b = wrapped.getBoundingClientRect(); return req.op === 'layout' ? { nodes: [{ id: 1, x: b.x, y: b.y, w: b.width, h: b.height }] } : {};
+        } };
+      </script>`, { headers: { 'content-type': 'text/html' } }) });
+    let s;
+    try {
+      s = await open({ host: 'web', browser: engine === 'chromium' ? 'chrome' : engine, url: server.url.href });
+      const { middleHits, fragment } = await s.carrier.evaluate(`(() => {
+        const b = wrapped.getBoundingClientRect(), c = wrapped.getClientRects()[0];
+        return { middleHits: document.elementFromPoint(b.x + b.width / 2, b.y + b.height / 2) === wrapped,
+          fragment: [c.x + c.width / 2, c.y + c.height / 2] };
+      })()`);
+      assert.equal(middleHits, false);
+      const reply = await s.tap('wrapped', { hover: true, wheel: [0, 40] });
+      assert.deepEqual(reply.at, fragment);
+      assert.deepEqual(await s.carrier.evaluate('events'), ['pointermove', 'wheel'].map(type =>
+        [type, 'wrapped', ...fragment.map(Math.floor), true]));
+    } finally { await s?.close(); await server.stop(true); }
   }, 30000);
 }
 

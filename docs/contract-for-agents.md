@@ -4854,12 +4854,20 @@ contacts. The CLI forms are `tap world mouse [at <x> <y>]` and `tap world contex
 click (each press counting 1, 2, 3); every click form and a wheel take `at <x> <y>` and
 `modifiers Shift+Meta`, and `down … modifiers Shift` or `drag … modifiers Shift` holds
 them to the lift. Chrome and macOS deliver these as a hand's (on macOS through the
-application, so its local event monitors see them); iOS, Linux, Windows, Firefox and
-WebKit answer `delivery: "unsupported"`, and a word a form does not use is refused by
-name. `tap stage wheel 0 -20 modifiers Control`
+application, so its local event monitors see them). Other carriers answer
+`delivery: "unsupported"` for forms they cannot carry; Firefox and WebKit carry
+clicks and wheels at a point, including wheels with modifiers. A word a form does
+not use is refused by name. `tap stage wheel 0 -20 modifiers Control`
 is a pinch's wheel; `tap world drop a.board` drags a file in (web, macOS). Plain canvas taps and held contacts are
 fingers, so their platform pointer identity and retained press history can differ
 from a mouse's; use the intended physical input when comparing game saves.
+
+On Firefox and WebKit, a wheel positions the pointer at its delivery point first;
+if it moves, the reply's `hovered: [x, y]` reports that input. To compare wheels across engines,
+use `session.tap(target, { hover: true, wheel: [dx, dy] })` on every page. It resolves
+one viewport point for the hover and wheel, keeping it if hover changes the layout.
+The wheel may also name `at: [x, y]` and `modifiers: 'Control'`.
+`conform.mjs --browser` does this and reports the comparison as hover followed by wheel.
 
 `tap` and `type` scroll a target whose middle is out of view into it first (its
 nearest scroll containers, then the page) and say so in the reply's `scrolled`.

@@ -413,7 +413,7 @@ export function install(exact) {
         if (req.agree) return { viewport: reply.viewport, agreement: { unavailable: 'no independent model: the page is the tree' }, ...tags() }; else if (req.native && reply.node) { delete reply.nodes; reply.node.native = { ...reply.node.native, subviews: { unavailable: 'the DOM is the tree; layout <target> names the element' } }; } // @ref LLP 1080.001 D1, D2
         return reply;
       }
-      case 'focus': { const el = views.get(req.id); if (!el) return { error: `no view ${req.id}` }; el.focus(); if (req.select !== false) await selectAll(el); return {}; }
+      case 'focus': { const el = views.get(req.id); if (!el) return { error: `no view ${req.id}` }; el.focus(); if (req.select !== false) await selectAll(el); return { ok: document.activeElement === el }; }
       case 'tap':
         if (req.part != null) return partTap(req);
         // A held state (LLP 1122 D8, `holdState`): the input glue's, as the real one (it loads after paint).
