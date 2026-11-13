@@ -1,6 +1,7 @@
 # Windows global shortcuts ignore the repeat option
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The Windows global shortcut passes `windows.repeat` to the host, which registers a chord without `MOD_NOREPEAT` while any of its readers asks for repeat and registers it again as readers attach, change and leave.
 **Systems:** @exact/global-shortcuts, Windows desktop hotkeys
 **Author:** Codex
 **Date:** 2026-11-12

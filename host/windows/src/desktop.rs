@@ -7,8 +7,12 @@
 //!   hears it ([RegisterHotKey](https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-registerhotkey)).
 //!   One registration per chord serves every reader of it; a press raises
 //!   each reader's event as an activation (D11 item 3). `MOD_NOREPEAT`
-//!   keeps a held chord to one press. A modifier pair needs a low-level
-//!   keyboard hook, which is not built: it answers `not-allowed`.
+//!   keeps a held chord to one press unless a reader asked for repeat
+//!   (`windows.repeat`, D8): `WM_HOTKEY` does not mark a repeat, so while
+//!   any reader of a chord asks for one, the chord is registered without
+//!   the flag and every reader of it hears each repeat. The registration
+//!   is made again as readers attach and leave. A modifier pair needs a
+//!   low-level keyboard hook, which is not built: it answers `not-allowed`.
 //! - **Print Screen alone** can be consumed by Snipping Tool even when
 //!   `RegisterHotKey` succeeds (#195). A nonzero DWORD or an unreadable
 //!   `HKCU\Control Panel\Keyboard\PrintScreenKeyForSnippingEnabled`
@@ -168,6 +172,7 @@ mod imp {
     struct Reader {
         session: String,
         id: String,
+        repeat: bool,
         extension: &'static str,
         event: &'static str,
     }
@@ -175,6 +180,8 @@ mod imp {
         keys: String,
         atom: i32,
         readers: Vec<Reader>,
+        /// Whether the chord is registered without `MOD_NOREPEAT`.
+        repeats: bool,
     }
 
     /// The host's one hot-key table, taskbar button and launch.
@@ -257,11 +264,10 @@ mod imp {
         }
 
         /// Registers `keys` under `atom`, or says why not.
-        fn register(&self, keys: &str, atom: i32) -> Result<(), Refusal> {
+        fn register(&self, keys: &str, atom: i32, repeat: bool) -> Result<(), Refusal> {
             let (modifiers, key) = self.available_chord(keys)?;
-            let ok = unsafe {
-                RegisterHotKey(std::ptr::null_mut(), atom, modifiers | MOD_NOREPEAT, key)
-            };
+            let modifiers = modifiers | if repeat { 0 } else { MOD_NOREPEAT };
+            let ok = unsafe { RegisterHotKey(std::ptr::null_mut(), atom, modifiers, key) };
             if ok != 0 {
                 return Ok(());
             }
@@ -336,6 +342,26 @@ mod imp {
                 .then(|| String::from_utf16_lossy(&buffer[..(size as usize / 2).saturating_sub(1)]))
         }
 
+        /// Register `chord` again when its readers' repeat changed. If the
+        /// new registration fails, the old one is made again.
+        fn follow_repeat(&self, chord: &mut Chord) -> Result<(), Refusal> {
+            let repeat = chord.readers.iter().any(|r| r.repeat);
+            if repeat == chord.repeats {
+                return Ok(());
+            }
+            unsafe { UnregisterHotKey(std::ptr::null_mut(), chord.atom) };
+            match self.register(&chord.keys, chord.atom, repeat) {
+                Ok(()) => {
+                    chord.repeats = repeat;
+                    Ok(())
+                }
+                Err(reason) => {
+                    let _ = self.register(&chord.keys, chord.atom, chord.repeats);
+                    Err(reason)
+                }
+            }
+        }
+
         /// Whether Settings › Apps › Startup turned the value off: the
         /// first byte of its `StartupApproved` record is odd.
         fn turned_off(&self) -> bool {
@@ -363,34 +389,49 @@ mod imp {
             session: &str,
             id: &str,
             keys: &str,
+            repeat: bool,
             extension: &'static str,
             event: &'static str,
         ) -> Result<(), Refusal> {
             let reader = Reader {
                 session: session.into(),
                 id: id.into(),
+                repeat,
                 extension,
                 event,
             };
             let mut chords = self.chords.borrow_mut();
             if let Some(chord) = chords.iter_mut().find(|c| c.keys == keys) {
                 self.available_chord(keys)?;
-                if !chord
+                // A reader asking again takes its new repeat.
+                let at = chord
                     .readers
                     .iter()
-                    .any(|r| r.session == session && r.id == id)
-                {
-                    chord.readers.push(reader);
+                    .position(|r| r.session == session && r.id == id);
+                let was = match at {
+                    Some(i) => Some(std::mem::replace(&mut chord.readers[i], reader)),
+                    None => {
+                        chord.readers.push(reader);
+                        None
+                    }
+                };
+                if let Err(reason) = self.follow_repeat(chord) {
+                    match at.zip(was) {
+                        Some((i, was)) => chord.readers[i] = was,
+                        None => drop(chord.readers.pop()),
+                    }
+                    return Err(reason);
                 }
                 return Ok(());
             }
             let atom = self.next.get();
-            self.register(keys, atom)?;
+            self.register(keys, atom, repeat)?;
             self.next.set(atom + 1);
             chords.push(Chord {
                 keys: keys.into(),
                 atom,
                 readers: vec![reader],
+                repeats: repeat,
             });
             Ok(())
         }
@@ -403,6 +444,10 @@ mod imp {
                     .retain(|r| !(r.session == session && r.id == id));
                 if chord.readers.is_empty() {
                     unsafe { UnregisterHotKey(std::ptr::null_mut(), chord.atom) };
+                } else {
+                    // On a failure the chord keeps the registration it had,
+                    // which still serves every reader left.
+                    let _ = self.follow_repeat(chord);
                 }
             }
             chords.retain(|c| !c.readers.is_empty());
@@ -415,7 +460,7 @@ mod imp {
             }
             // An atom of its own, given back at once.
             let atom = 0xBFFF;
-            self.register(keys, atom)?;
+            self.register(keys, atom, false)?;
             unsafe { UnregisterHotKey(std::ptr::null_mut(), atom) };
             Ok(())
         }

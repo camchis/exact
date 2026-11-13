@@ -33,12 +33,14 @@ pub struct Login {
 /// the loop's thread.
 pub trait Services {
     /// Register `keys` (an `aria-keyshortcuts` chord) for `session`'s `id`;
-    /// a press raises `extension`'s `event` with `[id, {id, keys}]`.
+    /// a press raises `extension`'s `event` with `[id, {id, keys}]`. With
+    /// `repeat`, a held chord raises a press per keyboard repeat.
     fn register_hotkey(
         &self,
         session: &str,
         id: &str,
         keys: &str,
+        repeat: bool,
         extension: &'static str,
         event: &'static str,
     ) -> Result<(), Refusal>;
