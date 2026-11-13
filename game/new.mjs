@@ -2,7 +2,7 @@
 import { spawnSync } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
 import { chmodSync, cpSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
-import { basename, dirname, relative, resolve } from 'node:path';
+import { basename, dirname, isAbsolute, relative, resolve } from 'node:path';
 import { capturedLockDrift, gameDefaults, gameShells, prepareGame, sdkFetch } from './app/shells.mjs';
 import { cargoEnvironment, lockedMetadata, pathFrom, patchLines } from '../scripts/app.mjs';
 import { PLATFORMS, SDK_CRATES, appCrateName, authoredCrate, copiedBuildScripts, namePlatform, withoutPlatformKeys } from '../scripts/app-shells.mjs';
@@ -1317,13 +1317,77 @@ function rootRefusal(path) {
   return lacks.length ? `${path} has no ${lacks.join(', ')} in [workspace.package], which the linux/ and android/ crates inherit` : null;
 }
 
+/** The Exact checkout an app's exact.mjs names by default (`const path = … ?? "<checkout>"`), or null. */
+const namedCheckout = (text) => /process\.env\.EXACT2 \?\? ("(?:[^"\\]|\\.)*")/.exec(text ?? '')?.[1] ?? null;
+
+/** Write the app's exact.mjs, and say so when the checkout it names changes: `update` names the checkout it runs
+ * from, as main's working tree sees it, so one run in a linked worktree pairs the app with that worktree's checkout,
+ * and nothing else shows it until main's next verb runs against it. */
+function writeCommands(dir, name, options) {
+  const at = resolve(dir, 'exact.mjs'), before = existsSync(at) ? namedCheckout(readFileSync(at, 'utf8')) : null;
+  const text = commandsFor(dir, name, options);
+  writeFileSync(at, text);
+  chmodSync(at, 0o755);
+  const after = namedCheckout(text);
+  return before && after && before !== after ? `exact.mjs now names the Exact checkout ${JSON.parse(after)} (it named ${JSON.parse(before)}; update names the checkout it runs from)` : null;
+}
+
+/** An `@exact/<module>` `file:` dependency an older `exact add` wrote as an absolute path, as `add` writes it now
+ * (`pathFrom`): the absolute one names one checkout's place, and a worktree pair's install reads another's. Only
+ * the dependency fields are read and written, through JSON, keeping the file's indentation; only a real change is said. */
+function packageSpecifiers(dir) {
+  const at = resolve(dir, 'package.json');
+  if (!existsSync(at)) return null;
+  const text = readFileSync(at, 'utf8');
+  let manifest;
+  try { manifest = JSON.parse(text); } catch { return null; }
+  let changed = false;
+  for (const field of ['dependencies', 'devDependencies', 'optionalDependencies']) {
+    const table = manifest[field];
+    if (!table || typeof table !== 'object') continue;
+    for (const [key, spec] of Object.entries(table)) {
+      const short = key.startsWith('@exact/') ? key.slice('@exact/'.length) : null;
+      if (!short || typeof spec !== 'string' || !spec.startsWith('file:') || !isAbsolute(spec.slice(5))) continue;
+      if (!existsSync(resolve(ROOT, 'packages', short))) continue;
+      const now = `file:${pathFrom(dir, resolve(ROOT, 'packages', short))}`;
+      if (now !== spec) { table[key] = now; changed = true; }
+    }
+  }
+  if (!changed) return null;
+  const indent = /^[ \t]+(?=")/m.exec(text)?.[0] ?? 2;
+  writeFileSync(at, JSON.stringify(manifest, null, indent) + (text.endsWith('\n') ? '\n' : ''));
+  return 'package.json (@exact/* paths as exact add writes them; run bun install)';
+}
+
+/** `canvas_jni!` moved from exact-linux to exact-painted (d00e51055): an android crate an older `exact new` wrote
+ * calls it from exact-linux, whose build then fails as "canvas_jni not found in exact_linux". The form that scaffold
+ * wrote, one `exact-linux = { path = "…/host/linux" }`, moves with the call (beside it when the crate uses more of
+ * exact-linux); `updateManifests` then writes the new crate's path. Both edits are decided before either file is
+ * written; any other form, or an existing exact-painted mention, is left to the author, and said, with what to change. */
+function paintedCanvas(dir) {
+  const lib = resolve(dir, 'android/src/lib.rs'), cargo = resolve(dir, 'android/Cargo.toml');
+  const source = existsSync(lib) ? readFileSync(lib, 'utf8') : '';
+  if (!source.includes('exact_linux::canvas_jni!') || !existsSync(cargo)) return null;
+  const toml = readFileSync(cargo, 'utf8');
+  const moved = source.replaceAll('exact_linux::canvas_jni!', 'exact_painted::canvas_jni!');
+  const lines = [...toml.matchAll(/^exact-linux\s*=\s*\{\s*path\s*=\s*("[^"\n]*host\/linux")\s*\}[ \t]*$/gm)];
+  const mentions = toml.match(/exact-linux/g)?.length ?? 0;
+  const left = 'android/src/lib.rs contains exact_linux::canvas_jni!, which moved to exact-painted in d00e51055; update could not safely migrate this dependency arrangement automatically. The canvas_jni migration made no edits; other update steps may still change Cargo.toml. Change the macro reference to exact_painted::canvas_jni! and ensure the relevant dependency table includes exact-painted (host/painted), retaining exact-linux if other code needs it.';
+  if (lines.length !== 1 || mentions !== 1 || toml.includes('exact-painted')) return left;
+  const painted = `exact-painted = { path = ${lines[0][1].replace(/host\/linux"$/, 'host/painted"')} }`;
+  const cargoNow = /exact_linux::/.test(moved) ? toml.replace(lines[0][0], `${lines[0][0]}\n${painted}`) : toml.replace(lines[0][0], painted);
+  writeFileSync(cargo, cargoNow);
+  writeFileSync(lib, moved);
+  return 'android/src/lib.rs and android/Cargo.toml (canvas_jni! is exact-painted\'s)';
+}
+
 function updateApp(dir, name, { without = null, with: platforms = [] } = {}) {
   // A game has no workspace of its own (the bake generates .shells/): its runner and notes are all there is to rewrite.
   if (existsSync(resolve(dir, 'app.contract')) && !existsSync(resolve(dir, 'Cargo.toml')) && gameDefaults(dir)) {
     if (without || platforms.length) throw new Error('update --with and --without: a game\'s hosts are its bake\'s (game/README.md), not platforms of its own');
-    writeFileSync(resolve(dir, 'exact.mjs'), commandsFor(dir, name, {game:true}));
-    chmodSync(resolve(dir, 'exact.mjs'), 0o755);
+    const named = writeCommands(dir, name, {game:true});
     const notes = updateNotes(dir, name, {game:true});
+    if (named) notes.push(named);
     if (editorTasks(dir, {game:true})) notes.push('.vscode/tasks.json');
     let drift = null;
     try {
@@ -1337,10 +1401,12 @@ function updateApp(dir, name, { without = null, with: platforms = [] } = {}) {
   // An app that authored no workspace (LLP 1153 D1): no Cargo file to rewrite; the platforms it ships are app.json's keys,
   // and the verb that builds one regenerates its workspace from them.
   if (!authoredApp(dir)) {
-    writeFileSync(resolve(dir, 'exact.mjs'), commandsFor(dir, name));
-    chmodSync(resolve(dir, 'exact.mjs'), 0o755);
+    const named = writeCommands(dir, name);
     const edits = platformEdits(dir, platforms, without);
     const notes = updateNotes(dir, name);
+    if (named) notes.push(named);
+    const specifiers = packageSpecifiers(dir);
+    if (specifiers) notes.push(specifiers);
     if (editorTasks(dir)) notes.push('.vscode/tasks.json');
     const unmounted = refreshManifestPaths(dir);
     defaultTest(dir);
@@ -1358,8 +1424,7 @@ function updateApp(dir, name, { without = null, with: platforms = [] } = {}) {
   writeFileSync(resolve(dir, 'rust-toolchain.toml'), readFileSync(resolve(ROOT, 'rust-toolchain.toml')));
   mkdirSync(resolve(dir, '.cargo'), { recursive: true });
   writeFileSync(resolve(dir, '.cargo/config.toml'), readFileSync(resolve(ROOT, '.cargo/config.toml')));
-  writeFileSync(resolve(dir, 'exact.mjs'), commandsFor(dir, name));
-  chmodSync(resolve(dir, 'exact.mjs'), 0o755);
+  const namedCheckoutNote = writeCommands(dir, name);
   // `android/` is Android's alone and goes with it. The `linux/` crate serves Linux and Android's headless drive: it goes
   // with Linux unless Android is named; otherwise a platform's keys go and the crate it shares (`apple/`) stays.
   const named = (p) => { try { return p in (JSON.parse(readFileSync(resolve(dir, 'app.json'), 'utf8')).host ?? {}); } catch { return false; } };
@@ -1403,6 +1468,10 @@ function updateApp(dir, name, { without = null, with: platforms = [] } = {}) {
       /"android"/.test(list) ? line : `members = [${[...list.split(',').map(m => m.trim()).filter(Boolean), '"android"'].sort().join(', ')}]`);
   }
   const notes = updateNotes(dir, name);
+  if (namedCheckoutNote) notes.push(namedCheckoutNote);
+  const specifiers = packageSpecifiers(dir), painted = paintedCanvas(dir);
+  if (specifiers) notes.push(specifiers);
+  if (painted) notes.push(painted);
   if (editorTasks(dir)) notes.push('.vscode/tasks.json');
   const unmounted = refreshManifestPaths(dir);
   defaultTest(dir);

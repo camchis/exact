@@ -250,3 +250,86 @@ test('update adds the SQLite provider only after checking the complete root mani
     assert.deepEqual(Bun.TOML.parse(readFileSync(file, 'utf8')), Bun.TOML.parse(original));
   } finally { rmSync(parent, { recursive: true, force: true }); }
 });
+
+test('update moves what an older scaffold wrote: canvas_jni! to exact-painted, absolute @exact paths, and says when the checkout changes', () => {
+  // Beside the checkout, as most apps are: `pathFrom` writes a relative path there (one in another top directory keeps its absolute one).
+  mkdirSync(resolve(root, 'target'), { recursive: true });
+  const parent = mkdtempSync(resolve(root, 'target/exact-older-scaffold-')), dir = resolve(parent, 'notes');
+  try {
+    createApp(dir, { with: ['android'] });
+    const { crates: generated, workspace } = ensureShells(dir);
+    for (const entry of ['Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', '.cargo', ...generated]) cpSync(resolve(workspace, entry), resolve(dir, entry), { recursive: true });
+    rmSync(workspace, { recursive: true, force: true });
+    // An android crate from before d00e51055, and an `@exact/` path from before `add` wrote pathFrom's.
+    const lib = resolve(dir, 'android/src/lib.rs'), cargo = resolve(dir, 'android/Cargo.toml'), pkg = resolve(dir, 'package.json');
+    writeFileSync(lib, readFileSync(lib, 'utf8').replace('exact_painted::canvas_jni!', 'exact_linux::canvas_jni!'));
+    writeFileSync(cargo, readFileSync(cargo, 'utf8').replace(/^exact-painted = (.*)host\/painted(.*)$/m, 'exact-linux = $1host/linux$2'));
+    const manifest = JSON.parse(readFileSync(pkg, 'utf8'));
+    manifest.dependencies = { ...manifest.dependencies, '@exact/motion': `file:${resolve(root, 'packages/motion')}` };
+    writeFileSync(pkg, JSON.stringify(manifest, null, 2) + '\n');
+    // exact.mjs paired with another checkout, as a run in another worktree leaves it.
+    const launcher = resolve(dir, 'exact.mjs');
+    writeFileSync(launcher, readFileSync(launcher, 'utf8').replace(/(process\.env\.EXACT2 \?\? )"[^"]*"/, '$1"/nowhere/exact2"'));
+    const said = createApp(dir, { update: true });
+    assert.match(said, /android\/src\/lib\.rs and android\/Cargo\.toml \(canvas_jni! is exact-painted's\)/);
+    assert.match(said, /package\.json \(@exact\/\* paths as exact add writes them; run bun install\)/);
+    assert.match(said, /exact\.mjs now names the Exact checkout \S+ \(it named \/nowhere\/exact2; update names the checkout it runs from\)/);
+    assert.ok(readFileSync(lib, 'utf8').includes('exact_painted::canvas_jni!(') && !readFileSync(lib, 'utf8').includes('exact_linux::'));
+    const deps = Object.values(Bun.TOML.parse(readFileSync(cargo, 'utf8')).target)[0].dependencies;
+    assert.equal(deps['exact-linux'], undefined);
+    assert.equal(deps['exact-painted'].path, pathFrom(resolve(dir, 'android'), resolve(root, 'host/painted')));
+    assert.equal(JSON.parse(readFileSync(pkg, 'utf8')).dependencies['@exact/motion'], `file:${pathFrom(dir, resolve(root, 'packages/motion'))}`);
+    // A second update has nothing of these left to say.
+    assert.doesNotMatch(createApp(dir, { update: true }), /canvas_jni|@exact\/\* paths|now names the Exact checkout/);
+  } finally { rmSync(parent, { recursive: true, force: true }); }
+});
+
+test('update moves only what it can move whole: package.json through JSON, and any other exact-linux form left and said', () => {
+  mkdirSync(resolve(root, 'target'), { recursive: true });
+  const parent = mkdtempSync(resolve(root, 'target/exact-older-forms-')), dir = resolve(parent, 'notes');
+  try {
+    createApp(dir, { with: ['android'] });
+    const { crates: generated, workspace } = ensureShells(dir);
+    for (const entry of ['Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', '.cargo', ...generated]) cpSync(resolve(workspace, entry), resolve(dir, entry), { recursive: true });
+    rmSync(workspace, { recursive: true, force: true });
+    const lib = resolve(dir, 'android/src/lib.rs'), cargo = resolve(dir, 'android/Cargo.toml'), pkg = resolve(dir, 'package.json');
+    const old = readFileSync(lib, 'utf8').replace('exact_painted::canvas_jni!', 'exact_linux::canvas_jni!');
+    // Compact JSON, and the same pair outside the dependency fields, which is not a dependency to move.
+    const absolute = `file:${resolve(root, 'packages/motion')}`;
+    const manifest = JSON.parse(readFileSync(pkg, 'utf8'));
+    writeFileSync(pkg, JSON.stringify({ ...manifest, dependencies: { ...manifest.dependencies, '@exact/motion': absolute }, overrides: { '@exact/motion': absolute } }));
+    // exact-linux as a table of its own: valid, but not the form an older scaffold wrote, so neither file changes.
+    writeFileSync(lib, old);
+    const linuxPath = JSON.stringify(pathFrom(resolve(dir, 'android'), resolve(root, 'host/linux')));
+    const generatedCargo = readFileSync(cargo, 'utf8');
+    const tabled = `${generatedCargo.replace(/^exact-painted = .*\n/m, '')}\n[target.'cfg(target_os = "android")'.dependencies.exact-linux]\npath = ${linuxPath}\n`;
+    writeFileSync(cargo, tabled);
+    const said = createApp(dir, { update: true });
+    const refusal = 'android/src/lib.rs contains exact_linux::canvas_jni!, which moved to exact-painted in d00e51055; update could not safely migrate this dependency arrangement automatically. The canvas_jni migration made no edits; other update steps may still change Cargo.toml. Change the macro reference to exact_painted::canvas_jni! and ensure the relevant dependency table includes exact-painted (host/painted), retaining exact-linux if other code needs it.';
+    assert.ok(said.includes(refusal), said);
+    assert.equal(readFileSync(lib, 'utf8'), old);
+    assert.ok(readFileSync(cargo, 'utf8').includes('.dependencies.exact-linux]') && !readFileSync(cargo, 'utf8').includes('exact-painted'));
+    const now = JSON.parse(readFileSync(pkg, 'utf8'));
+    assert.equal(now.dependencies['@exact/motion'], `file:${pathFrom(dir, resolve(root, 'packages/motion'))}`);
+    assert.equal(now.overrides['@exact/motion'], absolute);
+    assert.match(said, /package\.json \(@exact\/\* paths as exact add writes them; run bun install\)/);
+    // An exact-painted already there, as a table of its own, is not renamed into a second one.
+    const both = `${generatedCargo.replace(/^exact-painted = .*\n/m, `exact-linux = { path = ${linuxPath} }\n`)}\n[target.'cfg(target_os = "android")'.dependencies.exact-painted]\npath = ${JSON.stringify(pathFrom(resolve(dir, 'android'), resolve(root, 'host/painted')))}\n`;
+    writeFileSync(cargo, both);
+    writeFileSync(lib, old);
+    assert.ok(createApp(dir, { update: true }).includes(refusal));
+    assert.equal(readFileSync(lib, 'utf8'), old);
+    // The migration renamed nothing (other update steps still rewrite paths): exact-linux is still inline, exact-painted is defined once.
+    const after = readFileSync(cargo, 'utf8');
+    assert.match(after, /^exact-linux = \{ path = /m);
+    assert.equal(after.match(/exact-painted/g).length, 1);
+    // A crate that uses more of exact-linux keeps it, and gains exact-painted beside it.
+    writeFileSync(cargo, generatedCargo.replace(/^exact-painted = .*$/m, `exact-linux = { path = ${linuxPath} }`));
+    writeFileSync(lib, old + '\npub use exact_linux::Host as _UsedHere;\n');
+    assert.match(createApp(dir, { update: true }), /android\/src\/lib\.rs and android\/Cargo\.toml \(canvas_jni! is exact-painted's\)/);
+    const deps = Object.values(Bun.TOML.parse(readFileSync(cargo, 'utf8')).target)[0].dependencies;
+    assert.equal(deps['exact-linux'].path, pathFrom(resolve(dir, 'android'), resolve(root, 'host/linux')));
+    assert.equal(deps['exact-painted'].path, pathFrom(resolve(dir, 'android'), resolve(root, 'host/painted')));
+    assert.ok(readFileSync(lib, 'utf8').includes('exact_painted::canvas_jni!(') && readFileSync(lib, 'utf8').includes('exact_linux::Host'));
+  } finally { rmSync(parent, { recursive: true, force: true }); }
+});
