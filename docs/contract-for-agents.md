@@ -1806,9 +1806,13 @@ states would stop their input.
 
 `class=Style` applies literal style values; node attributes win. Conditional
 classes select two named styles with `class=(condition ? A : B)`. Computed values
-go on nodes. There is no selector cascade, dynamic style object, or arbitrary
-class-string composition. A style branch can mix a number and a CSS keyword in
-a property's admitted value space; this does not add general union types.
+go on nodes. Styles can also carry `backgroundMaterial`, `glassGroup` and
+`buttonStyle`. In a conditional class, each prop must be set in both styles or
+neither, unless the node supplies its own value. `backgroundMaterial="none"`
+explicitly removes a material. There is no selector cascade, dynamic style
+object, or arbitrary class-string composition. A style branch can mix a number
+and a CSS keyword in a property's admitted value space; this does not add
+general union types.
 On a number-only row such as `opacity`, a computed branch known to be a string
 is refused at build time even when another branch is numeric.
 
