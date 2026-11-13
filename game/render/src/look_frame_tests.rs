@@ -691,7 +691,7 @@ fn an_entity_is_drawn_when_its_emitter_draws_despite_a_rejected_mesh_or_sprite()
                 visible["reason"]
                     .as_str()
                     .unwrap()
-                    .starts_with("its emitter:"),
+                    .ends_with("its emitter: drawn (drew 1 quads)"),
                 "{visible}"
             );
         }
