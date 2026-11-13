@@ -1566,7 +1566,6 @@ and the Linux headless CPU renderer without claiming display frame timing.
   copied into the run after the build, would let an unchanged deploy reuse them. The
   `exact-filesystem` helper also rebuilds inside each deploy's capture, where its tool
   target sits.
-- **Other `fs.watch` consumers under Bun** (2026-09-23): on this Mac, Bun 1.4.2's `fs.watch` (file and recursive directory) delivered no event in 45 s while `watchFile` polling fired in 2 ms (oven-sh/bun#43870); a Contract save reached the update-lab page 10–40 s late or never. `watchModuleSources` in `host/web/dev.mjs` now polls at 100 ms as well. Still fs.watch-only: `rustOutputWatch` (the `current` pointer; the baker's reply covers the common case), the compiler-input directory watch at `dev.mjs` line ~863 (files there already poll), and `watchStaticTrees` in `serve.mjs` (asset, deck, and shader edits). Same fix or a shared poller.
 
 - LLP 1024 §9 guardrails (Charlie, 2026-09-27): enforce the prop update size budget (a named refusal status) and flag per-frame prop churn in the journal. Neither is enforced yet.
   2026-10-23 (lane q1022/u): Parked. Commit cd3142c3b6 was withdrawn by git revert 266a861210 at the orchestrator's instruction. LLP 1024 §9 supplies no byte limit, and the web did not share the Apple refusal. The only aggregate sizes measured before the withdrawal were synthetic regression inputs: JSON.stringify({value: "é".repeat(32761) + "aa"}) is 65,536 UTF8 bytes; replacing that value with "é".repeat(32762) + "a" is 65,537 bytes. Bun TextEn
