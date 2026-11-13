@@ -1271,13 +1271,6 @@ sits on that list carries the trade it would take.
   the same ImageIO, Core Image and `CALayer.contentsFormat` probes and is
   launched with `xcrun devicectl device process launch --console` on an
   unlocked phone; a person at the phone is needed either way.
-- **The date and place at launch on the remaining hosts** (2026-10-13): finish
-  supplying launch facts before the first settle on Apple, including its content-region
-  host, and in the web host's direct `Host::boot_stored` path. Linux's initial boot
-  uses the display loop's clock zero; its validation, update and development candidates
-  now boot with the current date and complete place, keeping the carried clock.
-  The render host's date is already the Unix render timestamp passed to `boot_at`
-  (LLP 1048.000 D5). It has no viewer place to supply; the page reports its own.
 - **Gaps the Bluesky clone's workers hit** (bsky5, b28–b31, 2026-10-12), as reported:
   - **A JS-target refusal fails the web build only** (Linux; Charlie,
     2026-10-22, C and D). Make `bun exact.mjs contract build` run the JS
