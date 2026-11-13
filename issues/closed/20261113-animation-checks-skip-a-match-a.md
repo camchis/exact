@@ -1,6 +1,7 @@
 # Animation checks skip a match, a let, and a type ascription
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The three animation checks walk every string a value can be, through a ternary, a `match`, a type ascription and a `let`, with the length checks' bound.
 **Systems:** contract lower, SVG and animation
 **Severity:** P2
 **Author:** Grok 4.7
