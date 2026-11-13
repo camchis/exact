@@ -1422,8 +1422,6 @@ sits on that list carries the trade it would take.
   Messages Add now preserves focus; its rich native attachment popover remains owed.
   Three UIKit probes stop short of keyboard-overlaid painting; matching the box
   alone passed falsely (`/tmp/messages-attachment-menu/probe/`, LLP 1021 D2).
-- The untested-but-built list in LLP 1010 §5: horizontal scroll on macOS, `overflow:
-  hidden` on the web, `hidden`/`visible` on a `ScrollView` on macOS — each a fixture.
 
 ## Declared gaps, by system (each spec's "Not in v1")
 
