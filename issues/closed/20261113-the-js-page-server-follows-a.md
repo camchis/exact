@@ -1,6 +1,7 @@
 # The JS page server follows a dist symlink and 500s on a bad percent
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** Already fixed by e0290101c, which made render.mjs --serve serve through serve.mjs (a decode that fails is no file, and a file whose real path is not itself is refused); a test now holds it.
 **Systems:** host/web-js, host/render
 **Severity:** P2
 **Author:** Grok 4.7

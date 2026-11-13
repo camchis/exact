@@ -838,6 +838,13 @@ test('web-build --out writes a site that serve.mjs serves by the hosting rule, r
     expect([file.headers['cache-control'], /^"[\w-]+"$/.test(file.headers.etag ?? '')]).toEqual(['no-cache', true]);
     expect(await get('/item/7')).toMatchObject({ status: 200, body: expect.not.stringContaining('The note, rendered.') });
     expect((await get('/no/such/route')).status).toBe(404);
+    // A bad percent escape is no file, and a link in the build to a file outside it is not served (render.mjs
+    // --serve serves through the same `serve`).
+    writeFileSync(resolve(dir, 'outside.txt'), 'outside the build\n');
+    symlinkSync(resolve(dir, 'outside.txt'), resolve(out, 'leak.js'));
+    const statuses = await Promise.all(['/%', '/%ZZ', '/leak.js'].map(async (path) => (await fetch(`http://127.0.0.1:${serve.port}${path}`)).status));
+    expect(statuses).toEqual([404, 404, 404]);
+    rmSync(resolve(out, 'leak.js'));
     // Asked as curl asks (any type, or no Accept), a page rendered per request is sent as to a browser; the client's
     // route is no such page, and a request for another type gets the 404 page.
     const asked = async (path, headers) => { const r = await fetch(`http://127.0.0.1:${serve.port}${path}`, { headers }); return [r.status, (await r.text()).includes(`>${path}<`)]; };
