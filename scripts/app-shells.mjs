@@ -173,6 +173,7 @@ include!(concat!(env!("OUT_DIR"), "/host.rs"));
   if (kind === 'linux') return {
     'Cargo.toml': `${header(`[[bin]]\nname = "${name}-linux"\npath = "src/main.rs"`)}ibex2-sqlite = ${dep('vendor/ibex/crates/ibex2-sqlite')}
 exact-logic = ${dep('logic')}
+exact-linux = ${dep('host/linux')}
 exact-painted = ${dep('host/painted')}
 exact-js = ${dep('js')}
 
@@ -188,7 +189,7 @@ include!(concat!(env!("OUT_DIR"), "/packages.rs"));
 include!(concat!(env!("OUT_DIR"), "/hatches.rs"));
 fn main() {
     let composed = exact_painted::Composed { hatches: exact_hatches(), packages: exact_packages() };
-    std::process::exit(exact_painted::run_composed::<AppData>(PLAN, COMPAT, composed));
+    std::process::exit(exact_linux::run_composed::<AppData>(PLAN, COMPAT, composed));
 }
 `,
   };

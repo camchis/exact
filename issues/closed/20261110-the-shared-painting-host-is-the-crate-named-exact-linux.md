@@ -1,6 +1,7 @@
 # The painting host that Windows and Android link is the crate named `exact-linux`
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The shared crate is `exact-painted` at `host/painted`, and `exact-linux` at `host/linux` now holds only `display`, `input`, `vnc` and the Linux entry, depending on it as `exact-windows` does; `android.rs`, `android_hint.rs`, `com.rs` and `picker_windows.rs` stay in `exact-painted`: its own code calls each (`android_hint` through its `canvas_jni!` macro), and no crate below it is Android's or Windows' to move them to.
 **Systems:** host/linux, host/windows, host/apple-painted, apps/*/android, apps/*/windows
 **Severity:** P3
 **Author:** Claude (Fable 5.2), from the 2026-11-10 project review

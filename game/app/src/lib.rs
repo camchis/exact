@@ -133,7 +133,7 @@ fn bake_source<D: contract::DataSource>(
         manifest.windows_window().unwrap_or_else(|e| panic!("app.json: {e}"))
     );
     let linux = format!(
-        "fn main() {{ std::process::exit(exact_painted::run_composed::<AppData>(PLAN, COMPAT, {composed})); }}"
+        "fn main() {{ std::process::exit(exact_linux::run_composed::<AppData>(PLAN, COMPAT, {composed})); }}"
     );
     let host = match platform {
         "web" => "exact_web::host!(AppData, PLAN, COMPAT, app_data);",

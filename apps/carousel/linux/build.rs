@@ -29,7 +29,7 @@ fn main() {
         .unwrap_or_else(|e| panic!("compatibility id: {e}"));
     std::fs::write(out_dir.join("compat.json"), compat.to_json()).unwrap();
     let host = if compat.inputs["store"]["L"] == "0" {
-        "exact_painted"
+        "exact_linux"
     } else {
         "exact_linux_update"
     };

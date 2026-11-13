@@ -16,7 +16,7 @@
 //   cannot run, with Zig as the C compiler, as the async lane's tier 2
 //   checks the Linux apps and Windows Desk: two crates added to the fixture,
 //   each the fixture's plan and the build's composition of the package with
-//   no data module, one over `exact_painted::run_composed` for
+//   no data module, one over `exact_linux::run_composed` for
 //   `x86_64-unknown-linux-gnu` (compiling `system.rs`), and one over
 //   `exact_windows::run_composed` for x64 (`x86_64-pc-windows-gnu`) and
 //   ARM64 (`aarch64-pc-windows-gnullvm`) (compiling `windows.rs`).
@@ -80,7 +80,7 @@ if (cross) {
   // `packages.rs` is what composes `linux/lib.rs`), so the package's Rust is compiled for each target.
   const name = JSON.parse(readFileSync(join(app, 'linux/Cargo.toml'), 'utf8').match(/^name = (".*")$/m)[1]).replace(/-linux$/, '');
   const exact2 = readFileSync(join(app, 'linux/Cargo.toml'), 'utf8').match(/^exact-painted = \{ path = "(.*)\/host\/painted" \}$/m)[1];
-  const run_composed = { linux: 'exact_painted::run_composed::<NoData>(PLAN, COMPAT, composed)', windows: 'exact_windows::run_composed::<NoData>("Fixture", Default::default(), PLAN, COMPAT, composed)' };
+  const run_composed = { linux: 'exact_linux::run_composed::<NoData>(PLAN, COMPAT, composed)', windows: 'exact_windows::run_composed::<NoData>("Fixture", Default::default(), PLAN, COMPAT, composed)' };
   for (const os of ['linux', 'windows']) {
     const dir = join(app, `check-${os}`);
     mkdirSync(join(dir, 'src'), { recursive: true });
@@ -94,7 +94,7 @@ build = "build.rs"
 [dependencies]
 exact-painted = { path = "${exact2}/host/painted" }
 exact-runner = { path = "${exact2}/runner" }
-${os === 'windows' ? `exact-windows = { path = "${exact2}/host/windows" }\n` : ''}
+${os === 'windows' ? `exact-windows = { path = "${exact2}/host/windows" }\n` : `exact-linux = { path = "${exact2}/host/linux" }\n`}
 [build-dependencies]
 exact-js-bake = { path = "${exact2}/js/bake" }
 `);

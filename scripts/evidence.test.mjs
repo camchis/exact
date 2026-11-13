@@ -80,6 +80,7 @@ test.each([
   ['host/apple-painted/src/lib.rs', ['macos']],
   ['host/web-capabilities/src/lib.rs', ['web']],
   ['host/web-geometry/src/lib.rs', ['web']],
+  ['host/linux/src/display.rs', ['linux']],
   ['host/linux-update/src/lib.rs', ['linux']],
   ['host/painted/src/presenter.rs', ['linux', 'windows', 'android']],
   ['host/ink/src/lib.rs', ['linux', 'windows', 'android']],

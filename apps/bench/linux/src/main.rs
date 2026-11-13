@@ -17,5 +17,5 @@ fn main() {
         packages: exact_packages(),
         ..Default::default()
     };
-    std::process::exit(exact_painted::run_composed::<AppData>(PLAN, COMPAT, composed));
+    std::process::exit(exact_linux::run_composed::<AppData>(PLAN, COMPAT, composed));
 }

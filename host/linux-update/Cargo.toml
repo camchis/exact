@@ -7,6 +7,7 @@ license.workspace = true
 publish = false
 
 [dependencies]
+exact-linux = { path = "../linux" }
 exact-painted = { path = "../painted" }
 exact-runner = { path = "../../runner" }
 exact-update = { path = "../../update" }

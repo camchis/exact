@@ -83,8 +83,8 @@ mod svg_hit;
 mod tabs;
 #[cfg(windows)]
 mod windows_field;
-#[cfg(any(target_os = "linux", all(test, unix)))]
-pub(crate) use display_frame::SubmittedFrame;
+#[cfg(target_os = "linux")]
+pub use display_frame::SubmittedFrame;
 #[path = "content_region/presenter.rs"]
 mod content_region;
 #[cfg(test)]
@@ -782,6 +782,24 @@ impl<D: DataSource> Presenter<D> {
     /// The focused input.
     pub fn focus(&self) -> Option<ViewId> {
         self.focus
+    }
+
+    /// The binary's `compat.json` (LLP 1030 D3a).
+    pub fn compat(&self) -> &str {
+        &self.compat
+    }
+
+    /// How many hosts this presenter has had: a frame sampler starts over
+    /// when another replaces the one it measured (LLP 1079 D3).
+    pub fn hosts(&self) -> u64 {
+        self.hosts
+    }
+
+    /// The display's frame period changed to `ms`: every module loaded now
+    /// and later is given it (`Frame::period_ms`, LLP 1009).
+    #[cfg(any(target_os = "linux", target_os = "android"))]
+    pub fn set_frame_period(&mut self, ms: f64) {
+        self.surfaces.period(ms);
     }
 
     /// Paint again at the next frame (a host whose surface came back).

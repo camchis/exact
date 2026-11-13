@@ -52,25 +52,22 @@ struct Picture {
 /// The pending pixel owner. ACK consumes its metadata even if a caller retains
 /// the pixel Arc for VNC, so acknowledged paragraph history cannot accumulate.
 #[cfg(any(target_os = "linux", target_os = "android", test))]
-pub(crate) struct SubmittedFrame {
+pub struct SubmittedFrame {
     pub(crate) pixels: Arc<Pixmap>,
     identity: Rc<Identity>,
     picture: RefCell<Option<Picture>>,
 }
-#[cfg(all(test, unix))]
+#[cfg(target_os = "linux")]
 impl SubmittedFrame {
-    pub(crate) fn fixture(value: u8) -> Self {
-        let mut pixels = Pixmap::new(1, 1).unwrap();
-        pixels.data_mut()[0] = value;
-        Self {
-            pixels: Arc::new(pixels),
-            identity: Rc::new(Identity {
-                origin: Rc::new(()),
-                succeeded: true,
-                activatable: true,
-            }),
-            picture: RefCell::new(None),
-        }
+    /// The frame's pixels, which a VNC client may keep after the display has acknowledged it.
+    pub fn pixels(&self) -> &Arc<Pixmap> {
+        &self.pixels
+    }
+}
+#[cfg(target_os = "linux")]
+impl AsRef<Pixmap> for SubmittedFrame {
+    fn as_ref(&self) -> &Pixmap {
+        &self.pixels
     }
 }
 
@@ -189,7 +186,7 @@ impl<D: DataSource> Presenter<D> {
     /// Direct DRM uses a fixed zero-origin surface. A different extent or
     /// scale needs a carrier-provided mapping; never guess from live layout C.
     #[cfg(target_os = "linux")]
-    pub(crate) fn display_input_mapping(&self, viewport: (f32, f32), scale: f32) -> bool {
+    pub fn display_input_mapping(&self, viewport: (f32, f32), scale: f32) -> bool {
         !self.display.active
             || self.display.witness().is_some_and(|a| {
                 a.viewport.0.to_bits() == viewport.0.to_bits()
@@ -198,8 +195,10 @@ impl<D: DataSource> Presenter<D> {
             })
     }
 
+    /// The frame to submit to the display, painted if it is dirty; `None`
+    /// while an earlier one is still pending.
     #[cfg(any(target_os = "linux", target_os = "android", test))]
-    pub(crate) fn display_frame(&mut self) -> Option<SubmittedFrame> {
+    pub fn display_frame(&mut self) -> Option<SubmittedFrame> {
         if self.display.blocked() {
             return None;
         }
@@ -290,8 +289,9 @@ impl<D: DataSource> Presenter<D> {
         })
     }
 
+    /// The display has shown `frame`: whether it was the one pending.
     #[cfg(any(target_os = "linux", target_os = "android", test))]
-    pub(crate) fn display_complete(&mut self, frame: &SubmittedFrame) -> bool {
+    pub fn display_complete(&mut self, frame: &SubmittedFrame) -> bool {
         if !self
             .display
             .pending

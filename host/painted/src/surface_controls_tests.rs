@@ -808,30 +808,20 @@ fn rejected_key_does_not_gain_ownership_and_duplicate_release_is_not_forwarded()
     done(p, path);
 }
 
-#[cfg(target_os = "linux")]
+/// W, A, S and D pressed, repeated and released, as the Linux host's evdev
+/// keyboard reports them (`input.rs` there): each release reaches the canvas
+/// that took the press, though the focus has moved to the editor.
 #[test]
-fn evdev_wasd_edges_reach_canvas_and_release_after_focus_moves() {
-    use crate::input::{InputEvent, Keyboard};
+fn wasd_edges_reach_canvas_and_release_after_focus_moves() {
     let (mut p, path) = fixture();
     let raw = find(&p, "raw");
     let editor = find(&p, "editor");
-    let mut keyboard = Keyboard::default();
-    for physical in [17, 30, 31, 32] {
+    for (code, key) in [("KeyW", "w"), ("KeyA", "a"), ("KeyS", "s"), ("KeyD", "d")] {
         p.focus = Some(raw);
-        for value in [1, 2, 0] {
-            if value == 0 {
+        for (down, repeat) in [(true, false), (true, true), (false, false)] {
+            if !down {
                 p.focus = Some(editor);
             }
-            let InputEvent::Key {
-                code,
-                shift,
-                down,
-                repeat,
-            } = keyboard.event(physical, value, None).unwrap()
-            else {
-                panic!("key event");
-            };
-            let (code, key) = crate::input::key(code, shift).unwrap();
             p.hardware_key(code, key, down, repeat);
             assert_eq!(last_input(&p).2["down"], down);
             assert_eq!(last_input(&p).2["code"], code);

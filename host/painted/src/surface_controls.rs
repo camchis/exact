@@ -1007,7 +1007,9 @@ impl<D: DataSource> Presenter<D> {
         })
     }
 
-    pub(crate) fn dispatch_press(&mut self, target: ViewId, now_ms: f64, pointer: bool) {
+    /// Press `target` as its activation does at `now_ms`: by a pointer, or
+    /// (`pointer` false) by a key, which keeps a surviving button focused.
+    pub fn dispatch_press(&mut self, target: ViewId, now_ms: f64, pointer: bool) {
         self.disabled_blur.clear();
         let row = self.capture_split_row(target);
         // Capture ancestry before the handler can remove its button. Pointer

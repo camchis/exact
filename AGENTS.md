@@ -185,8 +185,9 @@ section binds (`rules/RULES.md`, "Agents").
   socket through URLSession, wait on the wall clock or launch Bun, Swift or a nested
   cargo build are `async lane:`, and its Swift is the XCTests) and the native
   request executor the Apple, Linux and render hosts share (`exact-executor`). The
-  others (`exact-web-js`, `exact-web-capabilities`, `exact-painted`, `exact-windows`,
-  `exact-render`, …), `js/`, `gpu/` and most apps are
+  others (`exact-web-js`, `exact-web-capabilities`, `exact-painted` (the painted host
+  that `exact-linux`, `exact-windows` and Android's reader present), `exact-render`, …),
+  `js/`, `gpu/` and most apps are
   not tested by it (the sixth check compiles them, their tests too, and runs none),
   and the async lane reports a failing test only after the push. When you touch one, or
   what its tests read, run its tests before landing (`bun scripts/affected.mjs` names

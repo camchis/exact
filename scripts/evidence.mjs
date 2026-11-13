@@ -177,7 +177,7 @@ export function hostsTouched(paths, app) {
       if (p === 'host/executor/src/process_off.rs') hosts = ['web', 'ios', 'tvos', 'windows', 'android'];
       else if (/^host\/executor\/src\/process(?:_|\.)/.test(p)) hosts = ['web', 'macos', 'linux'];
     } else if (local === null && ['raster', 'svg-raster'].includes(directory)) hosts = [...apple, ...linux];
-    else if (local === null && directory === 'linux-update') hosts = ['linux'];
+    else if (local === null && ['linux', 'linux-update'].includes(directory)) hosts = ['linux'];
     else if (local === null && ['painted', 'ink'].includes(directory)) hosts = macUses(`exact-${directory}`) ? ['macos', ...linux] : linux;
     else if (local === null && directory === 'listen') hosts = ['macos', 'linux', 'android'];
     else if (local === null && directory === 'render') hosts = ['web'];

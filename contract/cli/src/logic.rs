@@ -97,7 +97,7 @@ pub fn native_storage_constructor(
 }
 
 /// A Linux app's whole `entry.rs`: [`rust_entry`], its `launch_parts()`, its
-/// `hatches` and a `main` that runs the parts before `host` (`exact_painted` or
+/// `hatches` and a `main` that runs the parts before `host` (`exact_linux` or
 /// `exact_linux_update`) starts with `run` (both from
 /// `native::rust_hatch_entry`). Run from the app's Linux build script.
 pub fn linux_entry(

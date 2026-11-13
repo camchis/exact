@@ -35,7 +35,7 @@ pub struct Snap {
 /// Where a wheel would have put a scroller unsnapped, and where it put it.
 pub(super) type WheelFree = ((f32, f32), (f32, f32));
 
-/// A browser's wheel notch, in points (`crate::input::LINE`): ticks that add
+/// A browser's wheel notch, in points (the Linux host's `input::LINE`): ticks that add
 /// up to one are a flick.
 const WHEEL_NOTCH: f32 = 40.0;
 

@@ -1,5 +1,5 @@
 //! Optional Linux delivery composition (LLP 1030 D4).
-//! A binary-only app calls `exact_painted::run`; an update-capable app calls this crate.
+//! A binary-only app calls `exact_linux::run`; an update-capable app calls this crate.
 #![deny(missing_docs)]
 mod store;
 use exact_painted::delivery::{Selection, Store};
@@ -13,7 +13,7 @@ pub fn run<D: DataSource + Default>(baked: &[u8], compat: &str) -> i32 {
 }
 
 /// [`run`] with the app's hatches (LLP 1075.003.000.001 §5), as
-/// `exact_painted::run_with_hatches` takes them.
+/// `exact_linux::run_with_hatches` takes them.
 pub fn run_with_hatches<D: DataSource + Default, H: exact_painted::Hatches>(
     baked: &[u8],
     compat: &str,
@@ -26,7 +26,7 @@ pub fn run_with_hatches<D: DataSource + Default, H: exact_painted::Hatches>(
     run_composed::<D>(baked, compat, composed)
 }
 
-/// [`run`] with what the app's build composed, as `exact_painted::run_composed`
+/// [`run`] with what the app's build composed, as `exact_linux::run_composed`
 /// takes it.
 pub fn run_composed<D: DataSource + Default>(
     baked: &[u8],
@@ -62,7 +62,7 @@ fn run_installed<D: DataSource + Default>(
         Ok(updates) => config.use_updates(Box::new(updates), baked),
         Err(error) => eprintln!("exact update: {error}"),
     }
-    exact_painted::app::run_config::<D>(&mut config, started)
+    exact_linux::run_config::<D>(&mut config, started)
 }
 
 impl Store for Updates {

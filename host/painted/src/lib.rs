@@ -1,20 +1,22 @@
-//! The Linux host.
+//! The painted host: what Linux, Windows and Android's reader share.
 //!
-//! @ref LLP 1015 (Linux host v1)
+//! @ref LLP 1015 (Linux host v1, where it began)
 //! @ref LLP 1001 §5–6 (layout is a host call; text measurement is injected)
 //! @ref LLP 1002 D2, §4 (every host but the web runs `exact-motion`)
 //!
-//! The third host and the first that paints. The runner and kernel run
-//! natively; after every commit the host lays the tree out with the
-//! kernel's own layout (Taffy, measuring text with Parley), seeks the
-//! motion engine to the app's clock, and the painter draws the kernel tree
-//! itself — vello on the GPU, tiny-skia on the CPU where there is none —
-//! **the kernel is the display list**: no batch, no mirror, no view tree of
-//! the platform's, because the platform has none to offer. The pixels go to DRM/KMS dumb buffers with evdev input, or
-//! into a buffer with no display at all, which is how the host is tested:
-//! the agent API (LLP 1012) over stdio, a screenshot, a smoke run — on a
-//! fleet Linux box with no GPU, or on macOS in the seconds-loop. Pure Rust
-//! end to end; no system library is linked.
+//! The host that paints. The runner and kernel run natively; after every
+//! commit the host lays the tree out with the kernel's own layout (Taffy,
+//! measuring text with Parley), seeks the motion engine to the app's clock,
+//! and the painter draws the kernel tree itself — vello on the GPU,
+//! tiny-skia on the CPU where there is none — **the kernel is the display
+//! list**: no batch, no mirror, no view tree of the platform's. Which of a
+//! platform's views it takes where it has some is decided per platform
+//! (LLP 1115.004 for Windows, LLP 1115.001 for Android). The pixels go to a
+//! platform's host (`exact-linux`'s display, `exact-windows`' window, the
+//! Android reader in `canvas`), or into a buffer with no display at all,
+//! which is how the host is tested: the agent API (LLP 1012) over stdio, a
+//! screenshot, a smoke run — on a fleet Linux box with no GPU, or on macOS
+//! in the seconds-loop. Pure Rust end to end; no system library is linked.
 //!
 //! - [`text`] — Parley: one paragraph cache answers measure and paint.
 //! - [`paint`] — the painter: one walk of the tree, every box recorded,
@@ -35,9 +37,7 @@
 //! - [`journal`] — the event journal launch parts subscribe to: startup,
 //!   custom events, errors.
 //! - [`launch_marks`] — startup timestamps for the display path.
-//! - [`app`] — the entry: the environment, headless or display.
-//! - [`display`], [`input`], [`vnc`] (Linux) — KMS dumb buffers, evdev, and
-//!   the screen over RFB with a client's pointer and keys as input.
+//! - [`app`] — the environment read once, the boot and the headless run.
 
 #![deny(unsafe_code)]
 #![deny(missing_docs)]
@@ -60,11 +60,6 @@ pub mod desktop;
 // The packages' own Rust names this crate so; `desktop_tests.rs` compiles it here.
 #[cfg(test)]
 extern crate self as exact_painted;
-#[cfg(target_os = "linux")]
-pub mod display;
-#[cfg(all(test, unix, not(target_os = "linux")))]
-#[path = "display/flip.rs"]
-mod display_flip;
 mod doc_watch;
 pub mod executor;
 pub mod fetch;
@@ -79,8 +74,6 @@ pub mod hatches;
 pub mod host;
 pub mod image;
 pub mod ink;
-#[cfg(target_os = "linux")]
-pub mod input;
 pub mod journal;
 mod kept;
 pub mod launch_marks;
@@ -106,11 +99,6 @@ pub mod text;
 #[cfg(any(target_os = "android", test))]
 #[path = "canvas/travel.rs"]
 mod travel;
-#[cfg(target_os = "linux")]
-pub mod vnc;
-#[cfg(all(test, unix, not(target_os = "linux")))]
-#[path = "vnc/auth.rs"]
-mod vnc_auth;
 mod wake;
 mod zone;
 
@@ -121,7 +109,7 @@ pub fn set_event_waker(waker: Option<std::sync::Arc<dyn Fn() + Send + Sync>>) {
     wake::install(waker);
 }
 
-pub use app::{run, run_composed, run_with_hatches, Composed};
+pub use app::Composed;
 pub use hatches::Hatches;
 pub use host::{Host, HostError};
 pub use presenter::Presenter;

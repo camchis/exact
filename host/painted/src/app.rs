@@ -1,6 +1,7 @@
 //! The app's entry: the environment read once, then one of three ways to
 //! run — the agent API over stdio, a headless frame (a smoke run or a
-//! screenshot), or the display.
+//! screenshot), or a platform's display (`exact-linux`'s DRM/KMS loop,
+//! `exact-windows`' window).
 //!
 //! @ref LLP 1015 §5–§6
 //!
@@ -687,47 +688,6 @@ pub(crate) fn boot_presenter_with_painter<D: DataSource + Default>(
     }
 }
 
-/// Run a Contract app without application data, sharing its compiled host.
-pub fn run_empty(baked: &[u8], compat: &str) -> i32 {
-    run::<()>(baked, compat)
-}
-
-/// Run the app: the process's exit code. `compat` is the binary's
-/// `compat.json` (LLP 1030 D3a), which the `delivery` resource answers from.
-pub fn run<D: DataSource + Default>(baked: &[u8], compat: &str) -> i32 {
-    run_composed::<D>(baked, compat, Composed::default())
-}
-
-/// [`run`] with the app's hatches (LLP 1075.003.000.001 §5): `H` is the one
-/// type its `modules/linux` names, and `words` the hatch words `app.json`
-/// gives this platform. Nothing of `H` is made before the first frame is
-/// presented.
-pub fn run_with_hatches<D: DataSource + Default, H: crate::hatches::Hatches>(
-    baked: &[u8],
-    compat: &str,
-    words: &'static [&'static str],
-) -> i32 {
-    let hatches = Some(crate::hatches::install::<H>(words));
-    run_composed::<D>(
-        baked,
-        compat,
-        Composed {
-            hatches,
-            ..Default::default()
-        },
-    )
-}
-
-/// [`run`] with what the app's build composed: its hatches, if it has
-/// any, and its packages' Linux implementations (`crate::package`).
-pub fn run_composed<D: DataSource + Default>(
-    baked: &[u8],
-    compat: &str,
-    composed: Composed,
-) -> i32 {
-    run_composed_with::<D>(baked, compat, None, composed)
-}
-
 /// What an app's build composes into its host beside the plan.
 #[derive(Default)]
 pub struct Composed {
@@ -737,22 +697,12 @@ pub struct Composed {
     pub packages: Vec<crate::package::Entry>,
 }
 
-/// Launch an explicitly registered consumer using the ordinary environment,
-/// receipt and store preflight. No generic worker or authoring schema is added.
-pub fn run_with_content_region<D: DataSource + Default>(
-    baked: &[u8],
-    compat: &str,
-    region: crate::content_region::ContentRegionRegistration,
-) -> i32 {
-    run_composed_with::<D>(baked, compat, Some(region), Composed::default())
-}
-
 static ROW_REUSE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 /// Whether the runners this process boots rebind list rows to new items
 /// (LLP 1078): `EXACT_ROW_REUSE` (`1` on, `0` off), else `default`. This
 /// host resets what it keeps by view for every renewed one.
-pub(crate) fn row_reuse_from_env(default: bool) {
+pub fn row_reuse_from_env(default: bool) {
     let on = std::env::var("EXACT_ROW_REUSE").map_or(default, |v| v != "0");
     ROW_REUSE.store(on, std::sync::atomic::Ordering::Relaxed);
 }
@@ -760,34 +710,6 @@ pub(crate) fn row_reuse_from_env(default: bool) {
 /// What [`row_reuse_from_env`] decided.
 pub(crate) fn row_reuse() -> bool {
     ROW_REUSE.load(std::sync::atomic::Ordering::Relaxed)
-}
-
-fn run_composed_with<D: DataSource + Default>(
-    baked: &[u8],
-    compat: &str,
-    region: Option<crate::content_region::ContentRegionRegistration>,
-    composed: Composed,
-) -> i32 {
-    row_reuse_from_env(false);
-    if print_baked_receipt(compat) {
-        return 0;
-    }
-    if let Err(why) = exact_runner::delivery::refuse_analysis(compat) {
-        eprintln!("exact: {why}");
-        return 1;
-    }
-    if exact_runner::Delivery::default().with_compat(compat).store != '0' {
-        eprintln!(
-            "exact: the baked store level requires the delivery adapter; regenerate the app entry"
-        );
-        return 1;
-    }
-    let started = Instant::now();
-    let mut config = Config::from_env(baked, compat);
-    config.content_region = region;
-    config.hatches = composed.hatches;
-    config.packages = composed.packages;
-    run_config::<D>(&mut config, started)
 }
 
 /// Apply the baked development boundary before a carrier starts worker threads.
@@ -859,26 +781,6 @@ pub fn show_neutral_look() {
 /// specimen door.
 pub fn show_material_look() {
     exact_kernel::style::metrics::set_column(exact_kernel::style::metrics::Column::Material);
-}
-
-/// Run a configured app, optionally composed with a delivery adapter.
-pub fn run_config<D: DataSource + Default>(config: &mut Config, started: Instant) -> i32 {
-    if let Err(why) = exact_runner::delivery::refuse_analysis(&config.compat) {
-        eprintln!("exact: {why}");
-        return 1;
-    }
-    show_neutral_look();
-    if config.headless() {
-        return run_headless::<D>(config, started, None);
-    }
-    #[cfg(target_os = "linux")]
-    {
-        crate::display::run::<D>(config, started)
-    }
-    #[cfg(not(target_os = "linux"))]
-    {
-        1
-    }
 }
 
 /// Run the shared headless startup and agent loop with the carrier's clipboard.
@@ -1169,13 +1071,6 @@ mod tests {
                 expected
             );
         }
-    }
-    #[test]
-    fn a_core_only_entry_refuses_an_update_capable_compatibility_record() {
-        assert_eq!(
-            run::<caltrain_data::Caltrain>(b"not read", r#"{"inputs":{"store":{"L":"A"}}}"#),
-            1
-        );
     }
     #[test]
     fn a_dev_plan_locator_stands_a_persisted_selection_aside() {

@@ -188,7 +188,7 @@ const CONTAINERS = new Set(['apps', 'examples', 'packages', 'host']);
 const PLATFORMS = {
   web: ['host/web', 'host/web-js', 'host/web-capabilities', 'host/web-geometry'],
   apple: ['host/apple', 'host/apple-painted', 'host/apple-update'],
-  linux: ['host/painted', 'host/linux-update', 'host/ink', 'host/svg-raster'],
+  linux: ['host/linux', 'host/painted', 'host/linux-update', 'host/ink', 'host/svg-raster'],
   windows: ['host/windows'], android: ['host/android'], terminal: ['host/terminal'],
 };
 /** A platform's name as a test says it, or as a flag (`--ios`). */

@@ -1124,6 +1124,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "exact-linux"
+version = "0.1.0"
+dependencies = [
+ "des",
+ "drm",
+ "evdev",
+ "exact-painted",
+ "exact-runner",
+ "getrandom 0.3.4",
+ "libc",
+ "tiny-skia",
+]
+
+[[package]]
 name = "exact-listen"
 version = "0.1.0"
 dependencies = [
@@ -1187,9 +1201,6 @@ dependencies = [
  "base64 0.22.1",
  "chrono",
  "chrono-tz",
- "des",
- "drm",
- "evdev",
  "exact-canvas",
  "exact-color",
  "exact-data",
@@ -1555,6 +1566,7 @@ name = "forest-linux"
 version = "0.1.0"
 dependencies = [
  "exact-game-app",
+ "exact-linux",
  "exact-logic",
  "exact-painted",
  "exact-runner",

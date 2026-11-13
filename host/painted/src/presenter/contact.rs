@@ -258,7 +258,8 @@ impl<D: DataSource> Presenter<D> {
         let (key, box_) = c.feedback.as_ref()?;
         box_.contains(c.position.0, c.position.1).then_some(*key)
     }
-    pub(crate) fn contact_position(&self) -> Option<(f32, f32)> {
+    /// Where the held contact is, if one is held.
+    pub fn contact_position(&self) -> Option<(f32, f32)> {
         (self.contact.as_ref().map(|c| c.position))
             .or_else(|| self.stage_contact().map(|(at, _)| at))
     }
