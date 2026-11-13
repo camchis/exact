@@ -249,3 +249,76 @@ fn a_header_whose_secret_is_absent_sends_nothing() {
         assert_eq!(r.derive("ghCode"), Some(&Value::str("refused")));
     }
 }
+
+const MIXED: &str = r##"shape Current
+  temperature_2m: number
+
+shape Ack
+  id: string
+
+source weather(place: string) as shape Current
+  url "https://api.example.test/forecast?place={place}"
+  pointer "/current"
+
+source save(title: string) as shape Ack
+  url "https://api.example.test/items"
+  method "POST"
+  body json
+
+component App
+  resource now = weather("here") as shape Current
+  resource notes = loadNotes() as shape string[] else empty()
+  mutation saved as shape Ack queue
+  action add
+    send saved = save("Milk")
+  view
+    text `${now.temperature_2m} ${notes.length}`
+"##;
+
+/// A data module that has not loaded, and answers nothing when asked.
+struct Loading;
+
+impl DataSource for Loading {
+    fn query(&mut self, source: &str, _: &[Value]) -> Result<Value, DataError> {
+        Err(DataError::Unavailable(source.into()))
+    }
+    fn ready(&self) -> bool {
+        false
+    }
+}
+
+/// In an app with a data module too, a declared source asks at once: no
+/// module answers it, so none it waits for (LLP 1162.001 D7). The module's
+/// own resource waits for it, as before.
+#[test]
+fn a_declared_source_does_not_wait_for_the_data_module() {
+    let mut r = Runner::boot(
+        contract::compile(MIXED).unwrap(),
+        Loading,
+        Kernel::with_monospace(),
+        Default::default(),
+        "/",
+    )
+    .unwrap();
+    let requests = r.take_requests();
+    named(&requests, "now");
+    assert!(requests.iter().all(|o| o.target != "notes"), "{requests:?}");
+    // A queued send to one goes out, and the one after it once it lands.
+    r.act("add", vec![]).unwrap();
+    r.act("add", vec![]).unwrap();
+    let mut sent = 0;
+    for _ in 0..4 {
+        r.advance(r.now_ms() + 1.0).unwrap();
+        let requests = r.take_requests();
+        let Some(out) = requests.iter().find(|o| o.target == "saved") else {
+            continue;
+        };
+        sent += 1;
+        let ticket = out.ticket;
+        r.fulfill(ticket, json(201, r#"{"id":"7"}"#)).unwrap();
+    }
+    assert_eq!(
+        sent, 2,
+        "both queued sends went out before the module loaded"
+    );
+}

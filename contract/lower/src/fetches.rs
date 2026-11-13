@@ -93,9 +93,13 @@ fn origin(url: &str) -> Result<String, String> {
             "the URL's scheme is `https` or `http`, not `{scheme}`"
         ));
     }
-    let end = rest
-        .find(['/', '?', '#'])
-        .ok_or("the URL's origin is written out, before any `{…}`: `https://host/{id}`, not `https://{host}/…`")?;
+    // The authority ends at a path, a query or a fragment, or at the end of
+    // a URL with no `{…}` at all (`https://api.example.com`).
+    let end = match rest.find(['/', '?', '#']) {
+        Some(end) => end,
+        None if head.len() == url.len() => rest.len(),
+        None => return Err("the URL's origin is written out, before any `{…}`: `https://host/{id}`, not `https://{host}/…`".into()),
+    };
     let authority = &rest[..end];
     if authority.is_empty() {
         return Err("the URL names no host".into());
@@ -405,6 +409,15 @@ mod tests {
 
     #[test]
     fn an_origin_is_the_literal_head_of_the_url() {
+        // A URL that is its origin alone ends the authority at its end.
+        assert_eq!(
+            origin("https://api.example.com"),
+            Ok("https://api.example.com".into())
+        );
+        assert_eq!(
+            origin("http://127.0.0.1:8080"),
+            Ok("http://127.0.0.1:8080".into())
+        );
         assert_eq!(
             origin("https://API.example.com/v1/{id}"),
             Ok("https://api.example.com".into())

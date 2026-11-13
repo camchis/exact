@@ -168,9 +168,9 @@ impl<D: DataSource> Runner<D> {
             // A head made before the source could answer waits for it, as
             // an unqueued send does (`unsent`); `data_ready` scans again.
             let ready = self.data.ready()
-                || self.queues.waiting[m]
-                    .front()
-                    .is_some_and(|w| exact_plan::runner_owned_source(&w.source));
+                || self.queues.waiting[m].front().is_some_and(|w| {
+                    exact_plan::runner_owned_source(&w.source) || self.source_ready(&w.source)
+                });
             if self.queues.waits(m) && self.idle(m) && ready {
                 self.queues.next_due[m] = self.armed_at();
             }

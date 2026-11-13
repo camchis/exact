@@ -16,6 +16,12 @@ fn failed(code: FailureCode, message: String) -> DataError {
 }
 
 impl<D: DataSource> Runner<D> {
+    /// Whether `source` can be asked now: the data module's once it is
+    /// ready, a declared source always, since no module answers it.
+    pub(super) fn source_ready(&self, source: &str) -> bool {
+        self.data.ready() || self.plan.fetch_named(source).is_some()
+    }
+
     /// The request declared source `source` makes for `args` (D1): a
     /// resource's is a read, a send's a write (D4).
     pub(super) fn fetch_answer(
