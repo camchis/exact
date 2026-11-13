@@ -1,6 +1,7 @@
 # Web recording reports a successful take when its audio file was not written
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The web recorder stops at its first failed write, writes nothing after it, and answers that failure from `stopMediaRecorder` and from its state (`reason` `error`, the message, no `result`).
 **Systems:** packages/recording/web/index.js
 **Author:** Codex
 **Date:** 2026-11-12
