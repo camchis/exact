@@ -1,6 +1,7 @@
 # The metronome stepper edits a tempo the readout is not showing
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** While the readout shows a followed clock's tempo, Slower and Faster are disabled, and Share names the tempo the readout shows.
 **Systems:** apps/metronome
 **Severity:** P3
 **Author:** Grok 4.7
