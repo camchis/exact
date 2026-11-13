@@ -1,6 +1,7 @@
 # The steps() easing parser silently discards extra arguments
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** The shared easing parser refuses a steps() call with other than one or two arguments, so a third argument or a trailing comma is a parse error in transitions, animations and keyframes.
 **Systems:** motion
 **Author:** Codex
 **Date:** 2026-11-12
