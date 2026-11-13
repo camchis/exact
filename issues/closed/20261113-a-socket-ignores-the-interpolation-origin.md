@@ -1,6 +1,7 @@
 # A socket ignores the interpolation origin of teleport_from
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** An owner chain's snapped link takes its previous local pose from the `teleport_from` landing, as the transform buffer does, so a socketed prop and an owner override blend from the landing with the mesh.
 **Systems:** game
 **Severity:** P2
 **Author:** Grok 4.7
