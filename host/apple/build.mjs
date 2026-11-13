@@ -57,6 +57,7 @@ import { documentTypes, exportedTypes, importedTypes, openingLinks, webPageTypes
 import { appClip, associatedDomains as claimedDomains, appleExecutableName, HOST_DEV, PINNED_RUST, checkModuleRoster, moduleDirectory, copyShaders, appleCargoClaims, awaitBuildOutput, cargoLibraryTarget, claimBuildOutput, appSourceKey, bakeOutput, buildBake, contractLast, bakeTarget, developmentBuildEnv, developmentURLScheme, gpuModules, hermesBundle, injectedProfiles, resolveApp, verifyBakeFiles } from '../../scripts/app.mjs';
 import { copyStaticTreeIfPresent, listAssets } from '../web/serve.mjs';
 import { startSweep } from '../../scripts/sweep.mjs';
+import { thinTextures } from '../../scripts/texture-families.mjs';
 import { bundleShaderLibraries } from './shader-libraries.mjs';
 import { appleBuildRefusal, guardFlags, reportBuilt } from '../../scripts/help.mjs';
 import { appleImplementations } from '../../js/bake/src/typescript.mjs';
@@ -888,6 +889,7 @@ async function main(args, lockHeld = false) {
     }
     bakedPlan = readFileSync(resolve(cargoEnv.EXACT_BAKE_OUTPUT, `${ios ? 'ios' : 'macos'}-${target}.plan`));
     copyAppleStaticTrees(app.dir, capture, [['assets', 'assets'], ['deck', 'deck']]);
+    thinTextures(capture, buildReceipt.compat.inputs.textureFamily); // the one family the bake's roster kept, if it thinned
     copyAppleStaticTrees(resolve(cargoEnv.EXACT_BAKE_OUTPUT, `${ios ? 'ios' : 'macos'}-${target}.entries`), capture, [['plans', 'plans'], ['typescript', 'typescript'], ['activities', 'activities']]);
     copyShaders(app, resolve(capture, 'shaders'));
     // The MSL development runs recorded, compiled for this SDK (shader-libraries.mjs).
