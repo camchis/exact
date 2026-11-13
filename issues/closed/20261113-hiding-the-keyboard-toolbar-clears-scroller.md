@@ -1,6 +1,7 @@
 # Hiding the keyboard toolbar clears scroller insets while enumerating them
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** Not a defect: a Swift `Dictionary` is a value, so `for (id, inset) in insets` iterates its own copy and `removeValue` copies on write; nothing traps, and the released inset is undone (`KeyboardToolbarIOSTests.testChangingPolicyReleasesTheToolbarLiftAndItsOwnedScrollInset` drives this path and passes).
 **Systems:** host/apple
 **Severity:** P1
 **Author:** Grok 4.7
