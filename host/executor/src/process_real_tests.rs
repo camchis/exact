@@ -325,29 +325,39 @@ fn a_stale_record_ends_no_group_that_is_not_the_apps() {
 
 #[test]
 fn a_quit_ends_every_group() {
-    quit_ends_every_group(false);
+    quit_ends_every_group("a_quit_ends_every_group", false);
 }
 
 #[test]
 #[ignore = "async lane: measures the five-second quit grace on the wall clock"]
 fn a_quit_keeps_its_five_second_grace() {
-    quit_ends_every_group(true);
+    quit_ends_every_group("a_quit_keeps_its_five_second_grace", true);
 }
 
-fn quit_ends_every_group(check_latency: bool) {
+/// The escalation waits on the caller when its thread cannot start.
+#[test]
+fn a_quit_without_its_escalation_thread_ends_every_group() {
+    quit_ends_every_group(
+        "a_quit_without_its_escalation_thread_ends_every_group",
+        false,
+    );
+}
+
+fn quit_ends_every_group(test: &str, check_latency: bool) {
     use std::io::{BufRead, Read, Write};
     use std::process::{Command, Stdio};
 
     const CHILD: &str = "EXACT_PROCESS_QUIT_TEST";
     if std::env::var_os(CHILD).is_none() {
-        let mut child = Command::new(std::env::current_exe().unwrap())
+        let mut command = Command::new(std::env::current_exe().unwrap());
+        command
             .args(["--exact", "--include-ignored", "--nocapture"])
-            .arg(if check_latency {
-                "process::real::tests::a_quit_keeps_its_five_second_grace"
-            } else {
-                "process::real::tests::a_quit_ends_every_group"
-            })
-            .env(CHILD, "1")
+            .arg(format!("process::real::tests::{test}"))
+            .env(CHILD, "1");
+        if test.contains("without_its_escalation_thread") {
+            command.env("EXACT_TEST_FAIL_QUIT_THREAD", "1");
+        }
+        let mut child = command
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .spawn()

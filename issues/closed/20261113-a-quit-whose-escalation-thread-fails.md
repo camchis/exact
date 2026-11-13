@@ -1,6 +1,7 @@
 # A quit whose escalation thread fails to spawn leaves children past SIGTERM
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** When the quit's escalation thread cannot start, the caller waits out the groups' grace, sends SIGKILL and prunes their records itself.
 **Systems:** host
 **Severity:** P2
 **Author:** Grok 4.7
