@@ -29,6 +29,12 @@ impl<'a, B: Brush> Line<'a, B> {
         self.data.break_reason
     }
 
+    /// Exact patch 18: the indent this line starts at, its text-indent and
+    /// its line start's together.
+    pub fn indent(&self) -> f32 {
+        self.data.indent
+    }
+
     /// Returns the range of text for the line.
     pub fn text_range(&self) -> Range<usize> {
         self.data.text_range.clone()

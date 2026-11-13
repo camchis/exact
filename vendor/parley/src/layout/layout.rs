@@ -174,6 +174,21 @@ impl<B: Brush> Layout<B> {
         self.data.indent_options = options;
     }
 
+    /// Exact patch 18: `amount` more advance after the cluster holding text
+    /// byte `index` (an inline box's padding beside its text). Call before
+    /// breaking lines; a new layout starts without it.
+    pub fn add_advance_after(&mut self, index: usize, amount: f32) {
+        self.data.add_advance_after(index, amount);
+    }
+
+    /// Exact patch 18: a line that starts at text byte `index` is indented
+    /// `amount` more, for each pair (sorted by index): an inline box's start
+    /// padding before its text, where a line breaks before the box. Call
+    /// before breaking lines.
+    pub fn set_line_starts(&mut self, starts: Vec<(usize, f32)>) {
+        self.data.line_starts = starts;
+    }
+
     /// Returns line breaker to compute lines for the layout.
     pub fn break_lines(&mut self) -> BreakLines<'_, B> {
         unjustify(&mut self.data);

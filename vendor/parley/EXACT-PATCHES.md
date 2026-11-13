@@ -120,6 +120,16 @@ named here pass.
     its inline boxes (an image in a paragraph's text, LLP 1011.002) in the
     same visual order, so a glyph after a box is placed past it. No
     behaviour changes.
+18. **Inline box edges.** A `<span>`'s padding, border and margin take room
+    beside its text (expo/exact#389). `Layout::add_advance_after` adds
+    advance to the cluster holding a text index and its last glyph, as
+    letter spacing does, without splitting the shaping run.
+    `Layout::set_line_starts` indents a line that starts at a given text
+    index (`resolve_indent`), and `calculate_content_widths` starts a
+    segment there with it: a span's start padding after a space goes to
+    the next line with its text when the line breaks before it, as in
+    Chrome. `Line::indent` reads a line's indent. Nothing changes for a
+    layout that calls neither.
 
 `Cargo.toml` also carries the empty `[workspace]` boundary described below;
 retain it when updating. All remaining archive files are byte-for-byte upstream.

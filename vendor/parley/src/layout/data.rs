@@ -313,6 +313,9 @@ pub(crate) struct LayoutData<B: Brush> {
     pub(crate) tabs: Vec<(usize, u32, f32)>,
     /// The spaces justification widened, with their own advances.
     pub(crate) justified: Vec<(usize, f32)>,
+    /// Exact patch 18: the text indices a line starting there is indented
+    /// more at, and how much (an inline box's start padding), sorted.
+    pub(crate) line_starts: Vec<(usize, f32)>,
 }
 
 impl<B: Brush> Default for LayoutData<B> {
@@ -346,6 +349,7 @@ impl<B: Brush> Default for LayoutData<B> {
             hyphenated: Vec::new(),
             tabs: Vec::new(),
             justified: Vec::new(),
+            line_starts: Vec::new(),
         }
     }
 }
@@ -374,6 +378,49 @@ impl<B: Brush> LayoutData<B> {
         self.hyphenated.clear();
         self.tabs.clear();
         self.justified.clear();
+        self.line_starts.clear();
+    }
+
+    /// Exact patch 18: `amount` more advance after the cluster holding text
+    /// byte `index`, as letter spacing adds it (`finish`): on the cluster and
+    /// its last glyph.
+    pub(crate) fn add_advance_after(&mut self, index: usize, amount: f32) {
+        let Some(run) = self.runs.iter().find(|r| r.text_range.contains(&index)) else {
+            return;
+        };
+        let (glyph_start, clusters) = (run.glyph_start, run.cluster_range.clone());
+        let Some(c) = clusters
+            .clone()
+            .find(|&c| self.clusters[c].text_range(run).contains(&index))
+        else {
+            return;
+        };
+        let cluster = &mut self.clusters[c];
+        cluster.advance += amount;
+        if cluster.glyph_len != 0xFF {
+            let start = glyph_start + cluster.glyph_offset as usize;
+            let end = start + cluster.glyph_len as usize;
+            if let Some(last) = self.glyphs[start..end].last_mut() {
+                last.advance += amount;
+            }
+        }
+    }
+
+    /// Exact patch 18: how much more a line starting at text byte `index`
+    /// is indented.
+    pub(crate) fn line_start(&self, index: usize) -> f32 {
+        self.line_starts
+            .binary_search_by_key(&index, |s| s.0)
+            .map_or(0.0, |i| self.line_starts[i].1)
+    }
+
+    /// The text index the cluster at `cluster` starts at.
+    pub(crate) fn cluster_text_start(&self, cluster: usize) -> Option<usize> {
+        let run = self
+            .runs
+            .iter()
+            .find(|r| r.cluster_range.contains(&cluster))?;
+        Some(self.clusters[cluster].text_range(run).start)
     }
 
     /// A tab's space glyph and stop interval.
@@ -682,6 +729,8 @@ impl<B: Brush> LayoutData<B> {
 
         let mut running_min_width = indent_for(true);
         let mut running_max_width = indent_for(true);
+        // Whether no cluster has been read: the text's first line starts at it.
+        let mut first = true;
         // Where each line of the two layouts starts (its indent): tab stops
         // count from there, as `BreakLines` counts them from `line.x`.
         let mut min_line_start = running_min_width;
@@ -698,6 +747,11 @@ impl<B: Brush> LayoutData<B> {
                     for (offset, cluster) in clusters.iter().enumerate() {
                         let index = run.cluster_range.start + offset;
                         let boundary = cluster.info.boundary();
+                        // Patch 18: a segment that starts where a line is
+                        // indented more starts there in either layout.
+                        let starts = (!self.line_starts.is_empty())
+                            .then(|| self.line_start(cluster.text_range(run).start))
+                            .unwrap_or(0.0);
                         let style = &self.styles[cluster.style_index as usize];
                         let prev_text_wrap_mode = text_wrap_mode;
                         text_wrap_mode = style.text_wrap_mode;
@@ -716,14 +770,20 @@ impl<B: Brush> LayoutData<B> {
                                 .max(running_min_width - trailing_whitespace + hyphen);
                             if boundary == Boundary::Mandatory {
                                 max_width = max_width.max(running_max_width - trailing_max);
-                                running_max_width = indent_for(opts.each_line);
-                                running_min_width = indent_for(opts.each_line);
+                                running_max_width = indent_for(opts.each_line) + starts;
+                                running_min_width = indent_for(opts.each_line) + starts;
                                 max_line_start = running_max_width;
                             } else {
-                                running_min_width = indent_for(false);
+                                running_min_width = indent_for(false) + starts;
                             }
                             min_line_start = running_min_width;
+                        } else if first && starts != 0.0 {
+                            running_min_width += starts;
+                            running_max_width += starts;
+                            min_line_start = running_min_width;
+                            max_line_start = running_max_width;
                         }
+                        first = false;
                         // A soft hyphen is invisible unless a line ends at
                         // it (and then shows the advance set above).
                         let advance = if cluster.info.source_char() == '\u{ad}' {
