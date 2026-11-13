@@ -1,6 +1,7 @@
 # A tamber that recovers from a refused place does not redraw
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** After a check takes a new answer the view is invalidated and its observers told whatever the previous inputs were, so a place that was refused and now answers is drawn.
 **Systems:** host/android
 **Severity:** P2
 **Author:** Grok 4.7
