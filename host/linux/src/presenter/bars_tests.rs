@@ -1182,3 +1182,27 @@ fn a_route_opts_out_of_or_credits_its_bars_room() {
     let plain = APP.replace(home, &home.replace("position", "padding-top=10 position"));
     assert_eq!(list_top(&plain).0, top + 10.0, "a plain padding adds");
 }
+
+/// @ref LLP 1123 D9 — a route in a sheet reads the sheet's own clearance,
+/// its handle, whatever the page's top inset is: the sheet starts below it.
+#[test]
+fn a_sheets_route_reads_the_sheets_own_inset() {
+    let (mut p, _) = barred(SHELF);
+    tap(&mut p, "add-book").unwrap();
+    let open = p.host().now() + 1000.;
+    p.tick(open);
+    let _ = p.frame();
+    let kernel = p.host.runner_mut().kernel_mut();
+    let mut env = kernel.env();
+    env.top = 62.0;
+    kernel.set_env(env).unwrap();
+    let (above, below, foot) = p.host.bars().room.unwrap();
+    p.host
+        .set_bar_room(Some((above + 1.0, below, foot)))
+        .unwrap();
+    let kernel = p.host().kernel();
+    let form = kernel.find_by_id("add-form")[0];
+    let form = kernel.node_by_key(form).unwrap().id;
+    let local = kernel.local_insets(form).unwrap();
+    assert_eq!(local[0], SHEET_HANDLE, "{local:?}");
+}

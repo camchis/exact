@@ -151,7 +151,7 @@ impl<D: DataSource> Host<D> {
             );
         }
         let (mut routes, mut tabs, mut stacks) = (Vec::new(), None, Vec::new());
-        let mut all_routes: Vec<ViewId> = Vec::new();
+        let (mut all_routes, mut sheeted): (Vec<ViewId>, Vec<ViewId>) = (Vec::new(), Vec::new());
         if let (Some(root), Some((above, below, foot))) = (root, room) {
             let back = kernel
                 .node(root)
@@ -191,6 +191,7 @@ impl<D: DataSource> Host<D> {
                     };
                     if sheet_of(&kinds, index).is_some() {
                         let cover = [crate::presenter::SHEET_HANDLE, 0.0, foot, 0.0];
+                        sheeted.push(*route);
                         wanted.insert(*route, HostCover::Edges(cover));
                         continue;
                     }
@@ -228,10 +229,16 @@ impl<D: DataSource> Host<D> {
             stacks = all;
             tabs = found;
         }
-        // A route the bars or a sheet inset owns that room (LLP 1123 D9).
+        // A route the bars or a sheet inset owns that room (LLP 1123 D9): a
+        // route in the page with the page's insets past it, and one in a sheet
+        // the sheet's own, below the status area at its handle and above the
+        // system's bar at its foot.
         let env = kernel.env();
         let locals: BTreeMap<ViewId, [f32; 4]> = (wanted.iter())
             .filter_map(|(id, cover)| match cover {
+                HostCover::Edges([top, _, bottom, _]) if sheeted.contains(id) => {
+                    Some((*id, [*top, env.right, *bottom, env.left]))
+                }
                 HostCover::Edges([top, _, bottom, _]) if all_routes.contains(id) => Some((
                     *id,
                     [

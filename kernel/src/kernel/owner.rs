@@ -71,9 +71,10 @@ pub(crate) fn env_at(arena: &NodeArena, slot: u32) -> Cow<'_, Env> {
 /// The four insets at `slot`, top right bottom left (LLP 1123 D9): an
 /// override `slot` declares, else its owner's host value when `slot` is an
 /// owner's root, else its parent's; at a root, the session root's. An
-/// override's own `var()` reads what `slot` would have without it, another
-/// edge's override on `slot` included; one that reads itself is a cycle,
-/// invalid at computed-value time, and so unset.
+/// override's `var()` reads the edge as `slot` has it: that edge's override
+/// on `slot`, else what `slot` inherits. Overrides that read themselves,
+/// directly or through one another, form a cycle, invalid at computed-value
+/// time, and so unset (CSS Variables 1 §3).
 pub(crate) fn local_at(arena: &NodeArena, slot: u32) -> [f32; 4] {
     let base = match arena.blocks.local(slot) {
         Some(host) => host,
@@ -90,31 +91,59 @@ pub(crate) fn local_at(arena: &NodeArena, slot: u32) -> [f32; 4] {
         RowValue::Dimension(d) if style.mask.has(id) => Some(d),
         _ => None,
     });
-    let reads = |d: &Dimension| matches!(d, Dimension::Compare(c) if c.reads_local());
-    let mut env = arena.env().clone();
-    let mut out = base;
-    // Plain lengths first, then those that read another edge's
-    for pass in [false, true] {
-        env.local = Some(out);
-        for (i, d) in declared.iter().enumerate() {
-            let Some(d) = d.as_ref().filter(|d| reads(d) == pass) else {
-                continue;
-            };
-            let edge = Edge::ALL[i];
-            if pass && cycles(d, edge) {
-                continue;
-            }
-            let mut at = env.clone();
-            at.local = Some(base);
-            out[i] = d.at_basis(if pass { &env } else { &at }, 0.0);
+    // Which declared edge reads which, and so, closed, which reads itself
+    // through others: a cycle, whose members are unset (CSS Variables 1 §3)
+    let mut reads = [[false; 4]; 4];
+    for (i, d) in declared.iter().enumerate() {
+        if let Some(Dimension::Compare(c)) = d {
+            reads[i] = Edge::ALL.map(|e| declared[e as usize].is_some() && c.reads_local_edge(e));
         }
     }
-    out
+    for k in 0..4 {
+        for i in 0..4 {
+            for j in 0..4 {
+                reads[i][j] |= reads[i][k] && reads[k][j];
+            }
+        }
+    }
+    let mut out: [Option<f32>; 4] = [None; 4];
+    for i in 0..4 {
+        resolve(i, &declared, &reads, base, arena.env(), &mut out);
+    }
+    out.map(|v| v.unwrap_or(0.0))
 }
 
-/// Whether an override of `edge` reads `edge` itself.
-fn cycles(d: &Dimension, edge: Edge) -> bool {
-    matches!(d, Dimension::Compare(c) if c.reads_local_edge(edge))
+/// Edge `i`'s value at a node: its override, read against the node's own
+/// values of the edges it references (resolved first, the graph being
+/// acyclic past its cycles), else what the node inherits (`base`), which a
+/// cycle's member takes too.
+fn resolve(
+    i: usize,
+    declared: &[Option<Dimension>; 4],
+    reads: &[[bool; 4]; 4],
+    base: [f32; 4],
+    env: &Env,
+    out: &mut [Option<f32>; 4],
+) -> f32 {
+    if let Some(v) = out[i] {
+        return v;
+    }
+    let value = match &declared[i] {
+        Some(d) if !reads[i][i] => {
+            let mut local = base;
+            for (j, v) in local.iter_mut().enumerate() {
+                if j != i && reads[i][j] {
+                    *v = resolve(j, declared, reads, base, env, out);
+                }
+            }
+            let mut env = env.clone();
+            env.local = Some(local);
+            d.at_basis(&env, 0.0)
+        }
+        _ => base[i],
+    };
+    out[i] = Some(value);
+    value
 }
 
 /// A box moved to another parent, created ones included, may be in another

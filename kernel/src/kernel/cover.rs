@@ -422,6 +422,33 @@ pub(crate) fn applied_padding(arena: &NodeArena, slot: u32) -> [f32; 4] {
     [top, right, bottom, left]
 }
 
+/// What the clearance adds to the box's padding beyond its authored padding,
+/// as layout pads it (`apply`): `applied_padding`, less what a credited
+/// padding already clears (LLP 1123 D3), so the padding a host reads back is
+/// the authored one. A percentage is of the parent's width as last laid out.
+pub(crate) fn contributed_padding(arena: &NodeArena, slot: u32) -> [f32; 4] {
+    let applied = applied_padding(arena, slot);
+    if applied == [0.0; 4] {
+        return applied;
+    }
+    let style = arena.effective_style(slot);
+    let env = crate::kernel::owner::env_for(arena, slot, &style);
+    let basis = arena.parent(slot).map_or(0.0, |p| arena.frame(p).width);
+    let pads = [
+        &style.padding_top,
+        &style.padding_right,
+        &style.padding_bottom,
+        &style.padding_left,
+    ];
+    std::array::from_fn(|i| {
+        let clearance = applied[i];
+        match clearance > 0.0 && credited(pads[i], Edge::ALL[i], &env) {
+            true => (clearance - pads[i].at_basis(&env, basis).max(0.0)).max(0.0),
+            false => clearance,
+        }
+    })
+}
+
 /// The points a cover adds to the box's padding for layout (`apply`), top,
 /// right, bottom and left: the host's sizing, not the box's CSS padding.
 pub(crate) fn added_padding(arena: &NodeArena, slot: u32) -> [f32; 4] {

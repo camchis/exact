@@ -113,6 +113,9 @@ fn a_padding_that_reads_the_inset_is_credited_not_added() {
         "the status bar's 62 and the bar's 44, once"
     );
     assert_eq!(frame(&mut kernel, 4), (0.0, 158.0, 390.0, 686.0));
+    // The padding read back is the author's 62, the clearance's 44 apart
+    let key = kernel.node(2).unwrap().key;
+    assert_eq!(kernel.resolved_padding(key).unwrap().1, 62.0);
     let pad = |kernel: &mut Kernel, batch, value: StyleValue| {
         let op = Op::SetStyle {
             id: 2,

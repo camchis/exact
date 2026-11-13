@@ -245,6 +245,73 @@ fn a_box_moved_or_mounted_into_an_owner_reads_its_insets() {
     assert_eq!(k.node(7).unwrap().frame.height, 83.0);
 }
 
+/// D9: overrides on one node that read one another resolve in dependency
+/// order, a chain through two edges included; a cycle across edges is
+/// invalid, so its members are unset, and an override that reads a member
+/// reads what the member inherits.
+#[test]
+fn overrides_resolve_their_dependencies_and_reject_cycles() {
+    let mut k = page();
+    k.set_local_insets(2, Some([106.0, 7.0, 34.0, 9.0]))
+        .unwrap();
+    let [top, right, bottom, left] = OVERRIDES;
+    let var = |edge: &str| format!("var(--exact-safe-area-inset-{edge})");
+    let (to_bottom, to_right) = (var("bottom"), var("right"));
+    let chain = [
+        (bottom, "20"),
+        (right, &to_bottom[..]),
+        (top, &to_right[..]),
+    ];
+    k.apply(0, 2, &[style(3, &chain)]).unwrap();
+    assert_eq!(k.local_insets(3), Some([20.0, 20.0, 20.0, 9.0]), "a chain");
+    let (to_left, to_top) = (var("left"), var("top"));
+    let cycle = [
+        (top, &to_left[..]),
+        (left, &to_top[..]),
+        (bottom, &to_left[..]),
+    ];
+    k.apply(0, 3, &[style(5, &cycle)]).unwrap();
+    let root = Edge::ALL.map(|e| k.env().local_inset(e));
+    let got = k.local_insets(5).unwrap();
+    assert_eq!(got[0], root[0], "top and left read each other: unset");
+    assert_eq!(got[3], root[3]);
+    assert_eq!(
+        got[2], root[3],
+        "bottom reads left as the node has it, unset"
+    );
+}
+
+/// A sticky box's inset that reads the local inset sticks below its route's
+/// bar, not at the document's 0: the constraint resolves where the box is.
+#[test]
+fn a_sticky_inset_reads_its_owners_inset() {
+    let mut k = Kernel::with_monospace();
+    let mut ops = create(1..=5);
+    ops.push(style(1, &[(StyleId::Height, "844")]));
+    ops.push(style(2, &[(StyleId::Height, "844")]));
+    ops.push(style(
+        3,
+        &[(StyleId::Height, "844"), (StyleId::OverflowY, "scroll")],
+    ));
+    ops.push(style(
+        4,
+        &[
+            (StyleId::PositionType, "sticky"),
+            (StyleId::Top, "var(--exact-safe-area-inset-top)"),
+            (StyleId::Height, "20"),
+        ],
+    ));
+    ops.push(style(5, &[(StyleId::Height, "2000")]));
+    ops.extend([children(1, &[2]), children(2, &[3]), children(3, &[4, 5])]);
+    ops.push(Op::AttachRoot { id: 1 });
+    k.apply(0, 1, &ops).unwrap();
+    k.set_local_insets(2, Some([106.0, 0.0, 0.0, 0.0])).unwrap();
+    layout(&mut k);
+    let key = k.node(4).unwrap().key;
+    let constraint = k.sticky_constraint(key).expect("a sticky box");
+    assert_eq!(constraint.insets[0], Some(106.0));
+}
+
 /// D9: an author's `--exact-safe-area-inset-*` on a node is what its
 /// subtree reads, over the host's value on an owner's root, as an inherited
 /// custom property; a change reaches the readers below it.
