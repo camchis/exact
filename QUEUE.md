@@ -205,19 +205,6 @@
 - **`check` on the Windows host** (2026-10-31, bake-off Windows lane). The painted presenter answers no `check` observation (`scripts/agent-check.mjs` takes web and iOS), so `verify windows` captures each screen unjudged: no contrast, target-size, overflow or largest-text findings. Answer it from the presenter as the Apple agent's `check` does, then let `verify windows` judge light and dark as iOS's does.
 - **M2 rest trace on the caret workload** (LLP 1149.001 M2b). The G5m caret now presents twice per second but still uses 27.148 process / 24.661 main-thread ms/s. Its `every(250, tick)` and `every(1000, second)` fire five times per second, and the display link starts and stops twice. Attribute the service passes, link start/stop and probe on the retained workload before predicting another CPU saving; this is not M2's timer-free rest case. See `bench/heavy-list/gpui/RESULTS.md`, “G5m, after M2b”.
 
-- **Wall-clock test bounds flake under load** (2026-10-30). In every full run on a loaded Mac one of these
-  failed and then passed alone: `exact-painted`'s `an_orderly_exit_waits_for_a_request_with_effects` (the one-second
-  `AGENT_EXIT_BOUND`, three full runs of three), `exact-apple`'s `a_quit_ends_every_group` ("the quit waited out the
-  grace") with the asynchronous-core suite wrapper, `exact-svg-file`'s five-second deadline and the Apple
-  upload-stream timeout. Each waits on the wall clock; `docs/testing.md`'s waits section says how to wait on the
-  event instead, or to mark the test `async lane:` where a bound is the point.
-  `workers_start_with_the_first_request` also misses its five-second completion bound with main's web files
-  (2026-11-04), alone and through the asynchronous-core wrapper. The ordered request completes; the independent
-  request without a grant does not. The same failure occurs with the web timeout fix restored.
-  In the press-spelling checks (2026-11-07), Linux's
-  `an_abort_whose_answer_was_replaced_is_still_cancelled_on_an_empty_pump` could not obtain seven
-  worker slots within 30 seconds before its server-write timeout. A control with main's sources
-  passed, as did the isolated case and full run after restoring the candidate.
 - **The Mac table's first-click probe fails with main's sources** (2026-11-07).
   `TableFeedKeyMacTests.testTheClickThatBringsTheWindowForwardSelectsARowAndPressesAControlInIt`
   leaves the selected row at -1. The same ten assertions fail with all changed Rust, Swift and
