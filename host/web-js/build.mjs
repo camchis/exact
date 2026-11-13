@@ -672,11 +672,12 @@ writeFileSync(resolve(gen, 'admission.js'), localImports(stubbed));
 // never linked. The realm it binds (the clock, the timers, the refused globals) stays with the module.
 if (fetchRefused) writeFileSync(resolve(gen, 'ts-fetch-refused.js'), [
   '// Generated: `fetch` for sources with no network grant (LLP 1047.002 D3): the app\'s own assets, else the refusal by name.',
-  "import { fetchWith } from './admission.js'; import { ordinary } from './ts-fetch.js'; import { tsGrantSet } from './admission-data.js';",
-  'export const fetch = (input, init) => ordinary(() => fetchWith(tsGrantSet, input, init));', ''].join('\n'));
+  "import { fetchWith } from './admission.js'; import { ordinary, responseFor } from './ts-fetch.js'; import { tsGrantSet } from './admission-data.js';",
+  'export const fetch = (input, init) => ordinary(() => fetchWith(tsGrantSet, input, init)).then(responseFor);', ''].join('\n'));
 cpSync(resolve(here, 'ts-fetch.js'), resolve(gen, 'ts-fetch.js'));
 cpSync(resolve(here, 'ts-body-from.js'), resolve(gen, 'ts-body-from.js'));
 cpSync(resolve(here, 'ts-stream.js'), resolve(gen, 'ts-stream.js'));
+cpSync(resolve(here, 'ts-sqlite.js'), resolve(gen, 'ts-sqlite.js'));
 cpSync(resolve(here, 'auth.js'), resolve(gen, 'auth.js'));
 cpSync(resolve(here, 'files.js'), resolve(gen, 'files.js'));
 cpSync(resolve(here, 'sounds.js'), resolve(gen, 'sounds.js'));
@@ -794,7 +795,7 @@ const scopedModule = (code, id) => {
   // string, which throws as on Hermes (`eval`, which no import may bind, is imported under a fresh name below).
   const bound = ['fetch', 'Date', 'Math', 'Intl', 'setTimeout', 'setInterval', 'requestAnimationFrame', 'requestIdleCallback',
     'clearTimeout', 'clearInterval', 'cancelAnimationFrame', 'cancelIdleCallback', 'performance', 'scheduler', 'XMLHttpRequest', 'WebSocket', 'EventSource', 'crypto', 'AbortSignal',
-    'Function'];
+    'Function', 'Promise', 'queueMicrotask', 'Response'];
   // The DOM and Node's globals are absent, as on Hermes (js/bake/src/typescript.mjs `packageRefusals`).
   const absent = ['window', 'self', 'frames', 'parent', 'top', 'opener', 'document', 'navigator', 'location', 'history', 'localStorage', 'sessionStorage',
     'indexedDB', 'HTMLElement', 'Element', 'getComputedStyle', 'customElements', 'alert', 'process', 'Buffer', 'global'];

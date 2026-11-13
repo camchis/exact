@@ -516,13 +516,15 @@ export const bundleOptions={platform:'browser',transform:{define:{'process.env.N
 // back the answer current when the function was called and restores the one
 // before after the step. The runtime that runs the module owns
 // `__exact_async_context` (js/src/prelude.js, host/web-js/ts-data.js); a
-// realm without one runs the steps as the stock helper would.
+// realm without one runs the steps as the stock helper would. The web hook also supplies the source's Promise,
+// so reactions on an async helper's result retain their entropy owner.
 export const lowered={target:'es2016'};
 const ASYNC_HELPER=/@oxc-project\+runtime@[^/]*\/helpers\/esm\/asyncToGenerator\.js$/;
 export const asyncContextHelper=`export default function _asyncToGenerator(fn) {
   return function () {
     var self = this, args = arguments, context = globalThis.__exact_async_context, at = context ? context.current() : undefined;
-    return new Promise(function (resolve, reject) {
+    var P = context && context.Promise || Promise;
+    return new P(function (resolve, reject) {
       var gen = fn.apply(self, args);
       function step(key, arg) {
         // A live answer's step that a module turn settled runs in that answer's own turn (LLP 1146 D2)
