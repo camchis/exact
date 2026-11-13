@@ -413,6 +413,35 @@ fn a_call_after_a_trap_runs_in_a_fresh_instance() {
     }
 }
 
+// A call refused after the module ran, as a reply over the seam's bound is
+// (`exact_logic_call` answers 1), may have changed the module's own state:
+// "leaky" marks the session at 2048 and is refused, and a marked session
+// refuses every call. The next call runs in a fresh instance.
+#[test]
+fn a_call_after_a_refused_one_runs_in_a_fresh_instance() {
+    let store = Store::new("secret.keep token", []);
+    let good = abi::call_request(&store, "x", &[], None).unwrap().len();
+    let module = wasm(&format!(
+        "i32.const 2048 i32.load if i32.const 1 return end
+        local.get 2 i32.const {good} i32.gt_u
+        if i32.const 2048 i32.const 1 i32.store i32.const 1 return end"
+    ));
+    let plan = plan();
+    let mut candidate = Swappable::wasm(Fixture)
+        .replacement(&plan, &receipt(&plan, &module), module)
+        .unwrap();
+    candidate.activate().unwrap();
+    for _ in 0..3 {
+        assert_eq!(candidate.query("x", &[]).unwrap(), Value::Number(42.));
+        let refused = candidate.query("leaky", &[]).unwrap_err();
+        assert!(
+            matches!(&refused, DataError::Interface(e) if e.contains("refused")),
+            "{refused:?}"
+        );
+        assert_eq!(candidate.query("x", &[]).unwrap(), Value::Number(42.));
+    }
+}
+
 // This crate's dev-dependencies compile wasmi's `simd` and `memory64` in, as
 // another crate of an app may: the engine still refuses both proposals.
 #[test]

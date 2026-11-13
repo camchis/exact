@@ -1,6 +1,7 @@
 # A reply over the seam bound keeps the module's mutations
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** Any failed call to a Rust module, a refusal such as a reply over the seam's bound as well as a trap, discards the instance and activates the module afresh before another call.
 **Systems:** logic
 **Severity:** P2
 **Author:** Grok 4.7
