@@ -1,6 +1,7 @@
 # A perf block accepts clock held and clock until
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** A perf block refuses `clock held` and `clock until` as it refuses `clock +N real`: each lets real time pass while the agent's clock stands, so the counts would depend on the machine.
 **Systems:** contract
 **Severity:** P2
 **Author:** Grok 4.7
