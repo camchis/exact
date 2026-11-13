@@ -1,6 +1,7 @@
 # A second Expose send while a reply is streaming drops the draft and shows no error
 
-**Status:** Open
+**Status:** Closed
+**Resolution:** Send waits (disabled, the draft kept) while a reply is answering, sharing an article then says "Expose is still answering" instead of sending, and a turn the module still refuses shows that on the transcript until the answer ends.
 **Systems:** apps/expose
 **Severity:** P2
 **Author:** Grok 4.7
