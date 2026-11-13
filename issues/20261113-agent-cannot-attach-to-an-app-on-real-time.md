@@ -1,4 +1,4 @@
-# The agent cannot attach to an app running on real time
+# The agent cannot attach to an app on real time
 
 **Status:** Open
 **Systems:** scripts/agent.mjs, scripts/agent-launch.mjs, host/apple/Sources/ExactKit/Agent.swift
@@ -32,3 +32,11 @@ it made.
 
 A read-only attach (`tree`, `state`, `layout`, `logs`, `perf frames live`) to a running
 development build that leaves its clock alone, reached as `trace --pid` reaches one.
+
+## Decision needed
+
+The existing live carrier requires launch-time opt-in; a normal development
+process exposes no carrier for these reads. Read-only attachment requires a
+decision about how that process admits a client, selects a session and limits
+operations (LLP 1012 §8; LLP 1142 D8). Frame capture itself is no longer the
+reported defect. This issue remains open for attachment.
