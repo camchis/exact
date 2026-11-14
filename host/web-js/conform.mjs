@@ -207,7 +207,7 @@ function serve(dir) {
 // the same reason, the `Debug` text of the runner's error, a line's prefix being each host's own. Other refusals compare
 // only as refused or not (the steps' state). A refusal repeated by a host's own deliveries counts once: a list's edge
 // is asked again at each report, and the Linux host reports a settling list more often than a page does.
-const BOUND = /Instance\(Trap\((?:IterationLimit|StringTooLong|ValueTooLarge|ValueTooDeep) \{ pc: \d+ \}\)\)|Trap\((?:IterationLimit|StringTooLong|ValueTooLarge|ValueTooDeep) \{ pc: \d+ \}\)|StringTooLong \{ name: "(?:[^"\\]|\\.)*" \}/;
+const BOUND = /Instance\(Trap\((?:IterationLimit|CallLimit|CallDepth|StringTooLong|ValueTooLarge|ValueTooDeep) \{ pc: \d+ \}\)\)|Trap\((?:IterationLimit|CallLimit|CallDepth|StringTooLong|ValueTooLarge|ValueTooDeep) \{ pc: \d+ \}\)|StringTooLong \{ name: "(?:[^"\\]|\\.)*" \}/;
 const boundReasons = lines => lines.flatMap(l => {
   const m = BOUND.exec(l); if (!m) return [];
   const suffix = l.slice(m.index + m[0].length).replace(/; unset$/, '').replace(/ \}$/, '');

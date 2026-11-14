@@ -294,7 +294,7 @@ impl<D: DataSource> Runner<D> {
                 let mut progress = false;
                 let mut all = true;
                 for i in 0..self.plan.derives.len() {
-                    if derives[i].is_some() {
+                    if self.plan.derives[i].unsettled || derives[i].is_some() {
                         continue;
                     }
                     // Unchanged inputs, unchanged value: no evaluation.

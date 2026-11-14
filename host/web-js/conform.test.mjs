@@ -907,6 +907,13 @@ test('bound comparisons include the evaluation and words while joining view and 
   const start = comparisonSource.indexOf('const boundReasons =');
   const end = comparisonSource.indexOf('}).filter((r, i, all) => r !== all[i - 1]);', start) + '}).filter((r, i, all) => r !== all[i - 1]);'.length;
   const reasons = new Function(source + comparisonSource.slice(start, end) + '; return boundReasons;')();
+  for (const [kind, suffix] of [
+    ['CallLimit', ': past the 65,536 derive calls one evaluation may take'],
+    ['CallDepth', ': past 64 derive call levels'],
+  ]) {
+    const reason = `Trap(${kind} { pc: 19 })${suffix}`;
+    expect(reasons([`site 0: text trapped ${reason}; unset`])).toEqual([reason]);
+  }
   const suffix = ': past the 65,536 list steps one evaluation may take';
   expect(reasons([`poisoned: Instance(Trap(IterationLimit { pc: 17 })) in view 12 (site 58) each subject${suffix}`]))
     .toEqual(reasons([`poisoned: Instance(Trap(IterationLimit { pc: 17 })) in site 58 each subject${suffix}`]));

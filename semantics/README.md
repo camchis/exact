@@ -1206,10 +1206,10 @@ element's `testId` are observed, and nothing inside a virtualized `list`:
 the runner builds only the rows its window lays out, which is layout, so
 both sides leave a virtualized list's descendants out of the observation
 (the list's own line stays). The runner's evaluation bounds (list steps,
-string length, value size and depth) are a refinement the semantics
+derive calls and call depth, string length, value size and depth) are a refinement the semantics
 doesn't model (LLP 1090 D8): a step the runner refuses for one
-(`IterationLimit`, `StringTooLong` as a trap or an argument's or write's
-refusal, `ValueTooLarge`, `ValueTooDeep`) is `UNSUPPORTED`, outside the
+(`IterationLimit`, `CallLimit`, `CallDepth`, `StringTooLong` as a trap or an
+argument's or write's refusal, `ValueTooLarge`, `ValueTooDeep`) is `UNSUPPORTED`, outside the
 semantics, not a divergence, and so is a step after the runner unset a
 binding for one (its journal line is a `#` note in the runner's
 observation). The web's JS target refuses the same steps

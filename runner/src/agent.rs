@@ -851,9 +851,14 @@ fn state_with<D: DataSource>(runner: &Runner<D>, request: &str) -> String {
         s.push_str(&runner.faults().json());
     }
     s.push_str(",\"derives\":{");
-    for (i, row) in plan.derives.iter().enumerate() {
+    for (i, row) in plan
+        .derives
+        .iter()
+        .enumerate()
+        .filter(|(_, r)| !r.unsettled)
+    {
         let name = plan.str(row.name);
-        if i > 0 {
+        if !s.ends_with('{') {
             s.push(',');
         }
         quote(name, &mut s);

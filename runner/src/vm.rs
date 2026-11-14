@@ -96,6 +96,7 @@ impl Frame {
 }
 
 /// Everything an expression may read.
+#[derive(Clone, Copy)]
 pub struct Env<'a> {
     /// The plan the code belongs to.
     pub plan: &'a Plan,
@@ -535,6 +536,8 @@ fn eval_machine(
         extents: std::mem::take(&mut scratch.extents),
         decoded: std::mem::take(&mut scratch.decoded),
         steps: 0,
+        calls: 0,
+        depth: 0,
     };
     let value = machine::run(&mut run, &mut scratch.machine);
     scratch.machine.pos = 0;
@@ -706,6 +709,8 @@ struct Run<'e, 'a> {
     extents: Extents,
     decoded: Decoded,
     steps: u32,
+    calls: u32,
+    depth: u16,
 }
 
 impl Host<Value> for Run<'_, '_> {
@@ -768,6 +773,57 @@ impl Host<Value> for Run<'_, '_> {
     fn load_derive(&mut self, i: u64, pc: usize) -> Result<Value, Trap> {
         let derive = i as usize;
         let env = self.env;
+        if let Some(row) = env.plan.unsettled_body(derive as u32) {
+            self.calls += 1;
+            if self.calls > 65_536 {
+                return Err(Trap::CallLimit { pc });
+            }
+            if self.depth >= 64 {
+                return Err(Trap::CallDepth { pc });
+            }
+            let frames = match row.owner {
+                None => &env.frames[..0],
+                Some(owner) => {
+                    let region = env.plan.arm(owner).region.0;
+                    let end = env
+                        .frames
+                        .iter()
+                        .rposition(|f| f.region == Some(region))
+                        .ok_or(Trap::BadScope { pc, depth: 0 })?
+                        + 1;
+                    &env.frames[..end]
+                }
+            };
+            let nested_env = Env {
+                frames,
+                params: &[],
+                ..*env
+            };
+            let code = env.plan.code(row.body);
+            let mut nested = Run {
+                env: &nested_env,
+                code,
+                allowed_writes: &[],
+                constants: env
+                    .strings
+                    .constants
+                    .as_deref()
+                    .map(|pool| (pool, row.body.offset as usize)),
+                cursor: Reader::new(code),
+                out: Outcome::default(),
+                extents: std::mem::take(&mut self.extents),
+                decoded: Decoded::default(),
+                steps: self.steps,
+                calls: self.calls,
+                depth: self.depth + 1,
+            };
+            let value = machine::run(&mut nested, &mut Machine::default());
+            self.steps = nested.steps;
+            self.calls = nested.calls;
+            self.extents = nested.extents;
+            self.out.store_dependent |= nested.out.store_dependent;
+            return value;
+        }
         let value = env
             .derives
             .get(derive)
@@ -1080,6 +1136,8 @@ impl Trap {
     pub fn bound(&self) -> &'static str {
         match self {
             Self::IterationLimit { .. } => ": past the 65,536 list steps one evaluation may take",
+            Self::CallLimit { .. } => ": past the 65,536 derive calls one evaluation may take",
+            Self::CallDepth { .. } => ": past 64 derive call levels",
             Self::StringTooLong { .. } => ": past the 64 MiB a string may hold",
             Self::ValueTooLarge { .. } => ": past the 16,777,216 nodes or 64 MiB a value may hold",
             Self::ValueTooDeep { .. } => ": past 64 levels",
@@ -1087,3 +1145,5 @@ impl Trap {
         }
     }
 }
+#[cfg(test)]
+mod unsettled_tests;

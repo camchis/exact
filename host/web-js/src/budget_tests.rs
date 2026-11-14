@@ -215,3 +215,16 @@ fn labels_are_only_built_on_the_trap_path() {
         );
     }
 }
+
+#[test]
+fn at_read_rows_share_the_readers_list_and_call_budgets() {
+    let mut plan = contract::compile("component App\n  state xs = [1, 2]\n  derive picked = xs.map(x => x + 1)\n  view\n    text `${picked.length}`\n").unwrap();
+    plan.derives[0].unsettled = true;
+    let js = crate::emit::emit(&plan, false, false).unwrap().js;
+    assert!(js.contains("const d_0=$budget=>"), "{js}");
+    assert!(js.contains("++$budget.s>65536"), "{js}");
+    assert!(js.contains("let $budget={s:0,n:0,d:0}"), "{js}");
+    assert!(js.contains("d_0($budget)"), "{js}");
+    assert!(js.contains("finally{$budget.d--}"), "{js}");
+    assert!(!js.contains("const d_0=memo"), "{js}");
+}
