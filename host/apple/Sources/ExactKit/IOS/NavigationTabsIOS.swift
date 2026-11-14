@@ -150,9 +150,10 @@ extension NavigationHost {
             holder.view.accessibilityIdentifier = "exact-navigation-\(UUID().uuidString)"
         }
         // Sized before it enters the window, where UIKit lays it out.
-        holder.view.frame = ownerFrame(holder, in: root)
+        let mount = ownerMount(root)
+        holder.view.frame = ownerFrame(holder, in: mount)
         holder.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-        root.addSubview(holder.view)
+        mount.addSubview(holder.view)
         holder.view.setPaintForeground(aboveAuthored: false)
         fitOwner()
         holder.didMove(toParent: parent)
@@ -239,13 +240,13 @@ extension NavigationHost {
                 guard !box.isEmpty, box.intersects(area), box.minY >= end - 0.5,
                       routes.contains(where: { $0.minX < box.maxX && $0.maxX > box.minX }) else { continue }
                 bottom = max(bottom, area.maxY - box.minY)
-                if child.superview === root { rows.append(child) }
+                if child.superview === ownerMount(root) { rows.append(child) }
             }
             for branch in holding where !panels.contains(branch) {
                 visit(branch.container.subviews.compactMap { $0 as? NodeView })
             }
         }
-        visit(root.subviews.compactMap { $0 as? NodeView })
+        visit(ownerMount(root).subviews.compactMap { $0 as? NodeView })
         return (bottom, rows)
     }
 

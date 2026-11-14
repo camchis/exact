@@ -3276,6 +3276,10 @@ scrolls on y (`lower-route-scroll`).
 
 ## Tabs and stacks
 
+On iOS, `overflow="auto"` or `"scroll"` on the navigation root keeps the native
+container inside that scroller, sized to the root's box. Otherwise the native
+container fills the session view.
+
 Tabs with a stack each have one layout that works on web, macOS and iOS
 ([the tabs fixture](../contract/corpus/tabs.contract), driven by
 `host/web-js/conformance/tabs.steps`):

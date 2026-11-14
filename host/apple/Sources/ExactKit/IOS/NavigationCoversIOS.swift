@@ -17,8 +17,8 @@ extension NavigationHost {
     var wantsWholeView: Bool { primaryOwner != nil && !ExactEnv.authoredChrome }
 
     /// @ref LLP 1075.003 §3.7, LLP 1083.000 D4 — the native container stands
-    /// for the routes in the navigation root's paint order, but its box is
-    /// the page's, where the routes' boxes may not be: a column the author
+    /// for the routes in the navigation root's paint order. Its box can extend
+    /// past the routes' authored boxes: a column the author
     /// placed beside routes offset past it shows on the web and would be
     /// covered here. A child of the root that no shown route's box
     /// meets, which the routes therefore paint nothing over, paints over the
@@ -32,7 +32,8 @@ extension NavigationHost {
     /// With the tab bar hidden, an in-flow row below the panels bounds the
     /// bottom too, whether the root's child or nested beside them (`rowsBelowTabs`).
     func clearBesideRoutes(tabBarHidden: Bool? = nil) {
-        guard let owner = primaryOwner, let root = container, let holder = owner.viewIfLoaded, holder.superview === root else { return }
+        guard let owner = primaryOwner, let root = container, let holder = owner.viewIfLoaded,
+              holder.superview === ownerMount(root) else { return }
         let routes = primaryRoutes.filter { $0.viewIfLoaded?.window != nil && presenter.views[$0.node.id] === $0.node }
             .map { $0.node.convert($0.node.bounds, to: root) }.filter { !$0.isEmpty }
         let owned = Set(tabPanels + (tablistAppearanceNone ? [] : [adoptedTablist].compactMap { $0 }))
@@ -40,7 +41,7 @@ extension NavigationHost {
         let before = besideOwner === owner ? besideInsets : .zero
         var changed = false, reach = UIEdgeInsets.zero
         let (bottom, rows) = rowsBelowTabs(in: area, routes: routes, skipping: owned, hidden: tabBarHidden)
-        for case let child as NodeView in root.subviews {
+        for case let child as NodeView in ownerMount(root).subviews {
             let box = child.convert(child.bounds, to: root)
             let below = rows.contains { $0 === child }
             let clears = !ExactEnv.authoredChrome && !routes.isEmpty && !owned.contains(child.id) && !box.isEmpty
@@ -56,7 +57,7 @@ extension NavigationHost {
         }
         // UIKit already supplies the indicator and any inset inherited from an outer container.
         reach.bottom = max(0, bottom - max(0, holder.safeAreaInsets.bottom - before.bottom))
-        if changed { PaintOrder.changed(root) }
+        if changed { PaintOrder.changed(ownerMount(root)) }
         // Exact's part only: what an app's hatch set on its container stays
         let now = owner.additionalSafeAreaInsets
         let wanted = UIEdgeInsets(top: now.top - before.top + reach.top, left: now.left - before.left + reach.left,

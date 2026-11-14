@@ -1017,9 +1017,13 @@ extension NavigationHost {
         return appearance
     }()
 
-    /// Register a replacement before its first native layout. Resolve only
-    /// the containing route, preserving that stack's Back relationships.
+    /// Keep the primary owner in the root's authored scroller. For a route's
+    /// replacement, register it before its first native layout, preserving Back.
     func scrollBackendChanged(_ node: NodeView) {
+        if node === container {
+            fitOwner()
+            return
+        }
         for current in ViewPresentation.controllers(for: node) {
             if let route = current as? RouteController, route.host === self, let stack = route.stack {
                 guard route.collapseScroll === node || route.edgeScroll === node || (node.scrollView != nil && contentScroller(of: route) === node) else { return }

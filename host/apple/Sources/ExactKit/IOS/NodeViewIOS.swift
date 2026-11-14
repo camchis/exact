@@ -739,6 +739,7 @@ package final class NodeView: UIView, UITextViewDelegate, UITextFieldDelegate, U
         presenter?.videoVisibility?.changed()
         presenter?.reaimFixedGradients()
         presenter?.scrollPump.scrolled(self)
+        if presenter?.navigation.container === self { presenter?.owners.publish() }
         FrameSampler.scrolled(scrollView, in: presenter?.session, person: false)
         presenter?.session?.frameHealth.trackScrolled(scrollView)
         repaintThrough()
@@ -1263,9 +1264,10 @@ package final class NodeView: UIView, UITextViewDelegate, UITextFieldDelegate, U
             // Neither axis scrolls any more: the children come back out.
             GlassGroups.moving(in: self) {
                 for child in sv.subviews where child is NodeView { addSubview(child) }
+                scroll = nil
+                if presenter?.navigation.container === self { presenter?.navigation.fitOwner() }
                 sv.removeFromSuperview()
             }
-            scroll = nil
             if pageBand != .zero || bandInset != .zero { more.pageBand = .zero; more.bandInset = .zero }
         }
         scroll?.scrollsX = (ox == "scroll" || ox == "auto")

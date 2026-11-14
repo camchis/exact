@@ -685,12 +685,16 @@ final class NavigationHost: NSObject, UINavigationControllerDelegate, UIGestureR
         return Projection(root: root, tabs: tabs, stacks: stacks, at: at, selected: range.upperBound - 1, wanted: wanted)
     }
 
-    /// The native container fills the page's area. It owns the screen, so
-    /// the document is in its mount, where no scroll view holds it (`hostDocument`).
+    /// The native container fills its authored scroller's box, or the session.
     func fitOwner() {
         presenter.hostDocument(fixed: wantsWholeView)
-        guard let owner = primaryOwner, let view = owner.viewIfLoaded, let root = view.superview else { return }
-        let frame = ownerFrame(owner, in: root)
+        guard let owner = primaryOwner, let view = owner.viewIfLoaded, let root = container else { return }
+        let mount = ownerMount(root)
+        if view.superview !== mount {
+            mount.addSubview(view)
+            placeOwner()
+        }
+        let frame = ownerFrame(owner, in: mount)
         if view.frame != frame { view.frame = frame }
     }
 
@@ -712,9 +716,10 @@ final class NavigationHost: NSObject, UINavigationControllerDelegate, UIGestureR
         nav.setViewControllers(first, animated: false)
         watchPops(nav)
         parent.addChild(nav)
-        nav.view.frame = ownerFrame(nav, in: p.root)
+        let mount = ownerMount(p.root)
+        nav.view.frame = ownerFrame(nav, in: mount)
         nav.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-        p.root.addSubview(nav.view)
+        mount.addSubview(nav.view)
         nav.view.setPaintForeground(aboveAuthored: false)
         fitOwner()
         nav.didMove(toParent: parent)
@@ -945,19 +950,21 @@ final class NavigationHost: NSObject, UINavigationControllerDelegate, UIGestureR
     /// an authored tablist, a toast. On top of every child it hid a sibling
     /// tablist and a root overlay, and took their taps (shop F21, recipes F23).
     func placeOwner() {
-        guard let root = container, let owner = primaryOwner?.view, owner.superview === root else { return }
+        guard let root = container, let owner = primaryOwner?.view else { return }
+        let mount = ownerMount(root)
+        guard owner.superview === mount else { return }
         let ids = logicalChildren[root.id] ?? []
         let panels = tabPanels.compactMap { presenter.views[$0] }
         let region = ids.firstIndex { id in
             routeIDs.contains(id) || presenter.views[id].map { child in panels.contains { $0 === child || $0.isDescendant(of: child) } } == true
         }
         let after = Set(region.map { ids[($0 + 1)...] } ?? [])
-        guard let next = root.subviews.first(where: { ($0 as? NodeView).map { after.contains($0.id) } == true }) else {
-            if root.subviews.last !== owner { root.bringSubviewToFront(owner) }
+        guard let next = mount.subviews.first(where: { ($0 as? NodeView).map { after.contains($0.id) } == true }) else {
+            if mount.subviews.last !== owner { mount.bringSubviewToFront(owner) }
             return
         }
-        let at = root.subviews.firstIndex { $0 === next }!
-        if at == 0 || root.subviews[at - 1] !== owner { root.insertSubview(owner, belowSubview: next) }
+        let at = mount.subviews.firstIndex { $0 === next }!
+        if at == 0 || mount.subviews[at - 1] !== owner { mount.insertSubview(owner, belowSubview: next) }
     }
 
     /// A route's controller leaves for good: its header paints again and the
