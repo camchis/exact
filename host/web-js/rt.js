@@ -779,6 +779,7 @@ Object.assign(Link, {
   busy: () => !!Writes,
   poisoned: () => Poisoned,
   pauseTimers,
+  Invocation,
 });
 /** The app's data sources (LLP 1016). `answer(source, args, store)` gives `{v}` now, `{req}` (an HTTP request the host
  * runs, then `parse`s), a Promise (an executor-local continuation: TypeScript), or `null` while the source is not
