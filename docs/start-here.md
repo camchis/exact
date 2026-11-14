@@ -157,6 +157,7 @@ For EAS Build, use [iOS](recipes/eas-ios.md) or [Android](recipes/eas-android.md
 |a number field, a stepper's `step`|`number-field`, `stepper`|
 |a pick from six or more options (a picker)|`select`|
 |a chat that opens at its newest message|`chat-thread`|
+|a chat header with an avatar, and day pills|`chat-header`|
 |a long list or grid that loads more|`long-lists`|
 |a document or article longer than a screen, a long Markdown note|`long-text`|
 |a welcome at first launch|`first-launch`|
