@@ -6,6 +6,8 @@ use std::time::Instant;
 
 #[path = "fail_backend.rs"]
 mod fail_backend;
+#[path = "inline_opacity_tests.rs"]
+mod inline_opacity;
 #[path = "input_clock_tests.rs"]
 mod input_clock;
 #[path = "projection_discriminator_tests.rs"]
@@ -64,6 +66,7 @@ fn ready(p: &mut Presenter<()>) {
         assert!(p.poll_content_region().is_none());
     }
 }
+
 #[test]
 fn non_cpu_region_refuses_before_plan_font_or_device_work() {
     for choice in [PainterChoice::Auto, PainterChoice::Gpu] {

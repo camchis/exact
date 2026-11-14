@@ -1482,8 +1482,7 @@ package final class NodeView: UIView, UITextViewDelegate, UITextFieldDelegate, U
                 defer { Presenter.signposts.endInterval("text-draw", post); HostPhases.shared.end(phase) }
                 let spec = paragraphSpec()
                 if let paragraph = paragraphLayout() { eachFragment(ctx) { box, at, lines in
-                    paintBackgroundThroughText(ctx, paragraph: paragraph, spec: spec, in: box, lines: lines)
-                    TextEngine.draw(paragraph, spec: spec, in: box, context: ctx, dirty: rect.offsetBy(dx: -at.x, dy: -at.y), lines: lines) } }
+                    drawParagraph(ctx, paragraph: paragraph, spec: spec, in: box, dirty: rect.offsetBy(dx: -at.x, dy: -at.y), lines: lines) } }
             }
         }
         if !cssVisibilityHidden, Capture.capturing, let picture = Capture.web[id] {
