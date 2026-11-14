@@ -104,7 +104,7 @@ import { fileURLToPath } from 'node:url';
 import { conformArgs } from './conform-args.mjs';
 import { withoutSlots } from './conform-linux.mjs';
 import { WASM_UNBOUND, markUnbound, referenceTapRefused } from './conform-marked.mjs';
-import { clockOnAll, parseStep } from './conform-steps.mjs';
+import { clockOnAll, failedTests, parseStep } from './conform-steps.mjs';
 import { open } from '../../scripts/agent.mjs';
 import { reloadWeb } from '../../scripts/agent-test.mjs';
 import { refuseStale, webChanges } from '../../scripts/agent-launch.mjs';
@@ -822,15 +822,6 @@ async function drive(t, report, targetFail, dir, ws, js) {
     const [rw, ...results] = await Promise.all([run(w2.url), ...browsers.map(browser => run(j2.url, browser))]);
     w2.close(); j2.close();
     const lines = s => s.split('\n').filter(l => l.startsWith('test '));
-    const failedTests = output => {
-      const all = output.trim().split('\n'), found = [];
-      for (let i = 0; i < all.length; i++) if (/^test .*\bFAIL\b/.test(all[i])) {
-        const detail = [all[i]];
-        while (i + 1 < all.length && !/^test |^\d+ passed,/.test(all[i + 1])) detail.push(all[++i]);
-        found.push(detail.map(line => line.trim()).filter(Boolean).join(' | '));
-      }
-      return found;
-    };
     const lw = lines(rw.output);
     report.targets[t.name].tests = { [reference]: rw.output.trim().split('\n').at(-1) };
     const recordTests = (result, label) => {

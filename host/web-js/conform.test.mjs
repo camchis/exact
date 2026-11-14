@@ -1,6 +1,6 @@
 import { test, expect } from 'bun:test';
 import { conformArgs } from './conform-args.mjs';
-import { clockOnAll, clockVerdict, parseStep } from './conform-steps.mjs';
+import { clockOnAll, clockVerdict, failedTests, parseStep } from './conform-steps.mjs';
 import { open } from '../../scripts/agent.mjs';
 import { launchFacts, suiteBrowser } from '../../scripts/agent-launch.mjs';
 import { browserMissing } from '../../scripts/agent-playwright.mjs';
@@ -26,7 +26,7 @@ async function fixtureDrive(browser, {
     ...comparisons, crossBrowser: browser, crossBrowsers: browser?.split(',') ?? [],
     readyBrowsers: browser?.split(',') ?? [], maxSteps: 3,
     STATE_KEYS: ['slots'], LINUX_APART: {}, LINUX_OPS: [], linuxFor: () => null, linuxRef: false,
-    root: '/checkout', here: '/checkout/host/web-js', resolve, parseStep, clockOnAll,
+    root: '/checkout', here: '/checkout/host/web-js', resolve, parseStep, clockOnAll, failedTests,
     resolveApp: () => ({ dir: '/fixture' }),
     existsSync: path => path.endsWith('.steps') || (appTests && path.endsWith('app.test.contract')),
     readFileSync: path => path.endsWith('.steps') ? script : '',
@@ -942,4 +942,9 @@ test('bound comparisons include the evaluation and words while joining view and 
     .toEqual(reasons([`poisoned: Instance(Trap(IterationLimit { pc: 17 })) in site 58 each subject${suffix}`]));
   expect(reasons([`refused: Trap(IterationLimit { pc: 17 }) in derive "a"${suffix}`]))
     .not.toEqual(reasons([`refused: Trap(IterationLimit { pc: 17 }) in derive "b"${suffix}`]));
+});
+
+test('a failed test\'s detail leaves out a long test\'s progress and the property count', () => {
+  const output = ['test "a": FAIL', '  a: line 3: expected 1', 'still running test "b": 30s, at line 9 of 12 (drag)', 'properties on web: 4 always line checks', 'test "b": FAIL', '  b: line 9: no', '1 passed, 2 failed'].join('\n');
+  expect(failedTests(output)).toEqual(['test "a": FAIL | a: line 3: expected 1', 'test "b": FAIL | b: line 9: no']);
 });

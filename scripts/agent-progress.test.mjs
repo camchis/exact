@@ -10,8 +10,8 @@ import { heartbeat } from './agent.mjs';
 
 test('a long test says its line, its last and how long it has run; a drag says why it is slow', () => {
   const at = { name: 'flings', line: 150, last: 265, since: 0 };
-  assert.equal(heartbeat({ ...at, op: 'expect' }, 45_000), 'test "flings": running 45s, at line 150 of 265 (expect)');
-  assert.equal(heartbeat({ ...at, op: 'drag' }, 130_000), 'test "flings": running 2m10s, at line 150 of 265 (drag); a drag past the viewport is several strokes, each landing before the next');
+  assert.equal(heartbeat({ ...at, op: 'expect' }, 45_000), 'still running test "flings": 45s, at line 150 of 265 (expect)');
+  assert.equal(heartbeat({ ...at, op: 'drag' }, 130_000), 'still running test "flings": 2m10s, at line 150 of 265 (drag); a drag past the viewport is several strokes, each landing before the next');
 });
 
 test('test prints each result as it lands and, while a test runs long, where it is', () => {
@@ -37,8 +37,8 @@ test('test prints each result as it lands and, while a test runs long, where it 
     const r = spawnSync(process.execPath, ['-e', source], { cwd: dir, encoding: 'utf8', timeout: 20_000, env: { ...process.env, EXACT_FEEDBACK: '0' } });
     assert.equal(r.status, 1, r.stdout + r.stderr);
     assert.deepEqual(r.stdout.split('\n').filter(Boolean), ['test "quick": ok', '-- between', 'test "slow": FAIL', '1 passed, 1 failed']);
-    assert.match(r.stderr, /^test "slow": running \d+s, at line 5 of 9 \(drag\); a drag past the viewport/m);
-    assert.doesNotMatch(r.stderr, /test "quick": running/);
+    assert.match(r.stderr, /^still running test "slow": \d+s, at line 5 of 9 \(drag\); a drag past the viewport/m);
+    assert.doesNotMatch(r.stderr, /running test "quick"/);
     assert.match(r.stderr, /^ {2}slow: line 9: no$/m);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });

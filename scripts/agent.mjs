@@ -130,11 +130,12 @@ export { Cdp, browserDiagnosticNoise };
 /** How long a test runs before `test` says where it is, and how often after. */
 export const HEARTBEAT_MS = 30000;
 
-/** Where a long test is: its line of its last, how long it has run, and, at a drag, why a drag is slow. */
+/** Where a long test is: its line of its last, how long it has run, and, at a drag, why a drag is slow. Not a
+ * `test "…":` line, which conform.mjs reads as a result. */
 export const heartbeat = ({ name, line, last, op, since }, now) => {
   const s = Math.round((now - since) / 1000), took = s < 60 ? `${s}s` : `${Math.floor(s / 60)}m${String(s % 60).padStart(2, '0')}s`;
   const drag = op === 'drag' ? '; a drag past the viewport is several strokes, each landing before the next' : '';
-  return `test "${name}": running ${took}, at line ${line} of ${last} (${op})${drag}`;
+  return `still running test "${name}": ${took}, at line ${line} of ${last} (${op})${drag}`;
 };
 
 export const DRIVEN_HOSTS = ['web', 'macos', 'mac', 'ios', 'linux', 'android', 'windows', 'host', 'host-ios'];
