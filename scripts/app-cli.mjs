@@ -301,11 +301,16 @@ async function verbRun({ dir, name, game = false, exact2, args }, reply) {
   return exit; };
   // A verb that builds the app bundles app.ts with rolldown from this checkout's node_modules (the web's build and
   // every native bake); without it Bun's auto-install spins silently instead of failing. A drive of a site already
-  // built (`--url`, `--web-dist`) and `serve` of a build build nothing.
+  // built (`--web-dist`, or `--url` naming another origin; a path is the app's own, built first) and `serve` of a
+  // build build nothing.
+  const url = rest[rest.indexOf('--url') + 1] ?? '';
   const builds = ['web', 'web-build', 'test', 'agent', 'verify', 'ios', 'mac', 'linux', 'windows', 'android'].includes(verb)
-    && !rest.some((a) => a === '--url' || a === '--web-dist');
+    && !rest.includes('--web-dist') && !(rest.includes('--url') && /^[a-z][\w+.-]*:/i.test(url));
   if (builds && !['rolldown', 'rolldown.exe'].some((bin) => existsSync(resolve(exact2, 'node_modules/.bin', bin)))) {
-    console.error(`${verb}: exact's node_modules is missing: run \`bun install --frozen-lockfile\` in ${exact2} (every build's type check imports rolldown from it)`);
+    const error = `exact's node_modules is missing: run \`bun install --frozen-lockfile\` in ${exact2} (every build's type check imports rolldown from it)`;
+    console.error(`${verb}: ${error}`);
+    // Under `--json` the one object on stdout says so too: a build's `{code, error}`, a drive's or verify's `{error, exit}`.
+    if (rest.includes('--json')) { if (reply) reply({ code: 'node_modules_missing', error }); else console.log(JSON.stringify({ error, exit: 1 })); }
     return log(1);
   }
   // A drive with no host the app ships here runs nowhere, and says why (verify runs its semantics check alone).

@@ -804,7 +804,7 @@ async function newApp(path, {update = false, without = null, with: platforms = [
     printReport(report, {onlyMissing: true});
   }
   // The table above is the web's (LLP 1153 D1.6): a platform the app names is checked before its first build.
-  for (const platform of game ? [] : platforms ?? []) console.log(`Before the first ${platform} build: bun exact.mjs setup --check --platform ${platform} names what it lacks (the Xcode or SDK it needs among them).`);
+  for (const platform of game ? [] : platforms ?? []) console.log(`Before the first ${platform} build: bun ${resolve(ROOT, 'scripts/exact.mjs')} setup --check --platform ${platform} names what it lacks (the Xcode or SDK it needs among them).`);
   if (note >= 0) console.log(created.slice(note));
   if (noRust) console.log('\nWithout Rust, this machine cannot check or build the app locally: `bun exact.mjs contract build app.contract` and every local build or dev loop compile exact2\'s tools first. A build service builds it as it is; to check here, install rustup (https://rustup.rs).');
 }
