@@ -203,8 +203,8 @@ final class NodeExtras {
     /// A control bar over a scroller's content (LLP 1131 D3, D4): the scroller's paint rank, which it is placed
     /// above, and UIKit's edge effect.
     var bandOver: Int64?
-    /// A child of the navigation root that no route's box meets: it paints
-    /// over the native container (`NavigationHost.clearBesideRoutes`).
+    /// A child beside the routes or below their tab panels: it paints over
+    /// the whole-view native container (`NavigationHost.clearBesideRoutes`).
     var clearsNavigation = false
     var edgeInteraction: AnyObject?
     var scrollWritten: String?

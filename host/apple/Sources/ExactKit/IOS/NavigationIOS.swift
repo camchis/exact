@@ -249,6 +249,8 @@ final class RouteController: UIViewController, UIScrollViewDelegate {
             var keys: CGFloat = 0
             if contentViewport == nil, presenter.editsInBar(of: view), let top = presenter.keyboardTop, let window = view.window {
                 let edge = view.convert(CGPoint(x: 0, y: top), from: window).y
+                // Extend the inherited safe area (including a row beside the tabs) to the keys;
+                // the keyboard and that row obstruct the same edge.
                 keys = max(0, view.bounds.maxY - edge - (view.safeAreaInsets.bottom - additionalSafeAreaInsets.bottom))
             }
             if additionalSafeAreaInsets.bottom != keys { additionalSafeAreaInsets.bottom = keys }
