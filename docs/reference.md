@@ -1076,7 +1076,10 @@ its baked assets. Keep the tree in a dedicated directory beside `app.json`:
 `mac --bundle` copies it to `Contents/Resources/server`, preserving file modes,
 names such as `node_modules/@scope`, and relative symlinks within the tree.
 These files have no bake size cap and are excluded from TypeScript capture and
-web assets. `from` cannot overlap source, asset or output roots; `to` must name
+web assets. `from` cannot overlap source, asset or output roots: it is refused
+under `assets/`, `deck/`, `gpu/`, `fonts/`, `strings/`, `web/`, `apple/`, `linux/`,
+`src/`, `data/`, `modules/`, `node_modules/`, `target/` or `dist/` (a JSON file the
+app ships goes in a directory of its own, such as `data-files/`); `to` must name
 a private subtree of `Resources/`, `Helpers/` or `Frameworks/`. Mach-O helpers
 and libraries are signed before the outer bundle; `exact release` signs them
 with its release identity. Resource changes require a new binary, not an asset
