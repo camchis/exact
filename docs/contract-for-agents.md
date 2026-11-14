@@ -1646,6 +1646,7 @@ under `apple`, and `token.authorization` containing `id_token`, `code` and
 `state`. First-authorization name and email, when supplied, are in
 `token.user`. A dismissal returns `NetworkError`, as the web does; runtime
 cancellation returns `AbortError`.
+Backgrounding returns `NotAllowedError` for an open or waiting sheet.
 
 Pass the raw server nonce in `params.nonce`. Both the native request and
 the web authorization URL carry it unchanged. Apple's
@@ -1664,11 +1665,16 @@ unavailable and requests return `NotSupportedError`. iOS leaves entitlement
 validation to AuthenticationServices; an authorization failure returns `IdentityCredentialError` with Apple's code. A simulator run
 does not establish successful sign-in on a signed device.
 
-Google on Apple, `getCredentialState`, and the combined Apple/passkey sheet
-remain unimplemented. Native capabilities report Google unavailable and Apple
-`withPublicKey: false`. For Google on Apple, use `@exact/oauth` through the
-system browser. A combined `publicKey` and passive `identity` call still belongs to
-passkeys; this Apple-only path does not implement it (LLP 1133.014 D10).
+Pass both `publicKey` and passive `identity` to `get` for one system sheet
+offering a passkey and Sign in with Apple. Passkeys owns the controller and
+the call's lifetime; sign-in builds the Apple request and decodes its result
+(LLP 1133.014 D10). Apple `withPublicKey` follows its entitlement availability.
+A newer credential ceremony ends a pending passive request with `AbortError`.
+Other credential sheets wait in session order, across passkeys and sign-in.
+Active identity requests and `silent` or `conditional` mediation cannot share
+the sheet. Google on Apple and `getCredentialState` remain unimplemented.
+Native capabilities report Google unavailable; use `@exact/oauth` through
+the system browser for Google.
 
 ### Convex live queries
 

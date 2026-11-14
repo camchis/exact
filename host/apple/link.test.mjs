@@ -13,6 +13,85 @@ import { resolveApp } from '../../scripts/app.mjs';
 import { appleComposition, assertCapabilityFrameworks, assertLinkedSdk, compiledTargets, deploymentTargets, iosSimulatorTarget, loadedDylibs, recordMinimumOS } from './link.mjs';
 import { composedModule, moduleSeam, systemFrameworks } from './compose.mjs';
 import { writeDataKeys } from './data-keys.mjs';
+import { appleImplementations } from '../../js/bake/src/typescript.mjs';
+
+test.skipIf(process.platform !== 'darwin')('credential members load before their owner and stay in their session', () => {
+  useXcode();
+  const root = resolve(import.meta.dir, '../..'), dir = mkdtempSync(resolve(root, 'target/credential-members-'));
+  const run = args => {
+    const result = spawnSync('xcrun', ['--sdk', 'macosx', 'swiftc', '-swift-version', '5', ...args], { encoding: 'utf8' });
+    assert.equal(result.status, 0, result.stderr);
+  };
+  const write = (name, text) => { const path = resolve(dir, name); writeFileSync(path, text); return path; };
+  try {
+    const packages = appleImplementations(resolve(root, 'apps/auth-fixture'), 'macos', { passkeys: '@exact/passkeys', 'sign-in': '@exact/sign-in' });
+    assert.deepEqual(packages.find(p => p.extension === 'sign-in').credentialMembers, ['passkeys#get.identity']);
+    run(['-parse-as-library', '-emit-library', '-emit-module', '-module-name', 'ExactPackage',
+      resolve(root, 'host/apple/modules/ExactPackage.swift'), '-o', resolve(dir, 'libExactPackage.dylib')]);
+    const owner = write('Owner.swift', `import Foundation
+import ExactPackage
+public final class Owner: ExactPackage {
+    let context: ExactPackageContext
+    public init(context: ExactPackageContext) { self.context = context }
+    public func later(_ name: String, _ args: [String: Any], preferred: Any?, reply: @escaping ([String: Any]) -> Void) {
+        do { reply(try context.credentials.request("passkeys#get.identity", args: args).answer(NSObject())!) }
+        catch { reply(["error": "missing-member"]) }
+    }
+    public func call(_ name: String, _ args: [String: Any]) throws -> [String: Any] { [:] }
+}`);
+    const member = write('Member.swift', `import Foundation
+import ExactPackage
+public final class Member: ExactPackage, ExactCredentialMember {
+    let context: ExactPackageContext
+    public init(context: ExactPackageContext) {
+        self.context = context
+        context.credentials.register("passkeys#get.identity", member: self)
+    }
+    public func credentialRequest(_ args: [String: Any]) throws -> ExactCredentialRequest {
+        ExactCredentialRequest(requests: [NSObject()]) { [context] _ in ["session": context.session, "identity": args["identity"]!] }
+    }
+    public func later(_ name: String, _ args: [String: Any], preferred: Any?, reply: @escaping ([String: Any]) -> Void) { reply([:]) }
+    public func call(_ name: String, _ args: [String: Any]) throws -> [String: Any] { [:] }
+}`);
+    for (const [name, path] of [['Owner', owner], ['Member', member]]) run(['-parse-as-library', '-emit-library', '-emit-module',
+      '-I', dir, '-L', dir, '-lExactPackage', '-module-name', name, path, '-o', resolve(dir, `lib${name}.dylib`)]);
+    const composed = write('ExactComposed.swift', composedModule([
+      { extension: 'passkeys', module: 'Owner', className: 'Owner' },
+      { extension: 'sign-in', module: 'Member', className: 'Member', credentialMembers: packages.find(p => p.extension === 'sign-in').credentialMembers },
+    ], false));
+    const keys = resolve(dir, 'ExactDataKeys.swift');
+    writeDataKeys(resolveApp(resolve(root, 'apps/native-fixture')), keys, 'macos');
+    const main = write('main.swift', `import Foundation
+var answer: [String: Any] = [:]
+func session() -> ExactModule {
+    ExactComposedModule(context: ExactModuleContext(json: [:], host: nil, changed: { _, _, _ in }, now: { _ in 0 }))
+}
+func ask(_ module: ExactModule, _ value: String) -> String {
+    let reply = ExactReply(ctx: UnsafeMutableRawPointer(bitPattern: 1)) { _, status, bytes, count in
+        precondition(status == 200)
+        answer = try! JSONSerialization.jsonObject(with: Data(bytes: bytes!, count: count)) as! [String: Any]
+    }
+    precondition(ExactExtensions.later(module, ["extension": "passkeys", "send": "get", "args": ["publicKey": [:], "identity": value]], reply: reply))
+    precondition(answer["identity"] as? String == value)
+    return answer["session"] as! String
+}
+let first = session(), second = session()
+let a = ask(first, "first"), b = ask(second, "second")
+precondition(a != b)
+precondition(ask(first, "again") == a)
+ExactExtensions.destroy(first)
+precondition(ask(second, "survives") == b)
+ExactExtensions.destroy(second)
+print("credential member loading and isolation passed")
+`);
+    const binary = resolve(dir, 'members');
+    run(['-I', dir, '-L', dir, '-lExactPackage', '-lOwner', '-lMember', '-Xlinker', '-rpath', '-Xlinker', dir,
+      ...moduleSeam(resolve, root), keys, composed, main, '-o', binary]);
+    const result = spawnSync(binary, [], { encoding: 'utf8' });
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /credential member loading and isolation passed/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+}, 60_000);
 
 for (const [sdk, ios, tv] of [['appletvsimulator', true, true], ['iphonesimulator', true, false], ['macosx', false, false]]) {
   test.skipIf(process.platform !== 'darwin')(`native-fixture's Apple module typechecks for ${sdk}`, async () => {
