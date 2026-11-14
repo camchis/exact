@@ -219,3 +219,17 @@ fn an_intrinsic_size_lays_out() {
     assert!(batch.contains("\"error\":null"), "{batch}");
     assert!(host.layout_calls > layouts);
 }
+
+#[test]
+fn a_panic_inside_an_inert_entry_ends_it() {
+    let mut host = boot();
+    let caught = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        host.in_inert_entry(|_| -> String { panic!("a commit failed") })
+    }));
+    assert!(caught.is_err());
+    assert!(!host.inert_entry);
+    // The viewport after it still lays out in full.
+    let layouts = host.layout_calls;
+    host.resize(392.0, 844.0);
+    assert!(host.layout_calls > layouts);
+}

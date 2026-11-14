@@ -503,6 +503,17 @@ impl<D: DataSource> Host<D> {
         self.emit_collections(batch)
     }
 
+    /// Commits from an entry where only the commits move the tree
+    /// (`inert_entry`): a list's feedback, an event's action, an advance.
+    /// The flag ends with the commit, even when a panic unwinds through it
+    /// to a caller that keeps the host.
+    pub(super) fn in_inert_entry<T>(&mut self, commit: impl FnOnce(&mut Self) -> T) -> T {
+        self.inert_entry = true;
+        let out = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| commit(self)));
+        self.inert_entry = false;
+        out.unwrap_or_else(|panic| std::panic::resume_unwind(panic))
+    }
+
     /// An advance whose commits changed no node ([`Host::commit_tree`]): no
     /// layout unless a held height moved, but what layout keeps besides
     /// boxes still follows the commits. A commit can change a list's data
