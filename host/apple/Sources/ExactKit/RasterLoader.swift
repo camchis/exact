@@ -756,6 +756,19 @@ final class RasterLoader {
         interests.values.filter { i in !i.delivered && (i.failure == nil || i.held) && i.view.map(Self.mayShow) == true }.count
             + deferred.values.filter { $0.view.map(Self.mayShow) == true }.count
     }
+    /// A fragment follows its route's pictures until their first load or error,
+    /// including ones above the port. Resolution changes and parking keep that outcome.
+    /// A picture waiting to be on screen (parked, or a retry held off screen)
+    /// asks for nothing meanwhile, so it is not loading.
+    func loading(inside root: NodeView) -> Bool {
+        interests.values.contains { item in
+            guard let view = item.view, view.loadGeneration == item.generation else { return false }
+            return !item.announced && !item.parked && !(item.held && item.offscreen) && view.isDescendant(of: root)
+        } || deferred.values.contains { item in
+            guard let view = item.view, view.loadGeneration == item.generation else { return false }
+            return view.isDescendant(of: root)
+        }
+    }
     /// A loading image's box is on screen. An image sized on one axis
     /// (`width=96`, no height) has an empty box until its natural size
     /// lands, so an empty side counts as one point.
@@ -1321,6 +1334,8 @@ final class RasterLoader {
     /// The natural sizes a pass landed, then each source's first `load` or `error`.
     private func publish(_ landed: [(view: NodeView, generation: Int, size: CGSize)], _ settled: [(view: NodeView, generation: Int?, failure: String?)]) {
         report(landed); Self.announce(settled)
+        let presenter = landed.lazy.compactMap { $0.view.presenter }.first ?? settled.lazy.compactMap { $0.view.presenter }.first
+        presenter?.flushFragment()
         #if DEBUG
         testAnnounced = Array((testAnnounced + settled.map { ($0.view.id, $0.failure) }).suffix(64))
         #endif

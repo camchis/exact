@@ -59,6 +59,7 @@ extension Presenter {
 
     /// `given`: the node to align, found by its caller (a fragment's, in its route: `Fragment.swift`).
     func scrollElementIntoView(_ args: [Any], target given: NodeView? = nil) {
+        if given == nil { cancelFragment() }
         guard let name = args.first as? String,
               let target = given ?? views.values.sorted(by: { $0.id < $1.id }).first(where: { $0.props["id"] == name }),
               target.window != nil else {
@@ -176,7 +177,9 @@ final class ElementScrolls {
     /// target replaced, recycled into another row, or on an inactive route
     /// cancels its request.
     func flush() {
-        guard !held.isEmpty, !presenter.applying else { return }
+        guard !presenter.applying else { return }
+        defer { presenter.flushFragment() }
+        guard !held.isEmpty else { return }
         let settling = presenter.settlesElementScroll
         for entry in held {
             guard let node = entry.node, node.incarnation == entry.incarnation, presenter.views[node.id] === node,
@@ -278,7 +281,7 @@ extension Presenter {
 
     /// `given`: the node to align, found by its caller (a fragment's, in its route: `Fragment.swift`).
     func scrollElementIntoView(_ args: [Any], target given: NodeView? = nil) {
-        if given == nil, let fragment = fragmentHeld { elementScrolls.drop(fragment); fragmentHeld = nil } // the author's scroll wins over a fragment's still held
+        if given == nil { cancelFragment() }
         guard let name = args.first as? String,
               let target = given ?? views.values.sorted(by: { $0.id < $1.id }).first(where: { $0.props["id"] == name }) else {
             session?.log("scrollIntoView \"\(args.first ?? "")\" refused: no live node with that id")

@@ -14,6 +14,7 @@ const read = (cmd, args, opts = {}) => spawnSync(cmd, args, { encoding: 'utf8', 
  * Plans embed the current schema digest. App entries need the test app's `appId` to boot. */
 export function compileFixtures(root, run, env, dir, prefix, appId) {
   const contract = args => run(env.EXACT_CONTRACT, ['build', ...args]);
+  contract([resolve(root, 'host/apple/tests/fixtures/fragment.contract'), '-o', env[`${prefix}_FRAGMENT_PLAN`] = resolve(dir, 'fragment.plan')]);
   if (prefix === 'TEST_RUNNER_EXACT') {
     // LaunchColorIOSTests reads the build's XML and compiled catalogue as an app bundle.
     const fixtures = env[`${prefix}_LAUNCH_COLOR_FIXTURES`] = resolve(dir, 'launch-colors');

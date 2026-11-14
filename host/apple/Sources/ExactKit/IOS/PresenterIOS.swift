@@ -311,6 +311,7 @@ package final class Presenter {
     /// A restart: every view goes.
     func reset() {
         resetting = true; defer { resetting = false }
+        resetFragments()
         MainActor.assumeIsolated { HeldState.retire(self) } // before its views leave the map (HeldState.swift)
         WakeLock.hold(self, false) // the new host's first batch says it again
         releaseOrientationLock()
@@ -397,7 +398,8 @@ package final class Presenter {
     /// Replacing a node with the same HTML id cannot inherit it.
     private var pendingFocus: (node: NodeView, name: String?, selectText: Bool, reason: String)?
     private var deliveringFocus = false; lazy var elementScrolls = ElementScrolls(self) // held `scrollIntoView` requests (IntoView.swift)
-    var personScrolls = 0, fragmentArm: (activation: Int, scrolls: Int)?, fragmentSeen = 0, fragmentHeld: String? // the person's drags of a scroller; the activation a router change asked a fragment's scroll for and their count then, which one since cancels; the last armed; the fragment's request held (Fragment.swift)
+    var personScrolls = 0, fragmentArm: (activation: Int, scrolls: Int)?, fragmentSeen = 0
+    var fragmentHeld: FragmentHold?
     var pendingFocusObservation: [String: String]? {
         guard let pending = pendingFocus else { return nil }
         return ["target": pending.name ?? "#\(pending.node.id)", "reason": pending.reason]
@@ -914,6 +916,7 @@ package final class Presenter {
             case .paragraph:
                 applyParagraph(id, op.runs)
             case .props:
+                fragmentOffsetsWritten(op)
                 if flats.isFlat(id) { if flats.props(id, op) { return }; flats.promote(id) }
                 if let view = views[id] { anchorChanges.noteProps(op, on: view) }
                 views[id]?.applyProps(set: op.props, clear: op.clear)

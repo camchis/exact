@@ -176,6 +176,7 @@ final class RasterLoaderTests: XCTestCase {
         XCTAssertEqual(loader.loadingOnScreen, 0)
         // Scrolled on screen, a parked view asks again and paints.
         let back = try XCTUnwrap(parked.first)
+        XCTAssertFalse(loader.loading(inside: back), "a landed picture stays complete while parked off screen")
         back.frame.origin = .zero
         NotificationCenter.default.post(name: NSView.boundsDidChangeNotification, object: presenter.viewport.contentView)
         settle { back.raster != nil }
@@ -184,6 +185,34 @@ final class RasterLoaderTests: XCTestCase {
         XCTAssertEqual(images(loader).first { $0["view"] as? UInt32 == back.id }?["parked"] as? Bool, false)
         XCTAssertEqual(away.filter { $0.raster == nil }.count, parked.count)
         XCTAssertEqual(loader.diagnostics["parked"] as? Int, parked.count)
+    }
+    /// A picture parked off screen before its first outcome asks for nothing
+    /// until it shows, so a fragment's alignment cannot wait on it.
+    func testAPictureParkedBeforeItsFirstOutcomeIsNotLoadingInsideARoute() throws {
+        let (root, resolver, presenter, node, loader, window) = try fixture()
+        var shown: [NodeView] = []
+        defer {
+            loader.shutdown(); node.raster = nil; shown.forEach { $0.raster = nil }; window.close()
+            try? FileManager.default.removeItem(at: root)
+        }
+        // Seventeen 600 × 600 pictures on screen hold 23.7 of the 32 MiB, and
+        // an eighteenth's 8.5 MiB peak has no room beside them.
+        let side = 600 / window.backingScaleFactor
+        for i in 0..<17 {
+            let view = NodeView(id: UInt32(i + 2), kind: "image", presenter: presenter)
+            view.frame = NSRect(x: 0, y: 0, width: side, height: side)
+            presenter.views[view.id] = view; presenter.viewport.addSubview(view); shown.append(view)
+            try autoreleasepool { try png(root, "shown-\(i).png", width: 600, height: 600, identity: 60 + i) }
+            view.loadGeneration = 1
+            XCTAssertTrue(loader.load(view, source: "shown-\(i).png", resolver: resolver))
+        }
+        settle { shown.allSatisfy { $0.raster != nil } }
+        try png(root, "away.png", width: 600, height: 600, identity: 80)
+        node.frame = NSRect(x: 0, y: 10_000, width: side, height: side); node.loadGeneration = 1
+        XCTAssertTrue(loader.load(node, source: "away.png", resolver: resolver))
+        settle { self.images(loader).first { $0["view"] as? UInt32 == node.id }?["parked"] as? Bool == true }
+        XCTAssertFalse(loader.testAnnounced.contains { $0.view == node.id }, "parked before its load or error")
+        XCTAssertFalse(loader.loading(inside: node), "a parked picture is not loading")
     }
     /// A decode ImageIO declines is asked for again after a delay, loading
     /// all the while, and paints with no prop change, reload or new source.
@@ -622,6 +651,28 @@ final class RasterLoaderTests: XCTestCase {
         let decoded = loader.diagnostics["decoded"] as? Int
         for _ in 0..<100 { loader.resized(node) }
         XCTAssertEqual(loader.diagnostics["decoded"] as? Int, decoded)
+    }
+    func testFragmentLoadingEndsAtTheFirstImageOutcome() throws {
+        let (root, resolver, presenter, node, loader, window) = try fixture()
+        defer { loader.shutdown(); node.raster = nil; window.close(); try? FileManager.default.removeItem(at: root) }
+        try png(root, "picture.png", width: 1200, height: 600, identity: 51)
+        node.loadGeneration += 1
+        loader.testRequest = { _ in (0, 8) }
+        loader.load(node, source: "picture.png", resolver: resolver)
+        XCTAssertTrue(loader.loading(inside: node))
+        loader.testRequest = nil
+        loader.reconcile()
+        settle { node.raster != nil }
+        XCTAssertFalse(loader.loading(inside: node))
+        loader.testRequest = { _ in (0, 8) }
+        node.frame.size = CGSize(width: 400, height: 200)
+        loader.resized(node)
+        XCTAssertNotNil(node.raster, "a resolution retry keeps the first picture")
+        XCTAssertGreaterThan(loader.loadingOnScreen, 0)
+        XCTAssertFalse(loader.loading(inside: node), "a resolution retry cannot prolong fragment alignment")
+        node.loadGeneration += 1
+        loader.load(node, source: "replacement.png", resolver: resolver)
+        XCTAssertTrue(loader.loading(inside: node), "a new source has its own outcome")
     }
     func testRetiringTwoHangingHTTPInspectionsFreesWorkersForAnotherSession() throws {
         for operation in ["cancel", "reset", "pause", "shutdown"] {
