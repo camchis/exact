@@ -300,12 +300,12 @@ async function verbRun({ dir, name, game = false, exact2, args }, reply) {
   } catch {}
   return exit; };
   // A verb that builds the app bundles app.ts with rolldown from this checkout's node_modules (the web's build and
-  // every native bake); without it Bun's auto-install spins silently instead of failing. A drive of a site already
-  // built (`--web-dist`, or `--url` naming another origin; a path is the app's own, built first) and `serve` of a
-  // build build nothing.
-  const url = rest[rest.indexOf('--url') + 1] ?? '';
-  const builds = ['web', 'web-build', 'test', 'agent', 'verify', 'ios', 'mac', 'linux', 'windows', 'android'].includes(verb)
-    && !rest.includes('--web-dist') && !(rest.includes('--url') && /^[a-z][\w+.-]*:/i.test(url));
+  // every native bake); without it Bun's auto-install spins silently instead of failing. A web drive of a site
+  // already built (`--web-dist`, or a `--url` that is not a path: a path is the app's own, built first, as
+  // `drivesWeb` below) and `serve` of a build build nothing; a native `--url` (live reload) still bakes.
+  const builtSite = (verb === 'test' || verb === 'agent') && host === 'web'
+    && rest.some((a, i) => (a === '--url' && !rest[i + 1]?.startsWith('/')) || a === '--web-dist');
+  const builds = ['web', 'web-build', 'test', 'agent', 'verify', 'ios', 'mac', 'linux', 'windows', 'android'].includes(verb) && !builtSite;
   if (builds && !['rolldown', 'rolldown.exe'].some((bin) => existsSync(resolve(exact2, 'node_modules/.bin', bin)))) {
     const error = `exact's node_modules is missing: run \`bun install --frozen-lockfile\` in ${exact2} (every build's type check imports rolldown from it)`;
     console.error(`${verb}: ${error}`);
