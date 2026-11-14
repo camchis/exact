@@ -5,6 +5,9 @@ use super::*;
 mod advance_tests;
 #[path = "closed.rs"]
 pub(super) mod closed;
+#[cfg(test)]
+#[path = "inert_commit_tests.rs"]
+mod inert_commit_tests;
 #[path = "separator.rs"]
 pub(super) mod separator;
 
