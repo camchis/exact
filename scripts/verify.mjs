@@ -47,7 +47,7 @@ import { createRequire } from 'node:module';
 import { availableParallelism, loadavg, networkInterfaces } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { findings as feelFindings, summary as feelSummary } from '../host/apple/feel/analyze.mjs';
-import { compilerWarnings, information, shippedHost, windowsWindow } from './app-cli.mjs';
+import { compilerWarnings, information, oneScheme, shippedHost, windowsWindow } from './app-cli.mjs';
 import { guardFlags } from './help.mjs';
 import { holderOf, takePort } from './port-lock.mjs';
 import { alive, ancestors, commandLine } from './processes.mjs';
@@ -1150,7 +1150,8 @@ export function report({ host, built, compiler = [], server, tested, checks, rel
   const warned = compiler.filter((w) => !information(w)), noted = compiler.filter(information);
   if (warned.length) {
     const lines = warned.map((w) => `  ${w}`);
-    out.push(`compiler: ${plural(warned.length, 'warning')}`, ...byRule(lines));
+    // The colours that stay one in dark mode, one line (`oneScheme`, LLP 1168.000 D7.2); the full list keeps each.
+    out.push(`compiler: ${plural(warned.length, 'warning')}`, ...byRule(oneScheme(warned).map((w) => `  ${w}`)));
     full.push(`compiler: ${plural(warned.length, 'warning')} (bun exact.mjs contract build app.contract quotes each line)`, ...lines);
     findings += warned.length; for (const w of warned) counted(ruleOf(w));
   }

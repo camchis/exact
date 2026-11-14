@@ -114,17 +114,38 @@ export function warningLines(dir, host, warnings) {
   const noted = warnings.filter(information).length, counted = warnings.length - noted;
   const count = `compiler: ${[(counted || !noted) && `${counted} warning${counted === 1 ? '' : 's'}`, noted && `${noted} note${noted === 1 ? '' : 's'} (not counted)`].filter(Boolean).join(' and ')}`;
   if (!fresh.length) return [`${count}, as before (${where} lists them; bun exact.mjs contract build quotes each line)`];
+  // The colours' one line is the whole set's, said when any of its lines is new (a changed colour at the same site).
+  const colour = (w) => / warning \[lower-colour-one-scheme\] /.test(w), anyColour = fresh.some(colour);
+  const said = oneScheme(warnings.filter((w) => !webOnly(w))).filter((w) => fresh.includes(w) || (colour(w) && anyColour && !warnings.includes(w)));
   // In the compiler's order (`contract::warning_rank`), the symbols only the web draws blank one line: 21 of them hid
   // the euxy port's header warning.
   const web = fresh.filter(webOnly), one = web.length === 1;
   const group = web.length ? [`${web[0].split(' warning [')[0]} warning [lower-symbol-platform] ${web.length} SF Symbol use${one ? '' : 's'} draw${one ? 's' : ''} blank on the web, here first: an icon token or a role draws on every host (${where} lists each, and how)`] : [];
-  return [...fresh.filter((w) => !webOnly(w)), ...group, `${count}${fresh.length < warnings.length ? `, ${fresh.length} new (above)` : ''}; ${where} lists them all`];
+  return [...said, ...group, `${count}${fresh.length < warnings.length ? `, ${fresh.length} new (above)` : ''}; ${where} lists them all`];
 }
 
 /** A compiler warning that is information, not a problem: `tamber-unreachable` names a control whose host draws the
  *  platform's own look, which the author should know of and cannot change (LLP 1121 D9, amended 2026-10-30). A drive
  *  and verify say it but do not count it. contract's `warning_rank::information` is the same test. */
 export const information = (w) => / warning \[(tamber-unreachable|style-undrawn)\] /.test(w);
+
+/** The colours that stay one in dark mode (`lower-colour-one-scheme`), past one, as one line: their closing line with
+ *  the first three sites' `file:line`, theme tokens included, at the first's place (LLP 1168.000 D7.2: a chat app said
+ *  31 in every build). `contract build --json` lists each, with a token's own repair. contract_lower's
+ *  `warning_rank::one_scheme_line` is the same. */
+export function oneScheme(warnings) {
+  const said = (w) => /warning \[lower-colour-one-scheme\] /.test(w), closing = (w) => /warning \[lower-colour-one-scheme\] these /.test(w);
+  const close = warnings.find(closing), sites = warnings.filter((w) => said(w) && !closing(w));
+  if (!close || sites.length < 2) return warnings;
+  const place = (w) => w.split(' warning [')[0], line = (w) => place(w).replace(/:\d+$/, '');
+  const shown = [...sites.slice(0, 3).map(line), ...(sites.length > 3 ? ['…'] : [])].join(', ');
+  let message = close.split('] ').slice(1).join('] ').replace(/^(these \d+ (?:\S+ )*?(?:colours|tokens)) /, `$1 (${shown}) `)
+    .replace('each line above says how to repair it', '`contract build --json` says how to repair each')
+    .replace(" (each token's line says its own repair)", " (`contract build --json` says each token's repair)");
+  if (!message.includes('`contract build --json`')) message += ' `contract build --json` names each.';
+  const one = `${place(sites[0])} warning [lower-colour-one-scheme] ${message}`;
+  return warnings.flatMap((w) => (w === sites[0] ? [one] : w === close || sites.includes(w) ? [] : [w]));
+}
 
 /** A compiler warning only the web's picture shows: an SF Symbol drawn blank where the web is the one target besides
  *  Apple's (contract's `web_only`). Its first use names the targets, `ships web (…), where it is blank`; a later one,
@@ -599,7 +620,7 @@ async function webBuildQuiet(spawned, args, dir) {
       stream.on('data', (chunk) => { const lines = (rest + chunk).split('\n'); rest = lines.pop(); lines.forEach(line); });
       streams.push(new Promise((done) => stream.on('end', () => { if (rest) line(rest); done(); })));
     }
-  });
+  }, { EXACT_WARNINGS_WHOLE: '1' }); // each warning, which `warningLines` groups and lists
   await Promise.all(streams);
   for (const said of warningLines(dir, 'web', [...new Set(warnings)])) console.error(said);
   return code;
