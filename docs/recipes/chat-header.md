@@ -63,10 +63,11 @@ test "the header names the chat; each day opens with its pill"
 ```
 
 - `navigationBar="none"` on the route's element draws no bar, so the row is the header. A
-  pushed route has no Back then: put a `button press=back` first in the row.
-- An avatar photo: `image "assets/ada.jpg"` with a fixed `width`, `height` and
-  `border-radius` (half the width).
+  pushed route then has no Back: put a `button press=back` first.
+- A photo: `image "assets/ada.jpg"`, fixed `width` and `height`, `border-radius` half of it.
 - The pill is the row root's first child, never its sibling ([long lists](long-lists.md)).
-  `formatDay` names the day in the person's locale; `now` is the launch's, so tick it as
-  the [dates recipe](dates-and-days.md) does to pass midnight.
-- The transcript itself: [chat thread](chat-thread.md).
+  `formatDay` names the day in the person's locale; tick `now` as the
+  [dates recipe](dates-and-days.md) does to pass midnight.
+- A time on a bubble's last line: in a `box position="relative"`, end the text with a
+  hidden run, `` text `  ${m.time}` opacity=0 aria-hidden="true" ``, and draw the time
+  `position="absolute" right=8 bottom=4`. A full last line pushes it down.
