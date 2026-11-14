@@ -47,6 +47,11 @@ as an executable row. Each read still evaluates it in the instance's frame,
 using the reader's budget and trap handling. Rows store no result. Both the
 VM and JS target share a 65,536-call work limit across nested evaluations and
 bound call depth at 64; list-step accounting remains shared with the reader.
+Lowering limits shared call chains to 48, leaving sixteen frames below the
+runtime bound. It inlines a dependency when a new call or an existing
+body's depth would exceed that margin. Distinct 65-derive chains render 65
+with either a final-only read or reads of every declaration. JS call-limit
+traps carry the calling `LoadDerive`'s PC, as the runner's do.
 Action-body reads and action-valued derives retain substitution. Static shape
 readers follow executable aliases; retained argument projections use the VM's
 owner-frame cut. A compiled literal/child-derive table compares nested lists,
@@ -56,7 +61,7 @@ and swipe dispatch.
 The acceptance margin is 10% against a root-structured twin. The fixtures in
 `contract/corpus/derive-form/` have 19 editable sections, 152 fields, repeated
 derive reads and nested keyed rows. The component form's bundled `app.js` is
-146,270 B against 137,217 B (6.60% larger); its encoded plan is 32,801 B against
+147,923 B against 137,217 B (7.80% larger); its encoded plan is 32,801 B against
 30,253 B (8.42%). Tests enforce both size margins, compare runner trees and
 receipts, and compare rendered JS labels at boot and after 100 seeded edits.
 The edits change labels across the filter threshold, toggle inclusion, change
@@ -81,8 +86,11 @@ Keep this issue open for the general lowering-sharing correspondence.
 and callback-work counters, and restoration of the reader. `LowerCheck`
 validates root-owned bodies against their checked substituted expressions
 and detects a mutated row. Arm-owned bodies still need contextual validation
-in instance environments, including their view readers. The model still
-needs owned-slot stores, roster list-step and extent accounting, and a
+in instance environments, including their view readers. The model now carries
+per-instance owned-slot stores and reselects them after a callee's frame cut,
+restoring the reader's environment on return. These stores still need to be
+supplied by contextual translation validation. The model still needs roster
+list-step, string and extent accounting, and a
 refinement proof against the runner. Its local invariants do not prove
 the transformation's scope, binder or transitive-dependency conditions.
 

@@ -9,6 +9,12 @@ namespace Contract.VmRows
 
 open Vm
 
+structure InstanceFrame where
+  region : Option Nat := none
+  frame : Vm.Frame := {}
+  slots : List (Nat × Value) := []
+  deriving Inhabited
+
 structure Row where
   code : Code
   /-- The owning arm's region; none means the root. -/
@@ -16,20 +22,20 @@ structure Row where
   deriving Inhabited
 
 /-- Frame regions, like Vm.Env.frames, are innermost first. -/
-def ownerFrames (frames : List (Option Nat × Frame)) (owner : Option Nat) :
-    Option (List (Option Nat × Frame)) :=
+def ownerFrames (frames : List InstanceFrame) (owner : Option Nat) :
+    Option (List InstanceFrame) :=
   match owner with
   | none => some []
   | some r =>
-    let rest := frames.dropWhile (fun f => f.1 != some r)
+    let rest := frames.dropWhile (fun f => f.region != some r)
     if rest.isEmpty then none else some rest
 
 /-- Cutting selects the nearest owner and retains every enclosing frame. -/
-theorem owner_frames_cut (r : Nat) (frame : Frame) (rest)
-    (innerFrames : List (Option Nat × Frame))
-    (outside : ∀ f ∈ innerFrames, f.1 ≠ some r) :
-    ownerFrames (innerFrames ++ (some r, frame) :: rest) (some r) =
-      some ((some r, frame) :: rest) := by
+theorem owner_frames_cut (r : Nat) (frame : Frame) (slots) (rest)
+    (innerFrames : List InstanceFrame)
+    (outside : ∀ f ∈ innerFrames, f.region ≠ some r) :
+    ownerFrames (innerFrames ++ { region := some r, frame, slots } :: rest) (some r) =
+      some ({ region := some r, frame, slots } :: rest) := by
   induction innerFrames with
   | nil => simp [ownerFrames]
   | cons f fs ih =>
@@ -39,16 +45,37 @@ theorem owner_frames_cut (r : Nat) (frame : Frame) (rest)
 
 /-- A reader's extra inner frames add exactly their count to an owner's
 item, index or match-binding depth. -/
-theorem frame_read_rebase (innerFrames owner : List (Option Nat × Frame)) (d : Nat)
+theorem frame_read_rebase (innerFrames owner : List InstanceFrame) (d : Nat)
     (read : Frame → Option α) :
-    (((innerFrames ++ owner).map (·.2))[innerFrames.length + d]?).bind read =
-      ((owner.map (·.2))[d]?).bind read := by
+    (((innerFrames ++ owner).map (·.frame))[innerFrames.length + d]?).bind read =
+      ((owner.map (·.frame))[d]?).bind read := by
   simp [List.map_append, List.getElem?_append_right]
+
+/-- Owned slots come from the nearest instance of their region, even when
+that instance has no value for the slot. A root slot keeps its root value. -/
+def slotValue (root : Option Value) (owner : Option Nat) (slot : Nat)
+    (frames : List InstanceFrame) : Option Value :=
+  match owner with
+  | none => root
+  | some r => (frames.find? (·.region == some r)).bind fun f =>
+      (f.slots.find? (·.1 == slot)).map (·.2)
+
+def slotsAt (env : Vm.Env) (owners : List (Option Nat)) (frames : List InstanceFrame) :=
+  env.slots.zipIdx.map fun (v, i) => slotValue v (owners[i]?.join) i frames
+
+theorem root_slot_unchanged (root : Option Value) (slot : Nat) (frames) :
+    slotValue root none slot frames = root := rfl
+
+theorem owned_slot_nearest (root : Option Value) (r slot : Nat) (frame : Frame)
+    (slots : List (Nat × Value)) (rest : List InstanceFrame) :
+    slotValue root (some r) slot ({ region := some r, frame, slots } :: rest) =
+      (slots.find? (·.1 == slot)).map (·.2) := by
+  simp [slotValue]
 
 structure Caller where
   code : Code
   env : Vm.Env
-  regions : List (Option Nat × Frame)
+  regions : List InstanceFrame
   machine : Machine
   deriving Inhabited
 
@@ -56,16 +83,21 @@ structure State extends Caller where
   callers : List Caller := []
   calls : Nat := 0
   listSteps : Nat := 0
+  slotOwners : List (Option Nat) := []
   deriving Inhabited
 
-def enter (s : State) (row : Row) (frames : List (Option Nat × Frame)) : State :=
+def enter (s : State) (row : Row) (frames : List InstanceFrame) : State :=
   { code := row.code
-    env := { s.env with frames := frames.map (·.2), params := [], writable := [] }
+    env := { s.env with
+      frames := frames.map (·.frame)
+      params := [], writable := []
+      slots := slotsAt s.env s.slotOwners frames }
     regions := frames
     machine := .init
     callers := s.toCaller :: s.callers
     calls := s.calls + 1
-    listSteps := s.listSteps }
+    listSteps := s.listSteps
+    slotOwners := s.slotOwners }
 
 def resume (s : State) (v : Value) (caller : Caller) (rest : List Caller) : State :=
   { toCaller := { caller with machine := { caller.machine with
@@ -73,7 +105,8 @@ def resume (s : State) (v : Value) (caller : Caller) (rest : List Caller) : Stat
       stack := v :: caller.machine.stack } }
     callers := rest
     calls := s.calls
-    listSteps := s.listSteps }
+    listSteps := s.listSteps
+    slotOwners := s.slotOwners }
 
 inductive Result where
   | next (s : State)
@@ -121,9 +154,13 @@ def runFrom (rows : List (Option Row)) : Nat → State → Except Trap (Value ×
     | .next s => runFrom rows n s
 
 def run (rows : List (Option Row)) (code : Code) (env : Vm.Env)
-    (regions : List (Option Nat) := []) (fuel : Nat := 1 <<< 22) :
+    (regions : List (Option Nat) := []) (fuel : Nat := 1 <<< 22)
+    (stores : List (List (Nat × Value)) := []) (slotOwners : List (Option Nat) := []) :
     Except Trap (Value × Vm.Effects) :=
-  runFrom rows fuel { code, env, regions := regions.zip env.frames, machine := .init }
+  let frames := (regions.zip env.frames).zipIdx.map fun ((region, frame), i) =>
+    { region, frame, slots := stores[i]?.getD [] : InstanceFrame }
+  let env := { env with slots := slotsAt env slotOwners frames }
+  runFrom rows fuel { code, env, regions := frames, machine := .init, slotOwners }
 
 theorem enter_fresh (s : State) (r : Row) (fs) :
     (enter s r fs).machine = Machine.init ∧
@@ -142,6 +179,15 @@ theorem resume_preserves (s : State) (v : Value) (c : Caller) (cs) :
     (resume s v c cs).listSteps = s.listSteps := by
   exact ⟨rfl, rfl, rfl, rfl⟩
 
+theorem enter_slot_scope (s : State) (r : Row) (fs) :
+    (enter s r fs).env.slots = slotsAt s.env s.slotOwners fs ∧
+    (enter s r fs).slotOwners = s.slotOwners := by
+  exact ⟨rfl, rfl⟩
+
+theorem resume_restores_environment (s : State) (v : Value) (c : Caller) (cs) :
+    (resume s v c cs).env = c.env ∧ (resume s v c cs).regions = c.regions := by
+  exact ⟨rfl, rfl⟩
+
 theorem root_frames (fs) : ownerFrames fs none = some [] := rfl
 
 /-- The row cannot see either a caller local or an intervening arm. -/
@@ -152,6 +198,29 @@ example :
       [some 2, some 1] 100 with
       | .ok (.str "owner", _) => true
       | _ => false) = true := by native_decide
+
+/-- A callee's cut hides an inner slot and retains the owner's slot. -/
+example :
+    (match run [some { code := [.loadSlot 0, .ret], owner := some 1 }]
+      [.loadDerive 0, .loadSlot 1, .list 2, .ret]
+      { slots := [none, none], owned := [true, true], frames := [{}, {}] }
+      [some 2, some 1] 100
+      [[(1, .str "inner")], [(0, .str "owner")]] [some 1, some 2] with
+      | .ok (.list [.str "owner", .str "inner"], _) => true
+      | _ => false) = true := by native_decide
+
+/-- An executable root row cannot borrow a caller's owned slot. -/
+example :
+    (run [some { code := [.loadSlot 0, .ret] }]
+      [.loadDerive 0, .ret] { slots := [none], owned := [true], frames := [{}] }
+      [some 1] 100 [[(0, .str "caller")]] [some 1]).isOk = false := by native_decide
+
+/-- A missing slot in the nearest same-region instance never falls back
+to the value of an enclosing instance of that region. -/
+example :
+    slotValue none (some 1) 0
+      [{ region := some 1 }, { region := some 1, slots := [(0, .str "outer")] }] = none := by
+  native_decide
 
 /-- A fresh local stack makes a malformed row's local read fail. -/
 example :

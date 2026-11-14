@@ -64,7 +64,7 @@ impl Em<'_> {
                 &mut self.uses,
             )?;
             let enter = self.uses.budget("$enter");
-            write!(out, "const d_{i}=($budget={{s:0,n:0,d:0}})=>{{{enter}($budget,0);try{{return ({f})($budget)}}finally{{$budget.d--}}}};").unwrap();
+            write!(out, "const d_{i}=($budget={{s:0,n:0,d:0}},$pc)=>{{{enter}($budget,$pc);try{{return ({f})($budget)}}finally{{$budget.d--}}}};").unwrap();
         }
         Ok(out)
     }

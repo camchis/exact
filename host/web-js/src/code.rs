@@ -464,9 +464,10 @@ impl Translator<'_> {
                     if self.plan.unsettled_body(x.args[0] as u32).is_some() {
                         self.uses.budget("$enter");
                         self.push(format!(
-                            "d_{}({})",
+                            "d_{}({},{})",
                             x.args[0],
-                            if self.shared { "$budget" } else { "" }
+                            if self.shared { "$budget" } else { "undefined" },
+                            x.pc
                         ));
                     } else {
                         self.push(format!("d_{}()", x.args[0]));

@@ -165,3 +165,22 @@ test('65 compiled equivalent aliases keep their authored style', async () => {
     expect(await page.getByTestId('alias64').evaluate(n => getComputedStyle(n).opacity)).toBe('0.25');
   });
 }, 60000);
+
+test('65 distinct compiled derive dependencies render their final value', async () => {
+  const source = readFileSync(resolve(corpus, 'depth.contract'), 'utf8');
+  for (const allReads of [false, true]) {
+    const reads = '    column\n' + Array.from({ length: 65 }, (_, i) => `      text \`${'${d' + i + '}'}\` testId="d${i}"`).join('\n');
+    await pageFor(allReads ? source.replace('    text `${d64}` testId="last"', reads) : source, async page => {
+      expect(await page.getByTestId(allReads ? 'd64' : 'last').textContent()).toBe('65');
+    });
+  }
+}, 60000);
+
+test('a compiled row call limit names its LoadDerive pc', async () => {
+  await pageFor(readFileSync(resolve(corpus, 'call-limit.contract'), 'utf8'), async page => {
+    const logs = await page.evaluate(async () => [...(await import('/rt.js')).journal]);
+    const traps = logs.filter(line => line.includes(' trapped ')).map(line => line.replace(/^t=\S+ /, ''));
+    expect(traps).toEqual(['site 0: text trapped Trap(CallLimit { pc: 19 }): past the 65,536 derive calls one evaluation may take; unset']);
+    expect(await page.getByTestId('last').textContent()).toBe('');
+  });
+}, 60000);

@@ -235,3 +235,88 @@ fn equivalent_aliases_keep_their_style_on_the_runner() {
     }
     assert!(runner.journal().all(|line| !line.contains("trapped")));
 }
+
+#[test]
+fn distinct_derive_dependencies_preserve_valid_call_depth() {
+    let source = std::fs::read_to_string(
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../corpus/derive-form/depth.contract"),
+    )
+    .unwrap();
+    for all_reads in [false, true] {
+        let source = if all_reads {
+            source.replace(
+                "    text `${d64}` testId=\"last\"",
+                &format!(
+                    "    column\n{}",
+                    (0..65)
+                        .map(|i| format!("      text `${{d{i}}}` testId=\"d{i}\"\n"))
+                        .collect::<String>()
+                ),
+            )
+        } else {
+            source.clone()
+        };
+        let plan = contract::compile(&source).unwrap();
+        let mut depths = vec![0; plan.derives.len()];
+        for (i, row) in plan.derives.iter().enumerate() {
+            if row.unsettled {
+                depths[i] = 1 + exact_runner::vm::instructions(plan.code(row.body))
+                    .map(Result::unwrap)
+                    .filter(|ins| ins.op == exact_plan::Opcode::LoadDerive)
+                    .map(|ins| depths[ins.args[0] as usize])
+                    .max()
+                    .unwrap_or(0);
+            }
+        }
+        assert_eq!(depths.into_iter().max(), Some(48));
+        let runner = Runner::boot(
+            plan,
+            Empty,
+            Kernel::with_monospace(),
+            Default::default(),
+            "/",
+        )
+        .unwrap();
+        let id = if all_reads { "d64" } else { "last" };
+        let key = runner.kernel().find_by_test_id(id)[0];
+        assert_eq!(
+            runner
+                .kernel()
+                .node_by_key(key)
+                .unwrap()
+                .props
+                .str(exact_kernel::PropId::Text),
+            Some("65")
+        );
+        assert!(runner.journal().all(|line| !line.contains("trapped")));
+    }
+}
+
+#[test]
+fn executable_call_limit_names_the_load_instruction() {
+    let plan = plan("call-limit.contract");
+    let pc = plan
+        .derives
+        .iter()
+        .filter(|r| r.unsettled)
+        .flat_map(|r| exact_runner::vm::instructions(plan.code(r.body)).map(Result::unwrap))
+        .find(|i| i.op == exact_plan::Opcode::LoadDerive)
+        .unwrap()
+        .pc;
+    assert!(pc > 0);
+    let runner = Runner::boot(
+        plan,
+        Empty,
+        Kernel::with_monospace(),
+        Default::default(),
+        "/",
+    )
+    .unwrap();
+    let journal = runner
+        .journal()
+        .filter(|line| line.contains(" trapped "))
+        .map(|line| line.split_once(' ').unwrap().1.to_owned())
+        .collect::<Vec<_>>();
+    assert_eq!(journal, [format!("view 1 (site 0): text trapped Trap(CallLimit {{ pc: {pc} }}): past the 65,536 derive calls one evaluation may take; unset")]);
+    eprintln!("call-limit LoadDerive pc: {pc}");
+}

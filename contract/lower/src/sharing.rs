@@ -1,18 +1,23 @@
 //! Share instance expressions after type and shape checks have seen substitution.
-use crate::{expr, LowerError, Lowerer};
+use crate::{expr, theme, LowerError, Lowerer};
 use contract_syntax::{
     inline::{Owner, Thunk},
-    Expr, Span,
+    Expr, Node, Span,
 };
 use contract_types::{Scope, Ty};
-use exact_plan::{asm::Asm, ArmsId, DerivesId};
+use exact_plan::{asm::Asm, ArmsId, DerivesId, NodesId};
 use std::collections::{BTreeMap, BTreeSet};
+
+// Keep sixteen of the executors' 64 call frames free. Sharing is optional;
+// an unusually deep dependency stays substituted instead of spending them.
+const MAX_SHARED_DEPTH: usize = 48;
 
 pub(super) struct Sharing {
     thunks: Vec<Thunk>,
     by_span: BTreeMap<Span, Vec<usize>>,
-    rows: Vec<Option<(DerivesId, Ty)>>,
+    rows: Vec<Option<(DerivesId, Ty, usize)>>,
     active: BTreeSet<usize>,
+    body_depths: Vec<usize>,
     pub root_scope: Scope,
     pub arm: Option<ArmsId>,
     pub instance: u32,
@@ -41,6 +46,7 @@ impl Sharing {
             by_span,
             rows: vec![None; thunks.len()],
             active: BTreeSet::new(),
+            body_depths: Vec::new(),
             root_scope: Scope::default(),
             arm: None,
             instance: 0,
@@ -51,11 +57,45 @@ impl Sharing {
 }
 
 impl Lowerer<'_> {
+    #[allow(clippy::too_many_arguments)]
+    pub(super) fn nodes(
+        &mut self,
+        nodes: &[Node],
+        parent: Option<NodesId>,
+        arm: Option<ArmsId>,
+        scope: &Scope,
+        locals: u16,
+        parent_tag: Option<&str>,
+    ) -> Result<(), LowerError> {
+        let outer = (self.sharing.arm, self.sharing.instance);
+        self.sharing.arm = arm;
+        for (order, n) in nodes.iter().enumerate() {
+            if theme::retained::stops_at_refusal() && !self.errors.is_empty() {
+                break;
+            }
+            self.sharing.instance = match n {
+                Node::Element { instance, .. } => *instance,
+                Node::When { tag, .. } | Node::Each { tag, .. } | Node::Match { tag, .. } => {
+                    self.sharing.regions.get(tag).copied().unwrap_or(outer.1)
+                }
+                _ => outer.1,
+            };
+            if let Err(e) = self.node(n, parent, arm, order as u32, scope, locals, parent_tag) {
+                self.errors.push(e);
+            }
+        }
+        (self.sharing.arm, self.sharing.instance) = outer;
+        Ok(())
+    }
+
     pub(crate) fn shared_expression(
         &mut self,
         e: &Expr,
         scope: &Scope,
     ) -> Result<Option<(DerivesId, Ty)>, LowerError> {
+        if self.sharing.active.len() >= MAX_SHARED_DEPTH {
+            return Ok(None);
+        }
         let Some(candidates) = self.sharing.by_span.get(&e.span()) else {
             return Ok(None);
         };
@@ -97,16 +137,26 @@ impl Lowerer<'_> {
         let Some((i, owner, own_scope)) = found else {
             return Ok(None);
         };
-        if let Some(row) = &self.sharing.rows[i] {
-            return Ok(Some(row.clone()));
+        if let Some((row, ty, depth)) = &self.sharing.rows[i] {
+            // Previously emitted dependencies can be deeper than the budget
+            // left at this call site. Inline their source in that case too.
+            if self.sharing.active.len() + depth > MAX_SHARED_DEPTH {
+                return Ok(None);
+            }
+            if let Some(parent) = self.sharing.body_depths.last_mut() {
+                *parent = (*parent).max(*depth);
+            }
+            return Ok(Some((*row, ty.clone())));
         }
         let thunk = self.sharing.thunks[i].clone();
         let (arm, instance) = (self.sharing.arm, self.sharing.instance);
         self.sharing.active.insert(i);
+        self.sharing.body_depths.push(0);
         self.sharing.arm = owner;
         self.sharing.instance = thunk.instance;
         let mut asm = Asm::new();
         let result = expr::compile(self, &mut asm, &thunk.expr, &own_scope, &mut 0);
+        let depth = self.sharing.body_depths.pop().unwrap() + 1;
         self.sharing.active.remove(&i);
         self.sharing.arm = arm;
         self.sharing.instance = instance;
@@ -123,7 +173,10 @@ impl Lowerer<'_> {
                 component: None,
             });
         }
-        self.sharing.rows[i] = Some((row, ty.clone()));
+        self.sharing.rows[i] = Some((row, ty.clone(), depth));
+        if let Some(parent) = self.sharing.body_depths.last_mut() {
+            *parent = (*parent).max(depth);
+        }
         Ok(Some((row, ty)))
     }
 }

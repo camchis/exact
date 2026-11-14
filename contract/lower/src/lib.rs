@@ -958,37 +958,6 @@ impl<'a> Lowerer<'a> {
     /// Lower sibling nodes under (`parent`, `arm`); `parent_tag` is the
     /// nearest enclosing element's tag (a region does not change it).
     #[allow(clippy::too_many_arguments)]
-    fn nodes(
-        &mut self,
-        nodes: &[Node],
-        parent: Option<NodesId>,
-        arm: Option<ArmsId>,
-        scope: &Scope,
-        locals: u16,
-        parent_tag: Option<&str>,
-    ) -> Result<(), LowerError> {
-        let outer = (self.sharing.arm, self.sharing.instance);
-        self.sharing.arm = arm;
-        for (order, n) in nodes.iter().enumerate() {
-            if theme::retained::stops_at_refusal() && !self.errors.is_empty() {
-                break;
-            }
-            self.sharing.instance = match n {
-                Node::Element { instance, .. } => *instance,
-                Node::When { tag, .. } | Node::Each { tag, .. } | Node::Match { tag, .. } => {
-                    self.sharing.regions.get(tag).copied().unwrap_or(outer.1)
-                }
-                _ => outer.1,
-            };
-            if let Err(e) = self.node(n, parent, arm, order as u32, scope, locals, parent_tag) {
-                self.errors.push(e);
-            }
-        }
-        (self.sharing.arm, self.sharing.instance) = outer;
-        Ok(())
-    }
-
-    #[allow(clippy::too_many_arguments)]
     fn node(
         &mut self,
         n: &Node,

@@ -221,9 +221,12 @@ fn at_read_rows_share_the_readers_list_and_call_budgets() {
     let mut plan = contract::compile("component App\n  state xs = [1, 2]\n  derive picked = xs.map(x => x + 1)\n  view\n    text `${picked.length}`\n").unwrap();
     plan.derives[0].unsettled = true;
     let js = crate::emit::emit(&plan, false, false).unwrap().js;
-    assert!(js.contains("const d_0=($budget={s:0,n:0,d:0})=>"), "{js}");
+    assert!(
+        js.contains("const d_0=($budget={s:0,n:0,d:0},$pc)=>"),
+        "{js}"
+    );
     assert!(js.contains("++$budget.s>65536"), "{js}");
-    assert!(js.contains("d_0()"), "{js}");
+    assert!(js.contains("d_0(undefined,"), "{js}");
     assert!(!js.contains("const d_0=memo"), "{js}");
     assert!(js.contains("finally{$budget.d--}"), "{js}");
     assert!(!js.contains("const d_0=memo"), "{js}");
@@ -243,7 +246,7 @@ fn emitted_row_graphs_stop_at_the_shared_work_and_depth_limits() {
         let mut source = "component App\n  derive d0 = 1\n".to_string();
         for i in 1..length {
             source.push_str(&format!(
-                "  derive d{i} = d{}{}\n",
+                "  derive d{i} = 1 + d{}{}\n",
                 i - 1,
                 if twice {
                     format!(" + d{}", i - 1)
@@ -257,6 +260,14 @@ fn emitted_row_graphs_stop_at_the_shared_work_and_depth_limits() {
         for row in &mut plan.derives {
             row.unsettled = true;
         }
+        let pcs = plan
+            .derives
+            .iter()
+            .flat_map(|r| exact_runner::vm::instructions(plan.code(r.body)).map(Result::unwrap))
+            .filter(|i| i.op == exact_plan::Opcode::LoadDerive)
+            .map(|i| i.pc)
+            .collect::<Vec<_>>();
+        assert!(pcs.iter().all(|pc| *pc > 0));
         std::fs::write(
             temp.join("app.js"),
             crate::emit::emit(&plan, false, false).unwrap().js,
@@ -274,7 +285,24 @@ fn emitted_row_graphs_stop_at_the_shared_work_and_depth_limits() {
             String::from_utf8_lossy(&out.stderr)
         );
         let output = String::from_utf8(out.stdout).unwrap();
-        assert!(output.contains("IterationLimit"), "{length}: {output}");
+        let (kind, bound) = if twice {
+            (
+                "CallLimit",
+                ": past the 65,536 derive calls one evaluation may take",
+            )
+        } else {
+            ("CallDepth", ": past 64 derive call levels")
+        };
+        assert!(
+            pcs.iter().any(|pc| output.trim()
+                == format!("site 0: text trapped Trap({kind} {{ pc: {pc} }}){bound}; unset")),
+            "{length}: {output}"
+        );
+        assert!(
+            pcs.iter()
+                .any(|pc| output.contains(&format!("pc: {pc} }}"))),
+            "{output}"
+        );
     }
     std::fs::remove_dir_all(temp).unwrap();
 }
