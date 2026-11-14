@@ -20,7 +20,8 @@ test('refreshTypes keeps canvas types regardless of how app.ts exports drawing',
       writeFileSync(resolve(dir, 'app.ts'), declaration);
       refreshTypes(dir, undefined, { quiet: true });
       const text = readFileSync(types, 'utf8');
-      assert.ok(text.endsWith(readFileSync(resolve(import.meta.dir, '../canvas/types.d.ts'), 'utf8')), declaration);
+      // Whole, wherever it sits: the language model's tool types follow it (9bbf8784c).
+      assert.ok(text.includes(readFileSync(resolve(import.meta.dir, '../canvas/types.d.ts'), 'utf8')), declaration);
       expected ??= text;
       assert.equal(text, expected);
       const written = statSync(types).mtimeMs;
