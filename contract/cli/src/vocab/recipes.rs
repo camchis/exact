@@ -95,6 +95,7 @@ pub const RECIPES: &[(&str, &str)] = &[
     recipe!("tips"),
     recipe!("tools"),
     recipe!("usb-hid-serial"),
+    recipe!("waveform-and-tail"),
     recipe!("web-look"),
     recipe!("website"),
 ];
