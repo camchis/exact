@@ -320,6 +320,9 @@ final class RouteController: UIViewController, UIScrollViewDelegate {
         host?.presenter.elementScrolls.revealEnded(scrollView)
     }
 
+    /// The tabpanel the route was last projected from (`NavigationHost.tabIndex(ofRoute:)`).
+    var panel: UInt32?
+
     /// Whether UIKit has held this route in a stack since a pop of it last
     /// reached the router (`NavigationHost.followPops`), and the navigation
     /// controller that last held it. With these a route of the router's that
@@ -685,6 +688,7 @@ final class NavigationHost: NSObject, UINavigationControllerDelegate, UIGestureR
         shownKeys = Array(keys(stacks[at])[range])
         selectedRouteCount = stacks[at].count
         let wanted = stacks.enumerated().map { index, routes in
+            let panel = tabs?.panels[index].id
             var presented = false
             return (index == at ? Array(routes[range]) : routes).map { node -> RouteController in
                 presented = presented || ["modal", "fullscreen"].contains(node.props["navigationPresentation"] ?? "")
@@ -693,6 +697,7 @@ final class NavigationHost: NSObject, UINavigationControllerDelegate, UIGestureR
                 c.pageScrollAxes = root.scroll.map { ($0.scrollsX, $0.scrollsY) }
                 c.usesPageViewport = !presented && (root.scrollView != nil || (!ExactEnv.authoredChrome && presenter.keyboardPolicy == "resizes-visual"))
                 c.host = self
+                c.panel = panel
                 controllers[node.id] = c
                 c.mount()
                 return c
