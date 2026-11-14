@@ -192,3 +192,12 @@ test('a checkout without node_modules refuses the type check before it starts, a
     assert.ok(!existsSync(ran), 'the check never started');
   });
 });
+
+test('a path printed as a command reads back whole in a shell, a space or quote in it too', async () => {
+  const { shellPath } = await import('./exact.mjs');
+  assert.equal(shellPath('/Users/a/exact/scripts/exact.mjs'), '/Users/a/exact/scripts/exact.mjs');
+  for (const path of ['/tmp/exact checkout/scripts/exact.mjs', "/tmp/it's here/exact.mjs"]) {
+    const read = spawnSync('/bin/sh', ['-c', `printf %s ${shellPath(path)}`], { encoding: 'utf8' });
+    assert.equal(read.stdout, path);
+  }
+});
