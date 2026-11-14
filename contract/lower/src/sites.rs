@@ -20,7 +20,7 @@ pub struct Sites {
     pub nodes: Vec<NodeSite>,
     /// The plan's slots: the declaring `state` or `mutation`.
     pub slots: Vec<Declared>,
-    /// The plan's derives (a child's never reach the plan).
+    /// The plan's settled derives and executable instance expressions.
     pub derives: Vec<Declared>,
     /// The plan's resources, including a placeholder's owner declaration.
     pub resources: Vec<Declared>,

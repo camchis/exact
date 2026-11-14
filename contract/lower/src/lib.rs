@@ -74,6 +74,7 @@ mod row_look;
 mod scale;
 mod scroll_bounds;
 mod shape_types;
+mod sharing;
 mod shorthands;
 mod sites;
 mod sounds;
@@ -220,6 +221,7 @@ pub(crate) struct Lowerer<'a> {
     sites: Option<Sites>,
     text_styles: Option<&'a mut warnings::TextStyles>,
     pub types: &'a Types,
+    sharing: sharing::Sharing,
     pub root: &'a contract_syntax::Component,
     pub canvas_targets: std::collections::BTreeSet<String>,
     pub ty_ids: BTreeMap<String, TypesId>,
@@ -440,6 +442,7 @@ fn lower_with_sites(
         sites: capture_sites.then(|| Sites::declared(ex)),
         text_styles,
         types,
+        sharing: sharing::Sharing::new(ex),
         root,
         canvas_targets: file
             .components
@@ -686,6 +689,7 @@ fn lower_body(
     }
     // Bodies.
     let scope = types.component_scope(root, root_types);
+    l.sharing.root_scope = scope.clone();
     for (i, s) in root.states.iter().enumerate() {
         if ex.owners[i] == Owner::Root && !(i == 0 && file.routes.is_some()) {
             let code = l.expr_code(&s.expr, &scope, 0)?;
@@ -830,6 +834,7 @@ fn lower_body(
     // instance is created — in its owning arm's scope, now that the arms
     // exist, or, for a use outside every region, at the boot render.
     for (i, owner) in ex.owners.iter().enumerate() {
+        l.sharing.instance = ex.state_instances[i];
         let state = &root.states[i];
         match *owner {
             Owner::Root => {}
@@ -851,7 +856,9 @@ fn lower_body(
                             ),
                             span: state.span,
                         })?;
+                l.sharing.arm = Some(id);
                 let init = l.expr_code(&state.expr, &arm_scope, 0)?;
+                l.sharing.arm = None;
                 l.b.set_slot_init(l.slots[i], init);
                 l.b.set_slot_owner(l.slots[i], id);
             }
@@ -960,14 +967,24 @@ impl<'a> Lowerer<'a> {
         locals: u16,
         parent_tag: Option<&str>,
     ) -> Result<(), LowerError> {
+        let outer = (self.sharing.arm, self.sharing.instance);
+        self.sharing.arm = arm;
         for (order, n) in nodes.iter().enumerate() {
             if theme::retained::stops_at_refusal() && !self.errors.is_empty() {
                 break;
             }
+            self.sharing.instance = match n {
+                Node::Element { instance, .. } => *instance,
+                Node::When { tag, .. } | Node::Each { tag, .. } | Node::Match { tag, .. } => {
+                    self.sharing.regions.get(tag).copied().unwrap_or(outer.1)
+                }
+                _ => outer.1,
+            };
             if let Err(e) = self.node(n, parent, arm, order as u32, scope, locals, parent_tag) {
                 self.errors.push(e);
             }
         }
+        (self.sharing.arm, self.sharing.instance) = outer;
         Ok(())
     }
 

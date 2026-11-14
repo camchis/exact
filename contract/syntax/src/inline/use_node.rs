@@ -173,6 +173,26 @@ pub(super) fn inline_use(
     } else {
         0
     };
+    for prop in c
+        .props
+        .iter()
+        .chain(&c.injects)
+        .filter(|p| !p.ty.as_ref().is_some_and(is_action))
+    {
+        let expr = &child_subst[&prop.name];
+        if !matches!(
+            expr,
+            Expr::Ident(..) | Expr::Number(..) | Expr::Str(..) | Expr::Bool(..) | Expr::None(..)
+        ) {
+            ctx.thunks.push(Thunk {
+                name: format!("@argument:{}#{n}", prop.name),
+                expr: expr.clone(),
+                owner,
+                instance,
+                span: prop.span,
+            });
+        }
+    }
     let mut names: BTreeMap<String, String> = BTreeMap::new();
     for st in &c.states {
         names.insert(st.name.clone(), lifted(&st.name, n));
@@ -293,6 +313,13 @@ pub(super) fn inline_use(
             .collect()
     };
     for ((derive, _), expr) in derives.iter().zip(resolved) {
+        ctx.thunks.push(Thunk {
+            name: lifted(&derive.name, n),
+            expr: expr.clone(),
+            owner,
+            instance,
+            span: derive.span,
+        });
         child_subst.insert(derive.name.clone(), expr);
     }
     let mut child = Subst::new(&child_subst, records).with_value_only(&value_names);

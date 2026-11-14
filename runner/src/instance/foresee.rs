@@ -156,6 +156,7 @@ fn region(
             let (Some(i), Some(parent)) = (want, parent) else {
                 return Ok(());
             };
+            new_frame.region = Some(r.region.0);
             let arm_id = plan.region(r.region).arms.iter().nth(i);
             if let Some(id) = arm_id.filter(|id| plan.slots.iter().any(|s| s.owner == Some(*id))) {
                 let slots: RowSlots = Rc::new(RefCell::new(BTreeMap::new()));

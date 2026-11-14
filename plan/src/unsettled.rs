@@ -7,6 +7,82 @@ impl Plan {
         self.derives.get(index as usize).filter(|row| row.unsettled)
     }
 
+    /// Follow a body consisting of one at-read load. Shape readers receive
+    /// the resolved body and its owner; inner loads remain explicit.
+    pub fn read_code<'a>(
+        &'a self,
+        mut code: &'a [u8],
+    ) -> (&'a [u8], Option<Option<crate::ArmsId>>) {
+        let mut owner = None;
+        while let Some(row) = self.executable_alias(code) {
+            code = self.code(row.body);
+            owner = Some(row.owner);
+        }
+        (code, owner)
+    }
+
+    fn executable_alias(&self, code: &[u8]) -> Option<&DerivesRow> {
+        let [op, a, b, c, d, ret] = code else {
+            return None;
+        };
+        (*op == Opcode::LoadDerive as u8 && *ret == Opcode::Return as u8)
+            .then(|| self.unsettled_body(u32::from_le_bytes([*a, *b, *c, *d])))?
+    }
+
+    /// Resolve an executable alias in the frames its owner can read.
+    pub fn read_code_in<'a, 'f, T>(
+        &'a self,
+        code: &'a [u8],
+        frames: &'f [T],
+        region: impl Fn(&T) -> Option<u32>,
+    ) -> Option<(&'a [u8], &'f [T])> {
+        let mut code = code;
+        let mut frames = frames;
+        let mut calls = 0;
+        while let Some(row) = self.executable_alias(code) {
+            calls += 1;
+            if calls > 64 {
+                return None;
+            }
+            frames = self.owner_frames(frames, row.owner, &region)?;
+            code = self.code(row.body);
+        }
+        Some((code, frames))
+    }
+
+    /// The lexical frame prefix available to an executable row, in the VM
+    /// and in static projections. A root row reads no instance frames.
+    pub fn owner_frames<'f, T>(
+        &self,
+        frames: &'f [T],
+        owner: Option<crate::ArmsId>,
+        region: impl Fn(&T) -> Option<u32>,
+    ) -> Option<&'f [T]> {
+        let end = match owner {
+            None => 0,
+            Some(owner) => {
+                let target = self.arm(owner).region.0;
+                frames.iter().rposition(|f| region(f) == Some(target))? + 1
+            }
+        };
+        Some(&frames[..end])
+    }
+
+    /// Frames removed when a reader calls a row owned by an enclosing arm.
+    /// `None` means that owner is outside the reader's lexical scope.
+    pub fn frame_cut(
+        &self,
+        mut reader: Option<crate::ArmsId>,
+        owner: Option<crate::ArmsId>,
+    ) -> Option<u32> {
+        let mut cut = 0;
+        while reader != owner {
+            reader = self.region(self.arm(reader?).region).arm;
+            cut += 1;
+        }
+        Some(cut)
+    }
+
     pub(crate) fn validate_unsettled(&self) -> Result<(), PlanError> {
         for (i, row) in self.derives.iter().enumerate() {
             if !row.unsettled {

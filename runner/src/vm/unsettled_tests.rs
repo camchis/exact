@@ -62,6 +62,15 @@ fn an_at_read_body_cuts_frames_and_has_fresh_locals() {
         },
     ];
     assert_eq!(read(&plan, d.0, &frames).unwrap(), Value::Number(17.0));
+    let mut call = Asm::default();
+    call.load_derive(d);
+    let call = call.finish();
+    let (body, scope) = plan.read_code_in(&call, &frames, |f| f.region).unwrap();
+    assert_eq!(body, plan.code(code));
+    assert_eq!(scope, &frames[..1]);
+    assert!(plan
+        .read_code_in(&call, &[] as &[Frame], |f| f.region)
+        .is_none());
     assert!(matches!(read(&plan, d.0, &[]), Err(Trap::BadScope { .. })));
 }
 

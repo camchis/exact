@@ -20,6 +20,9 @@
 
 - **`exact-render`'s stream test fails on main** (2026-11-13, run on this Mac). `stream::a_stream_completes_the_render_at_its_first_message_and_is_listed_open` (`host/render/tests/it/stream.rs:91`) finds 94 messages parsed, where the render should complete at the first and let the stream go (29 to 1,125 in other runs). Fails alone and on a clean origin/main checkout.
 - **`generationFile` can answer 404 for a file that is there** (2026-11-13, read, not run; the reviews of q0169). In `host/web/generations.mjs` `generationFile`, when the read of the current tree throws (the tree renamed mid-swap) and the swap is byte-identical, `generationOf(dist)` still names the same id, so it returns null for a file the build has. It should ask again, as it does when the id has moved.
+- **UIKit cover boot clearance.** `CoverBootIOSTests.testTheCoverRootUsesTheWholeViewInItsFirstSettlement` passes its initial viewport checks but expects bottom clearance 0 where the route reports 50 on iPhone 17 Pro, iOS 27.0. Literal and child-derived `viewport-fit="cover"` fail identically. Reconcile the assertion with `NavigationCoversIOS.routeEdges`.
+
+- **`host/web/tests/dev-scheduler.test.mjs` fails three cases on main** (2026-11-13): the generated-game-arguments, game-edit and declared-source-file cases throw `ReferenceError: basename is not defined` from the `changedPath` they slice out of `host/web/dev.mjs`; the test's sandbox does not provide `basename`.
 - **The JS target asks a queued send as App** (2026-11-12, read, not run). `host/web-js/schedule.js` keeps a waiting send's source and arguments (`m.wait`) but not the origin of the commit that queued it, and its `next` commit runs under whatever origin is ambient, so a tool's or a wake's queued send, its request (now stamped with `Origin.now()`, `resources.js`) and its `then` are the app's. The runner keeps that origin, invocation and causes (`queue.rs` `Waiting`). Keep them on the JS target and restore them around the `next` commit.
 - **Linux's neutral buttons: two web metrics left** (2026-11-12, after the symbol scales and image gap landed). A sidebar tab with a symbol and a title gets the web's `sidebar-gap` (10px) there, but Linux has no sidebar presentation of a tab list (it always draws a tab bar). A symbol-only button with an `aria-label` in a modal sheet's header paints its symbol on Linux where the web shows the accessible name as text ("Discard").
 - **A native route can cover an authored root tablist without an explicit paint order** (2026-11-12, iPhone 17 Pro simulator, iOS 27.0). The `overflowing-tabs.contract` fixture without its tablist’s `z-index=1` lays the active route across the full viewport and the driver refuses the tab press because that route covers its middle. Check default authored-tab paint order; the cover-feedback regression gives its bar an explicit order.
@@ -1340,7 +1343,12 @@ sits on that list carries the trade it would take.
   `plain` tier — persisted slots, with Caltrain's "last station"; `me`; the iOS
   first-launch keychain wipe; the data-protection keychain on macOS (a bundle and a
   profile); the Linux file store when that host links ibex2.
-- **Plan / runner** (LLP 1005 §8): per-instance derives or resources inside `each`.
+- **Executable instance rows: lowering proof** (LLP 1017.000 P4c): model row
+  calls in `Vm`, then prove lowering-level sharing against substituted source
+  expressions. `Expand` and `instance_iff` stay unchanged. Implementer: Codex,
+  fs/derive, 2026-11-13; runtime difftest covers rendering meanwhile.
+- **Plan / runner** (LLP 1005 §8): cached per-instance derives or resources inside `each`. At-read instance
+  expressions share executable rows without caching their values.
 - **Contract** (LLP 1006 §8): inlining budget; `contract` blocks as assertions;
   `cursor`; per-instance state; LSP.
 - **Web host** (LLP 1007 §9): a text-measurement bridge (the kernel's layout does not

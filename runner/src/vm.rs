@@ -77,8 +77,7 @@ pub struct Frame {
     pub index: Option<usize>,
     /// The `match` binding, when this scope is a `some(x)` arm.
     pub bound: Option<Value>,
-    /// The region this instance belongs to, when this scope is a row or an
-    /// arm that owns slots.
+    /// The region this instance belongs to, including arms with no state.
     pub region: Option<u32>,
     /// The instance's slots, when this scope is a row or an arm owning some.
     pub row: Option<RowSlots>,
@@ -392,13 +391,38 @@ pub fn instructions(code: &[u8]) -> impl Iterator<Item = Result<Instruction, Tra
         Some(next)
     })
 }
+/// Instructions reachable through at-read rows, each row scanned once.
+/// This is a dependency walk; nested offsets remain local to their bodies.
+pub fn transitive_instructions<'a>(
+    plan: &'a Plan,
+    code: &'a [u8],
+) -> impl Iterator<Item = Result<Instruction, Trap>> + 'a {
+    let mut bodies = vec![code];
+    let mut seen = std::collections::BTreeSet::new();
+    let mut out = Vec::new();
+    while let Some(body) = bodies.pop() {
+        for i in instructions(body) {
+            if let Ok(i) = &i {
+                if i.op == Opcode::LoadDerive {
+                    if let Some(row) = plan.unsettled_body(i.args[0] as u32) {
+                        if seen.insert(i.args[0]) {
+                            bodies.push(plan.code(row.body));
+                        }
+                    }
+                }
+            }
+            out.push(i);
+        }
+    }
+    out.into_iter()
+}
 
 /// Whether `code` is a literal — pushes of values and `Return`, nothing
 /// read — so a binding can be told from an expression without running it
 /// (LLP 1035.002 D5: a row bound by an expression is `dynamic`). Malformed
 /// code is not a literal.
-pub fn is_literal(code: &[u8]) -> bool {
-    instructions(code).all(|i| {
+pub fn is_literal(plan: &Plan, code: &[u8]) -> bool {
+    transitive_instructions(plan, code).all(|i| {
         i.is_ok_and(|i| {
             matches!(
                 i.op,
@@ -409,7 +433,7 @@ pub fn is_literal(code: &[u8]) -> bool {
                     | Opcode::Unit
                     | Opcode::Some
                     | Opcode::Return
-            )
+            ) || i.op == Opcode::LoadDerive && plan.unsettled_body(i.args[0] as u32).is_some()
         })
     })
 }
@@ -781,19 +805,10 @@ impl Host<Value> for Run<'_, '_> {
             if self.depth >= 64 {
                 return Err(Trap::CallDepth { pc });
             }
-            let frames = match row.owner {
-                None => &env.frames[..0],
-                Some(owner) => {
-                    let region = env.plan.arm(owner).region.0;
-                    let end = env
-                        .frames
-                        .iter()
-                        .rposition(|f| f.region == Some(region))
-                        .ok_or(Trap::BadScope { pc, depth: 0 })?
-                        + 1;
-                    &env.frames[..end]
-                }
-            };
+            let frames = env
+                .plan
+                .owner_frames(env.frames, row.owner, |f| f.region)
+                .ok_or(Trap::BadScope { pc, depth: 0 })?;
             let nested_env = Env {
                 frames,
                 params: &[],

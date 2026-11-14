@@ -50,8 +50,11 @@ impl SourceMap {
                 action.body,
             );
         }
-        for derive in &plan.derives {
-            add(0, derive.body);
+        for (i, derive) in plan.derives.iter().enumerate() {
+            add(
+                self.sites.derives.get(i).map_or(0, |d| d.instance),
+                derive.body,
+            );
         }
         for resource in &plan.resources {
             for a in resource

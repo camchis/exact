@@ -1216,3 +1216,14 @@ observation). The web's JS target refuses the same steps
 (`host/web-js/conform.mjs`). The checker's two type refusals that bound a value
 (`type-option-option`, `type-too-deep`) are in `Contract.check` too
 (`checkBounds`, and where `infer` grows a type: `some`, `map`, the roster).
+
+Executable instance expressions share plan rows during lowering. Source
+expansion and `instance_iff` still use substitution. Runtime difftest compares
+the runner's shared rendering with that meaning. The lowering check does not
+prove this sharing: `Vm.loadDerive` still models a settled environment read,
+and an executable row has no declaration in the expanded source program.
+It is reported as unrecognized by `LowerCheck`. The remaining proof needs a
+VM model for fresh-stack row calls, owner-frame cutting and shared bounds,
+then a lowering correspondence for replacing an instance expression by its
+row load. Existing lowering theorems cover the source compiler without that
+sharing transformation.

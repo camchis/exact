@@ -148,10 +148,12 @@ fn metered(ins: &[Instruction]) -> bool {
 
 /// Whether `code` reads or writes a row slot.
 pub fn touches_rows(plan: &Plan, code: &[u8]) -> bool {
-    instructions(code).flatten().any(|i| {
-        matches!(i.op, Opcode::LoadSlot | Opcode::StoreSlot)
-            && plan.slots[i.args[0] as usize].owner.is_some()
-    })
+    exact_runner::vm::transitive_instructions(plan, code)
+        .flatten()
+        .any(|i| {
+            matches!(i.op, Opcode::LoadSlot | Opcode::StoreSlot)
+                && plan.slots[i.args[0] as usize].owner.is_some()
+        })
 }
 
 /// A JavaScript function expression for `code` (`() => …`, or `(p0, …) =>`
@@ -167,10 +169,11 @@ pub fn function(
         .collect::<Result<_, _>>()
         .map_err(|t| format!("malformed code: {t:?}"))?;
     let before = uses.metered;
-    let shared = scope.unsettled
-        || ins
-            .iter()
-            .any(|i| i.op == Opcode::LoadDerive && plan.unsettled_body(i.args[0] as u32).is_some());
+    let loads = ins
+        .iter()
+        .filter(|i| i.op == Opcode::LoadDerive && plan.unsettled_body(i.args[0] as u32).is_some())
+        .count();
+    let shared = scope.unsettled || loads > 1 || loads != 0 && metered(&ins);
     let mut t = Translator {
         shared,
         plan,
@@ -460,7 +463,11 @@ impl Translator<'_> {
                 Opcode::LoadDerive => {
                     if self.plan.unsettled_body(x.args[0] as u32).is_some() {
                         self.uses.budget("$enter");
-                        self.push(format!("d_{}($budget)", x.args[0]));
+                        self.push(format!(
+                            "d_{}({})",
+                            x.args[0],
+                            if self.shared { "$budget" } else { "" }
+                        ));
                     } else {
                         self.push(format!("d_{}()", x.args[0]));
                     }

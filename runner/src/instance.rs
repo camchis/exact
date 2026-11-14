@@ -1230,7 +1230,7 @@ impl Tree {
             has_collections: u.env.plan.bindings.iter().any(|b| {
                 b.kind == BindingKind::Prop
                     && b.id == exact_kernel::PropId::Virtualized as u16
-                    && u.env.plan.code(b.expr)
+                    && u.env.plan.read_code(u.env.plan.code(b.expr)).0
                         != [
                             exact_plan::Opcode::Bool as u8,
                             0,

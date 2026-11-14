@@ -184,17 +184,17 @@ fn project_for<D: DataSource>(
 pub fn projects_as_booted(plan: &Plan) -> bool {
     use exact_plan::Opcode::*;
     plan.slots.iter().all(|slot| {
-        exact_runner::vm::instructions(plan.code(slot.init)).all(|i| {
+        exact_runner::vm::transitive_instructions(plan, plan.code(slot.init)).all(|i| {
             i.is_ok_and(|i| {
-                !matches!(
-                    i.op,
-                    LoadResource
-                        | LoadDerive
-                        | PendingResource
-                        | FailedResource
-                        | FailureResource
-                        | PendingMutation
-                )
+                !(i.op == LoadDerive && plan.unsettled_body(i.args[0] as u32).is_none())
+                    && !matches!(
+                        i.op,
+                        LoadResource
+                            | PendingResource
+                            | FailedResource
+                            | FailureResource
+                            | PendingMutation
+                    )
             })
         })
     })

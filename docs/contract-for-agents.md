@@ -712,13 +712,15 @@ Children may hold state, derives, and actions. They cannot declare resources,
 mutations, or tasks. Lift shared data requests to the root and pass values and
 actions. A child used under `for` owns row state keyed to that row's identity.
 Stable keys matter when content is inserted, removed, filtered, or reordered.
-A child's derive is expanded and evaluated at each read, so repeated reads and
-component uses can multiply code size. For a large shared calculation, declare the
-derive in the root and pass its name down as a prop. The web build reports
-`app.js` bytes and the largest components by their own expanded plan code and
-compiled instance count. Shared bodies count per use in that report; child
-components are listed separately from their parents. A `for` row is one
-compiled instance regardless of its runtime item count.
+A child's derive is compiled once per component use and evaluated at each read
+in that instance's frame. Non-atomic prop and inject arguments share that
+representation. These calculations use the reader's list and call budgets;
+a trap belongs to the reader. They are not cached. A root derive evaluates
+once per settlement, so put a calculation there when its result should be
+shared across readers. Action-body reads, action calls and `fn` calls still
+expand in place. The web build reports `app.js` bytes and each component's
+own plan instructions and compiled instance count. Shared bodies count per
+use; a `for` is one compiled instance regardless of its runtime item count.
 
 
 A root that has outgrown the 1,500-line cap keeps its members and moves them

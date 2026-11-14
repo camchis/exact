@@ -624,7 +624,7 @@ pub fn node<D: DataSource>(runner: &Runner<D>, id: u32) -> String {
                 let b = plan.binding(b);
                 b.kind == BindingKind::Style
                     && StyleId::from_bit(b.id as u32) == Some(row)
-                    && !crate::vm::is_literal(plan.code(b.expr))
+                    && !crate::vm::is_literal(plan, plan.code(b.expr))
             })
         })
     };

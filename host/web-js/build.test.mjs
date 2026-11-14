@@ -59,8 +59,7 @@ test('a media-only page applies its audio policy while activation waits and pres
 
 test.each([[false, false], [true, false], [true, true]])('a list first opened offline uses prepared chunks without evaluating them at boot (production: %s, interaction: %s)', async (production, interaction) => {
   if (webCompiler().cmd === 'cargo') throw new Error('build the compiler first: cargo build -p exact-web-js');
-  const root = resolve(import.meta.dir, '../..'), dir = mkdtempSync(resolve(root, 'target/offline-list-'));
-  const dist = resolve(dir, 'dist');
+  const root = resolve(import.meta.dir, '../..'), dir = mkdtempSync(resolve(root, 'target/offline-list-')), dist = resolve(dir, 'dist');
   let browser, server;
   try {
     writeFileSync(resolve(dir, 'app.json'), JSON.stringify({ name: 'Offline List', app: { id: 'test.offline-list', name: 'Offline List' }, host: { web: {} } }));
@@ -79,13 +78,11 @@ test.each([[false, false], [true, false], [true, true]])('a list first opened of
       if shown
         list virtualized=true estimated-item-height=40 height=120 width=320 testId="rows"
           for item in items key=item
-            text \`Row \${item}\` height=40 testId=\`row-\${item}\`
-`);
+            text \`Row \${item}\` height=40 testId=\`row-\${item}\`\n`);
     const built = spawnSync(process.execPath, ['host/web-js/build.mjs', 'offline-list', '--out', dist, '--render', interaction ? 'js' : 'none',
       ...(production ? ['--production'] : [])], { cwd: root, env: { ...process.env, EXACT_APP_DIR: dir }, encoding: 'utf8' });
     expect(built.status, built.stdout + built.stderr).toBe(0);
-    expect(built.stdout).toContain('own plan code by component (shared bodies counted per use)');
-    expect(built.stdout).toMatch(/OfflineList: \d+ B \(1 instance\)/);
+    expect(built.stdout).toMatch(/own plan code by component \(shared bodies counted per use\)[\s\S]*OfflineList: \d+ B \(1 instance\)/);
     expect(built.stdout).toContain(`${dist}: app.js ${statSync(resolve(dist, 'app.js')).size} B, built`);
     const collection = readdirSync(dist).find(name => /^collection-glue-.*\.js$/.test(name));
     expect(collection).toBeDefined();

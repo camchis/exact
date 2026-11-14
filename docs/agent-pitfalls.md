@@ -11,13 +11,13 @@ diagnose it. **Candidate diagnostic** marks one that could become a check cheapl
 
 This list holds what the [agent guide](contract-for-agents.md)'s rules don't make obvious.
 
-## Component code size
+## Component calculations
 
-- **Reading a large child derive many times grows the web program.** Child
-  derives expand at every read and component use. Move the calculation to a root derive and pass its name down as a prop.
-  The web build's component code report counts shared bodies per use, while
-  the plan's stored code pool may share identical bodies. (Compiler cost
-  tests and web JS emission, 2026-11-13.)
+- **A child derive still runs at every read.** Its body is compiled once per
+  use, without caching its value. Keep large calculations in a root derive
+  when readers should share the evaluated result. A binding's failing child
+  calculation unsets that binding; a root derive's failure refuses the commit.
+  (Instance expression tests and the form fixture pair, 2026-11-13.)
 
 ## Layout
 

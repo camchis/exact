@@ -42,6 +42,8 @@ mod paint_tests;
 mod presence;
 #[cfg(test)]
 mod presence_tests;
+#[cfg(test)]
+mod reader_tests;
 mod reads;
 mod sized;
 mod style;

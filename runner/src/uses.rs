@@ -350,7 +350,7 @@ pub fn uses(plan: &Plan) -> Uses {
                 // A shared element flies between its two places (LLP 1013.000).
                 Some(PropId::SharedElement) => uses = uses.with(Capability::Transitions),
                 Some(PropId::Virtualized)
-                    if constant_bool(plan.code(binding.expr)).is_none_or(|on| on) =>
+                    if constant_bool(plan, plan.code(binding.expr)).is_none_or(|on| on) =>
                 {
                     uses = uses.with(Capability::Collections);
                 }
@@ -599,7 +599,7 @@ pub fn svg_filters(plan: &Plan) -> bool {
 fn stdlib_calls(plan: &Plan) -> (bool, bool, bool) {
     let (mut format, mut geometry, mut lowercase) = (false, false, false);
     plan.each_code(&mut |code| {
-        for i in crate::vm::instructions(plan.code(code)).flatten() {
+        for i in crate::vm::instructions(plan.read_code(plan.code(code)).0).flatten() {
             if i.op == Opcode::Call {
                 match Stdlib::from_wire(i.args[0] as u8) {
                     Some(
@@ -686,7 +686,7 @@ fn runs_command(plan: &Plan, names: &[&str]) -> bool {
     let mut runs = false;
     plan.each_code(&mut |code| {
         runs = runs
-            || crate::vm::instructions(plan.code(code)).any(|i| {
+            || crate::vm::instructions(plan.read_code(plan.code(code)).0).any(|i| {
                 i.is_ok_and(|i| {
                     i.op == Opcode::Command
                         && plan
@@ -701,8 +701,8 @@ fn runs_command(plan: &Plan, names: &[&str]) -> bool {
 
 /// The boolean a binding always evaluates to, when its code is one constant:
 /// `Bool`, then `Return`.
-fn constant_bool(code: &[u8]) -> Option<bool> {
-    match code {
+fn constant_bool(plan: &Plan, code: &[u8]) -> Option<bool> {
+    match plan.read_code(code).0 {
         [op, value, ret] if *op == Opcode::Bool as u8 && *ret == Opcode::Return as u8 => {
             Some(*value != 0)
         }
@@ -713,7 +713,7 @@ fn constant_bool(code: &[u8]) -> Option<bool> {
 /// The string a binding always evaluates to, when its code is one constant:
 /// `Str`, then `Return`.
 fn constant_str<'a>(plan: &'a Plan, code: &[u8]) -> Option<&'a str> {
-    match code {
+    match plan.read_code(code).0 {
         [op, a, b, c, d, ret] if *op == Opcode::Str as u8 && *ret == Opcode::Return as u8 => {
             let id = u32::from_le_bytes([*a, *b, *c, *d]);
             plan.strings.get(id as usize).map(|_| plan.str(StrId(id)))
