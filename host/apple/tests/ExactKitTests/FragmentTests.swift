@@ -190,6 +190,21 @@ final class FragmentTests: XCTestCase {
         XCTAssertEqual(gap("other"), 0, accuracy: 1)
     }
 
+    func testAnActivationAlreadyTakenOrSupersededScrollsNothing() throws {
+        try fixture()
+        let p = session.presenter, held = try XCTUnwrap(p.fragmentHeld)
+        let visit = try XCTUnwrap(Int(try XCTUnwrap(node("port").props["navigationKey"])))
+        XCTAssertTrue(session.navigate("/item/7#other"))
+        let current = try XCTUnwrap(p.fragmentHeld)
+        XCTAssertFalse(current === held)
+        XCTAssertGreaterThan(p.fragmentSeen, 1, "an older activation to replay")
+        for activation in [p.fragmentSeen, p.fragmentSeen - 1] {
+            p.scrollToFragment([visit, "moves", activation])
+            XCTAssertEqual(gap("other"), 0, accuracy: 1, "activation \(activation): still at #other")
+            XCTAssertTrue(p.fragmentHeld === current, "activation \(activation): the current hold stays")
+        }
+    }
+
     func testAuthoredScrollCancelsThePictureHold() throws {
         try fixture()
         let p = session.presenter
@@ -308,6 +323,102 @@ final class FragmentTests: XCTestCase {
         window.addSubview(p.viewport)
         XCTAssertEqual(scroll.contentOffset.y, 600, accuracy: 1, "mounting resumes the fragment without another batch")
         withExtendedLifetime(p) {}
+    }
+
+    func testAStatusBarTapCancelsThePictureHold() throws {
+        try fixture()
+        let port = try XCTUnwrap(node("port").scrollView)
+        XCTAssertTrue(try node("port").scrollViewShouldScrollToTop(port))
+        port.setContentOffset(CGPoint(x: 0, y: -port.adjustedContentInset.top), animated: false)
+        let top = offset
+        try releasePicture()
+        XCTAssertEqual(offset, top, accuracy: 1, "the tap's scroll to the top stands")
+    }
+
+    /// A route projected from a navigation root that scrolls keeps the root's
+    /// scrolling in its page viewport (`RouteController.fitContentViewport`).
+    func testAFragmentScrollsThePageProjectedFromANavigationRoot() throws {
+        session = ExactApp.shared.makeSession(label: "fragment-navigation-root")
+        // The batches below stand in for the runner's: no plan boots over them.
+        XCTAssertNotNil(session.boot(plan: Data(), size: CGSize(width: 200, height: 400)).error)
+        let p = session.presenter, host = UIViewController(), view = ExactView(session: session)
+        window = UIWindow(frame: CGRect(x: 0, y: 0, width: 200, height: 400))
+        window.rootViewController = host
+        window.isHidden = false
+        host.view.addSubview(view)
+        view.frame = host.view.bounds
+        view.layoutIfNeeded()
+        session.rasters.setPaused(true)
+        p.apply(wireBatch([
+            ["op": "create", "id": 9, "kind": "view", "props": ["navigationKey": "7", "navigationBack": "back"], "style": ["overflow_y": "auto", "overflow_x": "hidden"]],
+            ["op": "create", "id": 1, "kind": "view", "props": ["navigationKey": "7"]],
+            ["op": "create", "id": 2, "kind": "image", "props": ["imageSource": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGMIqFjQAAAEbQHpbOjxOAAAAABJRU5ErkJggg=="]],
+            ["op": "create", "id": 3, "kind": "view", "props": ["id": "moves"]],
+            ["op": "create", "id": 4, "kind": "view", "props": ["id": "east"]],
+            ["op": "children", "id": 1, "ids": [2, 3, 4]],
+            ["op": "children", "id": 9, "ids": [1]],
+            ["op": "roots", "ids": [9]],
+            ["op": "frame", "id": 9, "x": 0, "y": 0, "w": 200, "h": 400],
+            ["op": "frame", "id": 1, "x": 0, "y": 0, "w": 800, "h": 1600],
+            ["op": "frame", "id": 2, "x": 0, "y": 0, "w": 100, "h": 10],
+            ["op": "frame", "id": 3, "x": 0, "y": 700, "w": 100, "h": 50],
+            ["op": "frame", "id": 4, "x": 600, "y": 1000, "w": 100, "h": 50],
+            ["op": "content", "id": 9, "w": 200, "h": 1600],
+            ["op": "content", "id": 1, "w": 800, "h": 1600],
+        ]))
+        window.layoutIfNeeded()
+        p.navigation.sync(wireBatch([]))
+        let route = try XCTUnwrap(p.navigation.activeRoute)
+        let target = try XCTUnwrap(p.views[3])
+        XCTAssertEqual(p.keyboardPolicy, "resizes-content")
+        let scroll = try XCTUnwrap(route.contentViewport, "the projected route keeps the root's scrolling")
+        XCTAssertFalse(scroll.scrollsX)
+        XCTAssertTrue(scroll.scrollsY)
+        XCTAssertEqual(scroll.contentSize.width, 800, accuracy: 0.5, "hidden overflow still scrolls programmatically")
+        scroll.layoutIfNeeded()
+        XCTAssertFalse(scroll.showsHorizontalScrollIndicator, "nor does it show the person a horizontal range")
+        p.apply(wireBatch([["op": "style", "id": 9, "style": ["overflow_x": "auto", "overflow_y": "hidden"]]]))
+        XCTAssertTrue(scroll.scrollsX)
+        XCTAssertFalse(scroll.scrollsY)
+        XCTAssertEqual(scroll.contentSize.height, 1600, accuracy: 0.5)
+        p.apply(wireBatch([["op": "style", "id": 9, "style": ["overflow_x": "hidden", "overflow_y": "auto"]]]))
+
+        // CSS `overflow: hidden` permits a programmatic scroll on that axis.
+        p.armFragment(1)
+        p.scrollToFragment([7, "east", 1])
+        let east = try XCTUnwrap(p.views[4]).convert(try XCTUnwrap(p.views[4]).bounds, to: scroll)
+        XCTAssertTrue(scroll.bounds.contains(east), "the fragment reveals a target past the hidden axis: \(east) in \(scroll.bounds)")
+        // The person's drag moves only the axis the root scrolls.
+        let start = scroll.contentOffset
+        route.scrollViewWillBeginDragging(scroll)
+        scroll.contentOffset = CGPoint(x: start.x - 300, y: start.y - 200)
+        route.scrollViewDidEndDragging(scroll, willDecelerate: false)
+        XCTAssertEqual(scroll.contentOffset.x, start.x, accuracy: 0.5, "a drag cannot pan the hidden axis")
+        XCTAssertEqual(scroll.contentOffset.y, start.y - 200, accuracy: 0.5)
+
+        route.additionalSafeAreaInsets.top = 24
+        route.view.layoutIfNeeded()
+        let clearance = scroll.safeAreaInsets.top
+        XCTAssertGreaterThan(clearance, 0, "native chrome covers the page's top")
+        p.armFragment(2)
+        p.scrollToFragment([7, "moves", 2])
+        XCTAssertEqual(scroll.contentOffset.y, 700 - clearance, accuracy: 0.5)
+        XCTAssertTrue(session.rasters.loading(inside: route.node))
+        XCTAssertEqual(target.convert(target.bounds, to: scroll).minY, scroll.bounds.minY + clearance, accuracy: 0.5)
+        p.apply(wireBatch([
+            ["op": "style", "id": 3, "style": ["margin_top": 900]],
+            ["op": "frame", "id": 3, "x": 0, "y": 900, "w": 100, "h": 50],
+        ]))
+        XCTAssertTrue(route.contentViewport === scroll)
+        XCTAssertEqual(scroll.contentOffset.y, 900 - clearance, accuracy: 0.5, "the page holds alignment while its picture loads")
+        p.apply(wireBatch([["op": "style", "id": 1, "style": ["safe_area": 1]]]))
+        XCTAssertEqual(scroll.contentOffset.y, 900, accuracy: 0.5, "authored clearance can align under the chrome")
+        p.apply(wireBatch([["op": "style", "id": 1, "style": ["safe_area": 0]]]))
+        XCTAssertEqual(scroll.contentOffset.y, 900 - clearance, accuracy: 0.5)
+        XCTAssertTrue(route.scrollViewShouldScrollToTop(scroll))
+        scroll.setContentOffset(.zero, animated: false)
+        p.flushFragment()
+        XCTAssertEqual(scroll.contentOffset.y, 0, accuracy: 0.5, "the page's status-bar scroll ends alignment")
     }
     #endif
 }

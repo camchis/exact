@@ -633,6 +633,7 @@ function drain() {
   for (const [e, o] of Scrolls)
     for (const name in o) {
       const at = o[name];
+      if (e[name] !== at) globalThis.exact?.fragment?.cancel(false);
       if (e.$jump) e.$jump(name, at);
       else if (e[name] !== at) {
         if (

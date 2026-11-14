@@ -3115,8 +3115,9 @@ hatch was last called: an app's top-edge selection, an app-owned `UIScrollView`
 included; else, where the route has a `navigationScroll`, the scroll view of the
 element it names, or nil when no element carries the name or it does not scroll;
 else the scroll view of the route's first vertical scroller; else the route's own
-viewport, which only an unpresented route under `interactive-widget="resizes-visual"`
-has; else nil. A native list's scroll view is its collection view. UIKit's
+viewport, which an unpresented route has when the navigation root scrolls or native
+chrome uses `interactive-widget="resizes-visual"`; else nil. A native list's scroll
+view is its collection view. UIKit's
 `contentScrollView(for: .top)` reports Exact's scroller only while it sits under the
 bar. A top-edge selection or nil reaches the hatch when Exact next prepares the
 route, at the next authored update (after a nil, possibly within the call), and the
@@ -3248,10 +3249,11 @@ route stays mounted (its nodes are in `tree`, marked `[hidden]`, or `[inactive]`
 beneath a sheet, which still shows it), so a `testId` two screens share names
 two nodes: give each screen its own (`list-error`, `detail-error`).
 
-Content taller than a native route is unreachable without an explicit scroll
-container. The exception is an unpresented iOS route under native chrome with
-`resizes-visual`: its viewport scrolls overflow and accommodates the keyboard
-without layout reflow. Put scrolling content in a `scroll` or `list` with
+Content taller than a native route needs a scroll container. An unpresented iOS
+route has a page viewport when its navigation root scrolls, preserving the root's
+scroll axes. Under native chrome, `resizes-visual` also supplies a page viewport
+that accommodates the keyboard without layout reflow. Otherwise put scrolling
+content in a `scroll` or `list` with
 `flex=1 min-height=0` right after its `header`. Use an outer `scroll` when a
 document contains smaller scrollers, so content outside them remains reachable.
 

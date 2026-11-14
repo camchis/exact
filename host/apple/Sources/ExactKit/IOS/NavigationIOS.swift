@@ -11,6 +11,7 @@ final class RouteController: UIViewController, UIScrollViewDelegate {
     let node: NodeView
     var key: String { node.props["navigationKey"] ?? "" }
     fileprivate var usesPageViewport = false
+    fileprivate var pageScrollAxes: (x: Bool, y: Bool)?
     private(set) var contentViewport: Viewport?
     private let keyboardInset = KeyboardInset()
     var contentMount: UIView { contentViewport ?? view }
@@ -237,8 +238,7 @@ final class RouteController: UIViewController, UIScrollViewDelegate {
         if node.superview !== contentMount { contentMount.addSubview(node) }
         host?.presenter.regrid(node) // from the controller's view, a grid origin of its own
     }
-    /// The route's room for the keys, and under `resizes-visual` its
-    /// viewport's frame, extent and inset.
+    /// The route's room for the keys, and its page viewport's frame, extent and inset.
     func fitContentViewport(in block: CGRect? = nil) {
         #if os(iOS)
         // Under a search in the bar the route keeps its layout (`block(in:)`)
@@ -247,7 +247,7 @@ final class RouteController: UIViewController, UIScrollViewDelegate {
         // A visual viewport takes them as its inset instead, without reflow.
         if let presenter = host?.presenter {
             var keys: CGFloat = 0
-            if contentViewport == nil, presenter.editsInBar(of: view), let top = presenter.keyboardTop, let window = view.window {
+            if contentViewport == nil || presenter.keyboardPolicy != "resizes-visual", presenter.editsInBar(of: view), let top = presenter.keyboardTop, let window = view.window {
                 let edge = view.convert(CGPoint(x: 0, y: top), from: window).y
                 // Extend the inherited safe area (including a row beside the tabs) to the keys;
                 // the keyboard and that row obstruct the same edge.
@@ -262,8 +262,13 @@ final class RouteController: UIViewController, UIScrollViewDelegate {
         let frame = ExactEnv.authoredChrome ? allocation : view.bounds
         if scroll.frame != frame { scroll.frame = frame }
         scroll.keyboardDismissMode = viewportKeyboardDismissal
+        scroll.scrollsX = pageScrollAxes?.x ?? true
+        scroll.scrollsY = pageScrollAxes?.y ?? true
         let extent = CGSize(width: max(node.bounds.width, node.style["overflow_x"]?.string == "visible" || node.style["overflow_x"] == nil ? node.content.width : 0),
                             height: max(node.bounds.height, node.style["overflow_y"]?.string == "visible" || node.style["overflow_y"] == nil ? node.content.height : 0))
+        // An axis the root does not scroll keeps its extent: CSS `overflow: hidden` still
+        // scrolls programmatically (a fragment, `scrollIntoView`). The person's drag
+        // cannot move it (`scrollViewDidScroll`).
         let size = CGSize(width: max(allocation.width, node.frame.minX + extent.width), height: max(allocation.height, node.frame.minY + extent.height))
         if scroll.contentSize != size { scroll.contentSize = size }
         // Keep drawing under the keyboard while the content clears its occupied area
@@ -281,7 +286,11 @@ final class RouteController: UIViewController, UIScrollViewDelegate {
     }
 
     func scrollViewDidScroll(_ scrollView: UIScrollView) {
-        guard scrollView === contentViewport, let presenter = host?.presenter else { return }
+        guard let scroll = contentViewport, scrollView === scroll, let presenter = host?.presenter else { return }
+        if let origin = dragOrigin {
+            let held = CGPoint(x: scroll.scrollsX ? scroll.contentOffset.x : origin.x, y: scroll.scrollsY ? scroll.contentOffset.y : origin.y)
+            if held != scroll.contentOffset { scroll.contentOffset = held; return }
+        }
         presenter.owners.publish()
         presenter.stickies.scrolled(node.id)
         presenter.transformGeometry.changed()
@@ -292,14 +301,20 @@ final class RouteController: UIViewController, UIScrollViewDelegate {
         node.repaintThrough()
     }
 
+    /// Where the person's drag of the page viewport began, until it comes to rest.
+    private var dragOrigin: CGPoint?
     func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
+        if scrollView === contentViewport { dragOrigin = scrollView.contentOffset }
         host?.presenter.elementScrolls.userScrolled(scrollView)
         if let session = host?.presenter.session { session.frameHealth.beginScroll(scrollView, session: session) }
     }
     func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
-        if !decelerate { host?.presenter.session?.frameHealth.endScroll(scrollView) }
+        if !decelerate { dragOrigin = nil; host?.presenter.session?.frameHealth.endScroll(scrollView) }
     }
-    func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) { host?.presenter.session?.frameHealth.endScroll(scrollView) }
+    func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) {
+        dragOrigin = nil
+        host?.presenter.session?.frameHealth.endScroll(scrollView)
+    }
 
     func scrollViewDidEndScrollingAnimation(_ scrollView: UIScrollView) {
         host?.presenter.elementScrolls.revealEnded(scrollView)
@@ -674,8 +689,9 @@ final class NavigationHost: NSObject, UINavigationControllerDelegate, UIGestureR
             return (index == at ? Array(routes[range]) : routes).map { node -> RouteController in
                 presented = presented || ["modal", "fullscreen"].contains(node.props["navigationPresentation"] ?? "")
                 let c = controllers[node.id] ?? RouteController(node)
-                // A separate visual viewport accommodates the keyboard without reflowing the route
-                c.usesPageViewport = !presented && !ExactEnv.authoredChrome && presenter.keyboardPolicy == "resizes-visual"
+                // The projected route keeps the page's scrolling when its root owns overflow.
+                c.pageScrollAxes = root.scroll.map { ($0.scrollsX, $0.scrollsY) }
+                c.usesPageViewport = !presented && (root.scrollView != nil || (!ExactEnv.authoredChrome && presenter.keyboardPolicy == "resizes-visual"))
                 c.host = self
                 controllers[node.id] = c
                 c.mount()

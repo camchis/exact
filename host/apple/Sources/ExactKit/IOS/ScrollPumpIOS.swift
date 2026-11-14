@@ -219,6 +219,12 @@ final class ScrollPump: NSObject, UIScrollViewDelegate {
         presenter?.stickies.scrolled(nil); scrolled(nil)
     }
     // The page's element reveals (`IntoView.swift`).
+    #if os(iOS)
+    func scrollViewShouldScrollToTop(_ scrollView: UIScrollView) -> Bool {
+        presenter?.elementScrolls.userScrolled(scrollView)
+        return true
+    }
+    #endif
     func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
         presenter?.elementScrolls.userScrolled(scrollView)
         if let session = presenter?.session { session.frameHealth.beginScroll(scrollView, session: session) }

@@ -835,11 +835,16 @@ try {
       const kept = await port();
       await press('to-other'); await at(await offset('other'), '#other');
       await press('to-moves'); await at(unloadedMoves, '#moves again');
+      await wheel(-200);
+      const forward = await port();
+      assert.notEqual(forward, unloadedMoves, 'the entry is left away from its fragment');
       assert.notEqual(await evaluate('document.readyState'), 'complete', 'the traversal happens while the document loads');
       await evaluate('history.go(-2)');
       await at(kept, 'Back two entries, to #moves as it was left');
+      await evaluate('history.go(2)');
+      await at(forward, 'Forward two entries, to #moves as it was left');
       await landPicture();
-      await at(kept, 'the traversed entry keeps its place when the picture lands');
+      await at(forward, 'the traversed entry keeps its place when the picture lands');
       await launch();
       const start = await offset('first'); // the route's, below the bar
       await press('to-top'); await at(start, '#top');

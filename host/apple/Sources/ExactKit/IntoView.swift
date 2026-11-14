@@ -371,6 +371,20 @@ extension Presenter {
         return projected
     }
 
+    /// Page clearance is kernel padding, so its bars do not appear in `adjustedContentInset`.
+    /// A reveal still aligns inside the part of that page UIKit leaves visible.
+    private func elementPageInsets(_ scroll: UIScrollView) -> UIEdgeInsets {
+        var inset = scroll.adjustedContentInset
+        guard let route = scroll.superview?.next as? RouteController,
+              route.contentViewport === scroll else { return inset }
+        let safe = scroll.safeAreaInsets, off = NavigationHost.clearanceOff(route.node)
+        if !NavigationHost.insetsNoTop(route.node) { inset.top = max(inset.top, safe.top) }
+        if off & 2 == 0 { inset.right = max(inset.right, safe.right) }
+        if off & 4 == 0 { inset.bottom = max(inset.bottom, safe.bottom) }
+        if off & 8 == 0 { inset.left = max(inset.left, safe.left) }
+        return inset
+    }
+
     /// The target's box in `sv` and where `sv`'s offset goes to align it,
     /// measured now: a layout can size a native row that had an estimated
     /// height. With `projected`, the box is where the inner reveals take it.
@@ -394,7 +408,7 @@ extension Presenter {
             frame = target.convert(target.bounds, to: sv)
         }
         let area = IntoView.inset(frame, style: target.style, family: "scroll_margin", outward: true)
-        let inset = owner?.scrollPortInsets(sv) ?? sv.adjustedContentInset
+        let inset = owner?.scrollPortInsets(sv) ?? elementPageInsets(sv)
         var port = IntoView.inset(sv.pageBounds.inset(by: inset), style: owner?.style ?? [:], family: "scroll_padding")
         if let grouped, sv === grouped, let pinned = pinnedHeader(over: frame, in: grouped) {
             port.origin.y += pinned

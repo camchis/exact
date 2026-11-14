@@ -153,6 +153,8 @@ extension Presenter {
         let fragment = args.count > 1 ? args[1] as? String ?? "" : ""
         let activation = args.count > 2 ? (args[2] as? NSNumber)?.intValue : nil
         let arm = fragmentArm.flatMap { $0.activation == activation ? $0 : nil }
+        // One armed before and not now was taken or superseded: it leaves the current hold alone.
+        if arm == nil, let activation, activation > 0, activation <= fragmentSeen { return }
         if arm != nil { fragmentArm = nil }
         if let arm, arm.scrolls != personScrolls {
             session?.log("fragment #\(fragment): the person scrolled first; the route stays where it is")
