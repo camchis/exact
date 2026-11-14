@@ -1090,6 +1090,7 @@ package final class Presenter {
         // control exists, so retarget guides in this same batch after sync.
         focusGuides.sync()
         #endif
+        attachRegionPopovers()
         ApplyProfile.time("pass.menus") { menus.sync() }
         glassGroups.reconcile()
         positionContexts()
@@ -1146,6 +1147,7 @@ package final class Presenter {
     /// `parent`'s children, in order: its views as subviews of its container,
     /// then its flat leaves' layers among them (LLP 1068 §6.1).
     func placeChildren(_ parent: NodeView, _ ids: [UInt32]) {
+        let ids = regionPopoverChildren(ids, of: parent)
         #if os(iOS)
         if #available(iOS 27.1, *) { arrangements.record(parent, children: ids) }
         #endif

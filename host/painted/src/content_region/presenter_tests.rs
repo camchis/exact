@@ -10,6 +10,8 @@ mod fail_backend;
 mod inline_opacity;
 #[path = "input_clock_tests.rs"]
 mod input_clock;
+#[path = "popover_tests.rs"]
+mod popover;
 #[path = "projection_discriminator_tests.rs"]
 mod projection_discriminator;
 const APP: &str = r#"component App

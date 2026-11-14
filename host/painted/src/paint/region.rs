@@ -237,6 +237,8 @@ impl Picture {
                 .node(id)
                 .ok_or("content node removed during capture")?;
             if (scene.hidden)(id)
+                || scene.kernel.is_top_layer(id)
+                || scene.kernel.host_block(id).is_some()
                 || node.is_inline_run()
                 || node.style.display == Display::None
                 || node.props.str(PropId::SemanticTag) == Some("dialog")

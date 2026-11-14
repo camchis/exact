@@ -817,6 +817,9 @@ fn holds_absolute(arena: &NodeArena, owner: u32) -> bool {
     arena.children(owner).iter().any(|&branch| {
         let (mut stack, mut seen) = (vec![branch], 0);
         while let Some(s) = stack.pop() {
+            if crate::style::top_layer::is_box(arena, s) {
+                continue;
+            }
             seen += 1;
             let children = arena.children(s);
             if crate::style::top_layer::layout_position(arena, s) == crate::PositionType::Absolute
@@ -858,7 +861,7 @@ fn validate(arena: &NodeArena, b: ContentRegion) -> Result<(), LayoutError> {
         // In the top layer the owner is laid out in its own block, after
         // the region's shell: no trial can place it (stage 14 B). Whether
         // it is in the top layer now, not whether the last layout's block
-        // still stands (a host's block is refused beside a region anyway).
+        // still stands. A host may supply a block only for a top-layer root.
         if arena.top_layer_slots.contains(s) {
             return Err(LayoutError::ContentRegion("region owner in the top layer"));
         }

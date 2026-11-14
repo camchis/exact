@@ -1193,7 +1193,7 @@ package final class Presenter {
                 if v.style["text_color"] != color { session?.noteAppearance(v) }
             case .children:
                 guard let parent = views[id] else { continue }
-                let want = op.ids.compactMap { views[UInt32($0)] }
+                let want = regionPopoverChildren(op.ids, of: parent).compactMap { views[$0] }
                 let container = parent.container
                 dialogs.children(container, want)
                 menus.children(container, want)
@@ -1309,6 +1309,7 @@ package final class Presenter {
         segments.sync()
         controls.sync()
         dialogs.sync()
+        attachRegionPopovers()
         menus.sync()
         glassGroups.reconcile()
         positionContexts()
