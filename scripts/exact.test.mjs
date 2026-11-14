@@ -1468,17 +1468,17 @@ test('an installed command opens the bundle it names, whatever the name holds', 
   assert.deepEqual(run.stdout.split('\n').slice(0, -1), ['-a', target, '--', ...files]);
 });
 
-test('exact new names setup --check for each native platform the app names, whose rows its web table leaves out', () => inDir((dir) => {
+test('exact new names setup --check for each native platform the app names, whose rows its web table leaves out', async () => { const { shellPath } = await import('./exact.mjs'); inDir((dir) => {
   const made = spawnSync(process.execPath, [resolve(import.meta.dir, 'exact.mjs'), 'new', resolve(dir, 'with-native'), '--with', 'ios', '--with', 'mac'], { encoding: 'utf8', timeout: 120_000 });
   assert.equal(made.status, 0, made.stderr);
-  const script = resolve(import.meta.dir, 'exact.mjs');
+  const script = shellPath(resolve(import.meta.dir, 'exact.mjs'));
   assert.ok(made.stdout.includes(`Before the first ios build: bun ${script} setup --check --platform ios names what it lacks (the Xcode or SDK it needs among them).`), made.stdout);
   assert.ok(made.stdout.includes(`Before the first macos build: bun ${script} setup --check --platform macos names`), made.stdout);
-  // The command it names is one setup takes, run from the app: it prints the platform's table, not its usage.
-  const named = /^Before the first macos build: bun ('[^']*'|\S+) (setup --check --platform macos)/m.exec(made.stdout);
-  const checked = spawnSync(process.execPath, [named[1].replace(/^'(.*)'$/, '$1'), ...named[2].split(' ')], { cwd: resolve(dir, 'with-native'), encoding: 'utf8', timeout: 120_000 });
+  // The command it names is one setup takes, run by a shell from the app: it prints the platform's table, not its usage.
+  const named = /^Before the first macos build: bun (.+? setup --check --platform macos) names/m.exec(made.stdout);
+  const checked = spawnSync('/bin/sh', ['-c', `${shellPath(process.execPath)} ${named[1]}`], { cwd: resolve(dir, 'with-native'), encoding: 'utf8', timeout: 120_000 });
   assert.doesNotMatch(checked.stderr, /Usage: exact setup/);
   assert.match(checked.stdout, /\bXcode\b|\bmacOS\b/);
   const plain = spawnSync(process.execPath, [resolve(import.meta.dir, 'exact.mjs'), 'new', resolve(dir, 'web-only')], { encoding: 'utf8', timeout: 120_000 });
   assert.doesNotMatch(plain.stdout, /Before the first/);
-}));
+}); }, 240_000);
