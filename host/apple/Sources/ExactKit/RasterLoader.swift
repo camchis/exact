@@ -809,6 +809,7 @@ final class RasterLoader {
         guard interest.offeredPixel > 0 else { return }
         let metadata = backend.metadata(interest.source).0
         let pixel = requestedPixel(view, metadata)
+        if let rendering = view.style["image_rendering"]?.string, rendering != "auto", pixel != interest.offeredPixel { retry(view.id); return }
         // Avoid re-decoding for every one-pixel live resize or small rounding.
         if pixel > interest.offeredPixel * 5 / 4 || pixel * 5 / 4 < interest.offeredPixel { retry(view.id); return }
         // An SVG filling its box is drawn at the box's ratio: either axis past the band is another picture.
@@ -843,6 +844,9 @@ final class RasterLoader {
     /// fill the box, so the longer one overflows it), as a browser decodes
     /// for the size it paints. Before the metadata, the box's longest side.
     private func requestedPixel(_ view: NodeView, _ metadata: RasterMetadata?) -> Int {
+        if let rendering = view.style["image_rendering"]?.string, rendering != "auto", let metadata, !metadata.svg {
+            return max(metadata.sourceWidth, metadata.sourceHeight)
+        }
         #if os(macOS)
         let scale = view.pixelScale ?? 1
         #else

@@ -1,5 +1,6 @@
 import Foundation
 import CoreGraphics
+import QuartzCore
 import CExact
 import ImageIO
 import ObjectiveC
@@ -707,15 +708,43 @@ enum RasterGeometry {
     /// alpha masks the tint (LLP 1011 §4). The same decoded pixels either way.
     /// A layer composited source-in, not `clip(to:mask:)`, which reads an
     /// image with alpha wrongly (a transparent pixel came back half covered).
-    static func draw(_ ctx: CGContext, _ image: CGImage, in rect: CGRect, tint: CGColor?) {
-        guard let tint else { ctx.draw(image, in: rect); return }
+    static func draw(_ ctx: CGContext, _ image: CGImage, in rect: CGRect, tint: CGColor?, rendering: String? = nil) {
+        ctx.saveGState()
+        defer { ctx.restoreGState() }
+        if rendering == "crisp-edges" { ctx.interpolationQuality = .none }
+        func picture() {
+            if rendering == "pixelated" { pixelated(ctx, image, in: rect) }
+            else { ctx.draw(image, in: rect) }
+        }
+        guard let tint else { picture(); return }
         ctx.saveGState()
         ctx.beginTransparencyLayer(in: rect, auxiliaryInfo: nil)
-        ctx.draw(image, in: rect)
+        picture()
         ctx.setBlendMode(.sourceIn)
         ctx.setFillColor(tint)
         ctx.fill(rect)
         ctx.endTransparencyLayer()
         ctx.restoreGState()
     }
+
+    static func filter(_ layer: CALayer, rendering: String?) {
+        let filter: CALayerContentsFilter = rendering == "crisp-edges" ? .nearest : .linear
+        layer.magnificationFilter = filter
+        layer.minificationFilter = filter
+    }
+
+    private static func pixelated(_ ctx: CGContext, _ image: CGImage, in rect: CGRect) {
+        let t = ctx.ctm
+        let n = RasterTiles.enlargement(image, rect: rect, scale: CGSize(width: hypot(t.a, t.b), height: hypot(t.c, t.d)))
+        ctx.interpolationQuality = .low
+        if n == CGSize(width: 1, height: 1) { ctx.draw(image, in: rect); return }
+        RasterTiles.each(image, rect: rect, visible: ctx.boundingBoxOfClipPath, enlargement: n, tint: nil) { pixels, core, halo in
+            ctx.saveGState()
+            ctx.setShouldAntialias(false)
+            ctx.clip(to: core)
+            ctx.draw(pixels, in: halo)
+            ctx.restoreGState()
+        }
+    }
+
 }

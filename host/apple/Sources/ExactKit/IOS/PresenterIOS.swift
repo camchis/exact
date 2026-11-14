@@ -838,6 +838,7 @@ package final class Presenter {
                 ApplyProfile.time("pass.text") { paintPresentedText() }
                 paintChangedText()
                 if !boxFilters.isEmpty { boxFilters.render() }
+                refreshPixelatedImages()
                 videoVisibility?.changed()
                 let q = waiting
                 waiting = []

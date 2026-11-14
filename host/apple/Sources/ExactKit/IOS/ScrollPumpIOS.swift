@@ -177,6 +177,7 @@ final class ScrollPump: NSObject, UIScrollViewDelegate {
     /// A scroller moved: sample a collection's travel and schedule its text.
     func scrolled(_ node: NodeView?) {
         guard let p = presenter, !p.applying, !inScroll else { return }
+        p.refreshPixelatedImages()
         inScroll = true
         defer { inScroll = false }
         lastScroll = CACurrentMediaTime()

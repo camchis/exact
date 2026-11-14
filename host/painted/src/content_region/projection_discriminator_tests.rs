@@ -79,9 +79,10 @@ impl Backend for ObservedRaster {
         clips: &[Shape],
         t: Transform,
         tint: Option<[u8; 4]>,
+        rendering: exact_kernel::ImageRendering,
     ) {
         self.shape("image", &Shape::rect(dst), t, &[]);
-        self.raster.image(i, dst, clips, t, tint);
+        self.raster.image(i, dst, clips, t, tint, rendering);
     }
     fn text(
         &mut self,

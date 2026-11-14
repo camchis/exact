@@ -297,6 +297,8 @@ extension NodeView {
     #if os(iOS) || os(tvOS)
     package func applyTransform() {
         defer { overflowClipGeometryChanged() }
+        let before = layer.transform
+        defer { if !CATransform3DEqualToTransform(before, layer.transform) { refreshPixelatedImages() } }
         // Flying scaled whole in its clip (LLP 1013.000 D4.4): the
         // flight's scale only.
         if flightLook != nil { stopPressEase() }
@@ -354,6 +356,8 @@ extension NodeView {
     #else
     package func applyTransform() {
         defer { overflowClipGeometryChanged() }
+        let before = layer?.transform ?? CATransform3DIdentity
+        defer { if !CATransform3DEqualToTransform(before, layer?.transform ?? CATransform3DIdentity) { refreshPixelatedImages() } }
         // A backdrop mirrors its box as the transform moves and scales it.
         defer { if !backdropOperations.isEmpty { applyBackdrop() } }
         // A frame's web view takes its scale by geometry (`FrameScaleMac.swift`).

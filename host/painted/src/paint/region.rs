@@ -99,7 +99,12 @@ enum Command {
 }
 enum Payload {
     Empty,
-    Image(Arc<Bitmap>, ObjectFit, Option<[u8; 4]>),
+    Image(
+        Arc<Bitmap>,
+        ObjectFit,
+        Option<[u8; 4]>,
+        exact_kernel::ImageRendering,
+    ),
     Text(
         Rc<Paragraph>,
         Option<Rc<inline_frame::Captured>>,
@@ -342,6 +347,7 @@ impl Picture {
                             image.clone(),
                             node.style.object_fit,
                             super::image_tint(&node, &(scene.presented)(id), painter.dark),
+                            node.computed_row(StyleId::ImageRendering, |s| s.image_rendering),
                         )
                     }),
                     NodeType::Svg => {
@@ -381,7 +387,7 @@ impl Picture {
                         s.walk(&mut |_| n += 1);
                         n
                     }
-                    Payload::Image(image, fit, _) => {
+                    Payload::Image(image, fit, _, _) => {
                         usize::from(object_fit(image.natural(), *fit, geometry.content).is_some())
                     }
                 };
@@ -742,7 +748,7 @@ impl<'a> Replay<'a> {
                                 .into_iter()
                                 .all(|(x, y)| x.is_finite() && y.is_finite());
                     });
-                    if let Payload::Image(image, fit, _) = &n.payload {
+                    if let Payload::Image(image, fit, _, _) = &n.payload {
                         finite &= object_fit(image.natural(), *fit, c).is_none_or(finite_rect);
                     }
                     if !finite {
@@ -857,11 +863,13 @@ impl<'a> Replay<'a> {
                     }
                     match &n.payload {
                         Payload::Empty => {}
-                        Payload::Image(image, fit, tint) => {
+                        Payload::Image(image, fit, tint, rendering) => {
                             if let Some(dst) = object_fit(image.natural(), *fit, g.content) {
                                 let clips = [g.content_edge()];
                                 let placed = image.placed(dst);
-                                painter.backend.image(image, placed, &clips, parent, *tint);
+                                painter
+                                    .backend
+                                    .image(image, placed, &clips, parent, *tint, *rendering);
                             }
                         }
                         Payload::Svg(s) => {
