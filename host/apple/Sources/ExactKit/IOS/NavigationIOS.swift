@@ -147,21 +147,18 @@ final class RouteController: UIViewController, UIScrollViewDelegate {
 
     /// The backdrop's colours last written, light and dark.
     private var backdropKey: [[Double]?]?
-    /// The controller's view paints what shows behind the route: a dynamic
-    /// colour resolved for the controller's current appearance, re-resolved
-    /// by UIKit when it changes (a route loaded before its window has a trait
-    /// collection would otherwise keep the light colour in dark mode), and
-    /// written again when a batch changes it. A pushed route shows its
-    /// backdrop (`backdrop`); a route under no background shows the system
-    /// background, not white. A sheet is the route's own background where it
-    /// has one, as a grouped sheet's surface is the grouped background (LLP
-    /// 1116.021 D7, amending LLP 1115 D2), so no white band shows where the
-    /// route stops above a keyboard's bar; else clear, over the surface its
-    /// presentation paints (`ModalController.paintSurface`: UIKit's glass at
-    /// a partial detent, LLP 1141.001 D3). What is behind the sheet is not,
-    /// and dimming belongs to UIKit's presentation. A full-screen route that
-    /// paints its own background is clear, as its presentation is
-    /// (`NodeView.paintsOverPage`): the route paints it once, over the page.
+    /// The controller's view paints what shows behind the route: a dynamic colour resolved for the
+    /// controller's current appearance, re-resolved by UIKit when it changes (a route loaded before
+    /// its window has a trait collection would otherwise keep the light colour in dark mode), and
+    /// written again when a batch changes it. A pushed route shows its backdrop (`backdrop`); a
+    /// route under no background shows the system background, not white. A sheet is the route's own
+    /// background where it has one, as a grouped sheet's surface is the grouped background (LLP
+    /// 1116.021 D7, amending LLP 1115 D2), so no white band shows where the route stops above a
+    /// keyboard's bar; else clear, over the surface its presentation paints
+    /// (`ModalController.paintSurface`: UIKit's glass at a partial detent, LLP 1141.001 D3). What
+    /// is behind the sheet is not, and dimming belongs to UIKit's presentation. A full-screen route
+    /// that paints its own background is clear, as its presentation is (`NodeView.paintsOverPage`):
+    /// the route paints it once, over the page.
     func paintBackdrop() {
         guard isViewLoaded else { return }
         // The route's view takes its accent as its tint, which its backdrop in the tint is resolved by
@@ -408,16 +405,14 @@ final class RouteController: UIViewController, UIScrollViewDelegate {
     }
 
     private var topEdgeWatch: NSKeyValueObservation?
-    /// iOS 26 draws the bar's edge effect on the outermost scroll view under
-    /// it, which for a route whose scroller (a list) lies in its page is the
-    /// page's viewport, not that scroller (measured on iOS 27: UIKit alone
-    /// does the same with a table view in a scroll view). So the viewport's
-    /// top effect shows only while that scroller is scrolled from its top,
-    /// as UIKit's does over a list that is the controller's own: no effect
-    /// over a list at rest. Its style stays `automatic`: the rows blurred and
-    /// faded under the whole bar to a line at its foot, as a UIKit or SwiftUI
-    /// list or scroll view draws them there (iOS 27, measured), where `soft`
-    /// left them legible under the title.
+    /// iOS 26 draws the bar's edge effect on the outermost scroll view under it, which for a route
+    /// whose scroller (a list) lies in its page is the page's viewport, not that scroller (measured
+    /// on iOS 27: UIKit alone does the same with a table view in a scroll view). So the viewport's
+    /// top effect shows only while that scroller is scrolled from its top, as UIKit's does over a
+    /// list that is the controller's own: no effect over a list at rest. Its style stays
+    /// `automatic`: the rows blurred and faded under the whole bar to a line at its foot, as a
+    /// UIKit or SwiftUI list or scroll view draws them there (iOS 27, measured), where `soft` left
+    /// them legible under the title.
     private func followTopEdge(_ scrollView: UIScrollView?) {
         topEdgeWatch = nil
         guard #available(iOS 26.0, tvOS 26.0, *), let page = contentViewport else { return }
