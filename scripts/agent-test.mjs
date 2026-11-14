@@ -852,8 +852,10 @@ export async function runTests({ host, browser, file, plan, app, size, env, webD
       let measured = null, mark = NO_FAILURES;
       const refusals = t.steps.filter((x) => x.op === 'expect-refusal').map((x) => x.target);
       // One step: an input, a read, an expect, or a `perf` block, whose steps run here in turn (LLP 1146 D3).
+      // The test's last line, a `perf` block's steps included.
+      const last = Math.max(...t.steps.flatMap((x) => [x.line, ...(x.steps ?? []).map((y) => y.line)]));
       const runStep = async (st, n, at) => {
-        atLine?.({ name: t.name, index, line: st.line, last: t.steps.at(-1)?.line, op: st.op });
+        atLine?.({ name: t.name, index, line: st.line, last, op: st.op });
         if (INPUTS.has(st.op)) await settleFired();
         if (st.op === 'type') { typed.add(st.target); touched.add(st.target); } else if (INPUTS.has(st.op) || st.op === 'reload') typed.clear();
         switch (st.op) {
