@@ -1463,5 +1463,10 @@ test('a verb that builds refuses at once in a checkout without node_modules, and
       assert.equal(r.status, 1, `${verb.join(' ')}: ${r.stderr}`);
       assert.match(r.stderr, new RegExp(`^${verb[0]}: exact's node_modules is missing: run \`bun install --frozen-lockfile\` in `, 'm'));
     }
+    // A drive of a site already built builds nothing, so it is not refused.
+    for (const verb of [['agent', 'web', '--url', 'http://127.0.0.1:9', 'tree'], ['test', 'web', '--web-dist', resolve(parent, 'dist')]]) {
+      const r = spawnSync(process.execPath, [resolve(dir, 'exact.mjs'), ...verb], { cwd: dir, env: { ...process.env, EXACT2: sdk, EXACT_FEEDBACK: '0' }, encoding: 'utf8', timeout: 30_000 });
+      assert.doesNotMatch(r.stderr, /node_modules is missing/, verb.join(' '));
+    }
   } finally { rmSync(parent, { recursive: true, force: true }); }
 });

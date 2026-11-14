@@ -300,8 +300,11 @@ async function verbRun({ dir, name, game = false, exact2, args }, reply) {
   } catch {}
   return exit; };
   // A verb that builds the app bundles app.ts with rolldown from this checkout's node_modules (the web's build and
-  // every native bake); without it Bun's auto-install spins silently instead of failing.
-  if (['web', 'web-build', 'serve', 'test', 'agent', 'verify', 'ios', 'mac', 'linux', 'windows', 'android'].includes(verb) && !['rolldown', 'rolldown.exe'].some((bin) => existsSync(resolve(exact2, 'node_modules/.bin', bin)))) {
+  // every native bake); without it Bun's auto-install spins silently instead of failing. A drive of a site already
+  // built (`--url`, `--web-dist`) and `serve` of a build build nothing.
+  const builds = ['web', 'web-build', 'test', 'agent', 'verify', 'ios', 'mac', 'linux', 'windows', 'android'].includes(verb)
+    && !rest.some((a) => a === '--url' || a === '--web-dist');
+  if (builds && !['rolldown', 'rolldown.exe'].some((bin) => existsSync(resolve(exact2, 'node_modules/.bin', bin)))) {
     console.error(`${verb}: exact's node_modules is missing: run \`bun install --frozen-lockfile\` in ${exact2} (every build's type check imports rolldown from it)`);
     return log(1);
   }

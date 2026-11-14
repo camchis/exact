@@ -17,10 +17,10 @@ component Voice
           row align-items="center" gap=8 padding="8px 12px" border-radius="18px 18px 4px 18px"
             background-color="-exact-fill" testId=`note-${n.id}`
             image "symbol:play" aria-label="Play" font="-exact-headline"
-            svg viewBox="0 0 160 28" width=160 height=28 aria-hidden="true"
+            svg viewBox="0 0 160 28" width=160 height=28 aria-hidden="true" testId=`wave-${n.id}`
               path d=n.wave fill="-exact-secondary-label"
             text n.duration font="-exact-caption1" color="-exact-secondary-label"
-          svg viewBox="0 0 8 13" width=8 height=13 aria-hidden="true"
+          svg viewBox="0 0 8 13" width=8 height=13 aria-hidden="true" testId=`tail-${n.id}`
             path d="M0 0 C0 6 2 11 8 13 H0 Z" fill="-exact-fill"
 ```
 
@@ -42,8 +42,10 @@ export const answer: Answer = (source, args, store, storage, native) => sources[
 ```
 
 ```contract-test
-test "a note draws its waveform"
+test "a note shows its waveform, its duration and its tail"
   clock data
+  expect tree has "wave-1"
+  expect tree has "tail-1"
   expect text "note-1" == "0:23"
 ```
 
@@ -51,6 +53,7 @@ test "a note draws its waveform"
   row's height stays its own, so a virtualized list measures it before it draws.
 - Shape the path once, in app.ts, when the note loads; the view does no arithmetic.
 - The tail is a second `svg` beside the bubble, whose corner on that side is nearly square
-  (`4px`), so the two meet without overlapping: `-exact-fill` is translucent, and an
-  overlap draws darker. Theirs goes on the left, mirrored (`transform="scale(-1, 1)"`).
+  (`4px`), so the two meet without overlapping: `-exact-fill` can be translucent, and an
+  overlap draws darker. Theirs: the `svg` before the bubble, the small corner bottom-left,
+  and `transform="translate(8, 0) scale(-1, 1)"` on the `path`, which keeps it in the viewBox.
 - `fill` takes a role (`-exact-fill`), as `background-color` does, so both follow dark mode.

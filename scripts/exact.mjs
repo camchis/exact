@@ -804,7 +804,7 @@ async function newApp(path, {update = false, without = null, with: platforms = [
     printReport(report, {onlyMissing: true});
   }
   // The table above is the web's (LLP 1153 D1.6): a platform the app names is checked before its first build.
-  for (const platform of game ? [] : platforms ?? []) console.log(`Before the first ${platform} build: bun exact.mjs setup --check ${platform} names what it lacks (the Xcode or SDK it needs among them).`);
+  for (const platform of game ? [] : platforms ?? []) console.log(`Before the first ${platform} build: bun exact.mjs setup --check --platform ${platform} names what it lacks (the Xcode or SDK it needs among them).`);
   if (note >= 0) console.log(created.slice(note));
   if (noRust) console.log('\nWithout Rust, this machine cannot check or build the app locally: `bun exact.mjs contract build app.contract` and every local build or dev loop compile exact2\'s tools first. A build service builds it as it is; to check here, install rustup (https://rustup.rs).');
 }
@@ -1251,6 +1251,8 @@ const TOPICS = {
   log: 'The driver\'s operations', sheet: 'Recipe: a navigation stack', push: 'Recipe: a navigation stack',
   'tab bar': 'Recipe: tabs', 'back button': 'Recipe: a navigation stack', share: 'Host commands',
   'dark mode': 'Recipe: theme: colours, light and dark, icons',
+  // An icon's `svg` file; a drawing in a row (the waveform recipe) is `docs waveform`.
+  svg: 'Recipe: theme: colours, light and dark, icons',
   'safe area': 'Declarations',
   // A module's `func call`; the tools recipe's title says "calls" of tool lines, which `docs tool` finds.
   call: 'Recipe: a native module in Swift',

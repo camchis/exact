@@ -174,3 +174,21 @@ catch (error) { console.error(error.message); process.exit(1); }
     }
   } finally { rmSync(dir, { recursive: true, force: true }); }
 }, 60000);
+
+test('a checkout without node_modules refuses the type check before it starts, and says to install', async () => {
+  const { checkTypes, modulesMissing, modulesRefusal } = await import('./exact.mjs');
+  assert.equal(modulesMissing(), false, 'this checkout is installed');
+  inDir((dir) => {
+    const root = resolve(dir, 'checkout'), app = resolve(dir, 'app'), ran = resolve(dir, 'ran');
+    mkdirSync(root);
+    mkdirSync(app);
+    writeFileSync(resolve(app, 'app.ts'), 'export const grants = \'\';\n');
+    writeFileSync(resolve(app, 'app.json'), '{}\n');
+    writeFileSync(resolve(dir, 'builder.mjs'), `require('node:fs').writeFileSync(${JSON.stringify(ran)}, '');`);
+    assert.equal(modulesMissing(root), true);
+    const checked = checkTypes(app, { capture: true, builder: resolve(dir, 'builder.mjs'), root });
+    assert.deepEqual(checked, { status: 1, report: `error: ${modulesRefusal(root)}\n` });
+    assert.match(checked.report, /node_modules is missing: run `bun install --frozen-lockfile` in .*checkout/);
+    assert.ok(!existsSync(ran), 'the check never started');
+  });
+});

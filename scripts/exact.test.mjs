@@ -1080,6 +1080,7 @@ test('docs prints the section on its words first, matching whole words', () => {
     [['dark', 'mode'], 'docs/recipes/theme.md', /follows light, dark/],
     [['image'], 'docs/recipes/app-json.md', /image "assets\/logo.png"/],
     [['svg'], 'docs/recipes/theme.md', /svg "icons\/play\.svg"/],
+    [['waveform'], 'docs/recipes/waveform-and-tail.md', /^# Recipe: a voice note's waveform/],
     [['animation'], 'docs/recipes/motion.md', /animation/],
     [['transition'], 'docs/recipes/motion.md', /transition/],
     [['timer'], 'docs/recipes/timers.md', /^# Recipe: timers/],
@@ -1467,29 +1468,16 @@ test('an installed command opens the bundle it names, whatever the name holds', 
   assert.deepEqual(run.stdout.split('\n').slice(0, -1), ['-a', target, '--', ...files]);
 });
 
-test('a checkout without node_modules refuses the type check before it starts, and says to install', async () => {
-  const { checkTypes, modulesMissing, modulesRefusal } = await import('./exact.mjs');
-  assert.equal(modulesMissing(), false, 'this checkout is installed');
-  inDir((dir) => {
-    const root = resolve(dir, 'checkout'), app = resolve(dir, 'app'), ran = resolve(dir, 'ran');
-    mkdirSync(root);
-    mkdirSync(app);
-    writeFileSync(resolve(app, 'app.ts'), 'export const grants = \'\';\n');
-    writeFileSync(resolve(app, 'app.json'), '{}\n');
-    writeFileSync(resolve(dir, 'builder.mjs'), `require('node:fs').writeFileSync(${JSON.stringify(ran)}, '');`);
-    assert.equal(modulesMissing(root), true);
-    const checked = checkTypes(app, { capture: true, builder: resolve(dir, 'builder.mjs'), root });
-    assert.deepEqual(checked, { status: 1, report: `error: ${modulesRefusal(root)}\n` });
-    assert.match(checked.report, /node_modules is missing: run `bun install --frozen-lockfile` in .*checkout/);
-    assert.ok(!existsSync(ran), 'the check never started');
-  });
-});
-
 test('exact new names setup --check for each native platform the app names, whose rows its web table leaves out', () => inDir((dir) => {
   const made = spawnSync(process.execPath, [resolve(import.meta.dir, 'exact.mjs'), 'new', resolve(dir, 'with-native'), '--with', 'ios', '--with', 'mac'], { encoding: 'utf8', timeout: 120_000 });
   assert.equal(made.status, 0, made.stderr);
-  assert.match(made.stdout, /^Before the first ios build: bun exact\.mjs setup --check ios names what it lacks \(the Xcode or SDK it needs among them\)\.$/m);
-  assert.match(made.stdout, /^Before the first macos build: bun exact\.mjs setup --check macos names/m);
+  assert.match(made.stdout, /^Before the first ios build: bun exact\.mjs setup --check --platform ios names what it lacks \(the Xcode or SDK it needs among them\)\.$/m);
+  assert.match(made.stdout, /^Before the first macos build: bun exact\.mjs setup --check --platform macos names/m);
+  // The command it names is one setup takes: it prints the platform's table, not its usage.
+  const named = /setup (--check --platform macos)/.exec(made.stdout)[1].split(' ');
+  const checked = spawnSync(process.execPath, [resolve(import.meta.dir, 'exact.mjs'), 'setup', ...named], { encoding: 'utf8', timeout: 120_000 });
+  assert.doesNotMatch(checked.stderr, /Usage: exact setup/);
+  assert.match(checked.stdout, /\bXcode\b|\bmacOS\b/);
   const plain = spawnSync(process.execPath, [resolve(import.meta.dir, 'exact.mjs'), 'new', resolve(dir, 'web-only')], { encoding: 'utf8', timeout: 120_000 });
   assert.doesNotMatch(plain.stdout, /Before the first/);
 }));
