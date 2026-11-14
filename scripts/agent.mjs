@@ -127,6 +127,16 @@ export { open, clockSpan } from './agent-session.mjs';
 export { runTests, textOf } from './agent-test.mjs';
 export { Cdp, browserDiagnosticNoise };
 /** The hosts `open` carries a drive on. */
+/** How long a test runs before `test` says where it is, and how often after. */
+export const HEARTBEAT_MS = 30000;
+
+/** Where a long test is: its line of its last, how long it has run, and, at a drag, why a drag is slow. */
+export const heartbeat = ({ name, line, last, op, since }, now) => {
+  const s = Math.round((now - since) / 1000), took = s < 60 ? `${s}s` : `${Math.floor(s / 60)}m${String(s % 60).padStart(2, '0')}s`;
+  const drag = op === 'drag' ? '; a drag past the viewport is several strokes, each landing before the next' : '';
+  return `test "${name}": running ${took}, at line ${line} of ${last} (${op})${drag}`;
+};
+
 export const DRIVEN_HOSTS = ['web', 'macos', 'mac', 'ios', 'linux', 'android', 'windows', 'host', 'host-ios'];
 export async function main(argv, injected = {}) {
   const { flags, rest } = parseFlags(argv);
@@ -156,10 +166,28 @@ export async function main(argv, injected = {}) {
       throw new Error(
         `--touch ${flags.touch} is not taken with --test: a test's \`drag\` is a real gesture by itself on an iOS simulator; --touch platform makes every tap one too (LLP 1080.000)`,
       );
+    // Each test's line as it ends, and, while one runs past HEARTBEAT_MS, where it is every HEARTBEAT_MS: a run of
+    // long tests (a few hundred drags) said nothing after the server's line until the last test ended.
+    const said = new Set(),
+      report = (t) => {
+        said.add(t);
+        console.log(`test "${t.name}": ${t.skipped ? `skipped on ${host} (${t.skipped})` : t.failures.length ? 'FAIL' : 'ok'}`);
+        for (const f of t.failures) console.error('  ' + f);
+        for (const n of t.notes ?? []) console.error(`  note: ${n}`);
+      };
+    let at = null;
+    const atLine = (step) => { at = at?.index === step.index ? { ...at, ...step } : { ...step, since: Date.now() }; };
+    const every = injected.heartbeatMs ?? HEARTBEAT_MS,
+      beat = setInterval(() => {
+        if (at && Date.now() - at.since >= every) console.error(heartbeat(at, Date.now()));
+      }, every);
+    beat.unref?.();
     return (await import('./verify.mjs')).withAppServer(
       resolveApp(flags.app).dir,
       async () => {
         const r = await (injected.runTests ?? runTests)({
+          atLine,
+          atResult: (t) => { at = null; report(t); },
           host,
           browser,
           file: flags.test,
@@ -181,14 +209,8 @@ export async function main(argv, injected = {}) {
           chrome: flags.chrome,
           scale: flags.scale,
           port: flags.port,
-        });
-        for (const t of r.results) {
-          console.log(
-            `test "${t.name}": ${t.skipped ? `skipped on ${host} (${t.skipped})` : t.failures.length ? 'FAIL' : 'ok'}`,
-          );
-          for (const f of t.failures) console.error('  ' + f);
-          for (const n of t.notes ?? []) console.error(`  note: ${n}`);
-        }
+        }).finally(() => clearInterval(beat));
+        for (const t of r.results) if (!said.has(t)) report(t);
         console.log(`${r.passed} passed, ${r.failed} failed${r.skipped ? `, ${r.skipped} skipped` : ''}`);
         // The run, against the build it used (LLP 1146 D2: `bun scripts/evidence.mjs`).
         (await import('./evidence.mjs')).recordRun(flags.app, {
