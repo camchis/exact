@@ -19,10 +19,14 @@ impl Em<'_> {
             if r.unsettled {
                 continue;
             }
-            let f = code::function(plan, plan.code(r.body),
+            let f = code::function(
+                plan,
+                plan.code(r.body),
                 &code::evaluation(top, format!("derive {:?}", plan.str(r.name)), false),
-                0, &mut self.uses)
-                .map_err(|e| format!("derive {}: {e}", plan.str(r.name)))?;
+                0,
+                &mut self.uses,
+            )
+            .map_err(|e| format!("derive {}: {e}", plan.str(r.name)))?;
             let memo = self.uses.rt("memo");
             let _ = write!(
                 body,

@@ -25,6 +25,7 @@ tested against it, differentially and at random.
 | `Contract/Vm.lean` | A model of the expression VM (`runner/src/vm.rs`) for the opcodes expressions and action bodies use, over instructions with symbolic operands, and a decoder from the plan's bytes (`plan/tables/format.json`, `opcodes`). |
 | `Contract/Lower.lean` | A compiler from the semantics' expressions and statements to VM code, mirroring `contract/lower` (`expr.rs`, `stmts.rs`) instruction for instruction. |
 | `Contract/VmFacts.lean`, `Lower{Types,Sim,Spec,Proof,Lists,Calls,Correct,Stmt}.lean` | Its correctness proof (below). |
+| `Contract/VmRows.lean` | Executable derive calls over the VM: fresh callee machines, owner-frame selection, shared call and callback-work counters, and caller restoration. |
 | `Contract/LowerCheck.lean` | The Lean half of `difftest lowering`. |
 | `vm-extract/` | The shipped VM machine (`runner/src/machine.rs`) extracted to Lean by Charon and Aeneas, and proved to refine `Contract/Vm.lean` step by step and run by run (`vm-extract/README.md`). |
 | `Contract/ValTy.lean` | Types as sets of values (`ValTy`, `conforms` without finiteness), the order and join the checker's `?` induces (`Ty.le`, `Ty.unify`), and that `conforms` at a complete type gives `ValTy`. |
@@ -1218,12 +1219,26 @@ observation). The web's JS target refuses the same steps
 (`checkBounds`, and where `infer` grows a type: `some`, `map`, the roster).
 
 Executable instance expressions share plan rows during lowering. Source
-expansion and `instance_iff` still use substitution. Runtime difftest compares
-the runner's shared rendering with that meaning. The lowering check does not
-prove this sharing: `Vm.loadDerive` still models a settled environment read,
-and an executable row has no declaration in the expanded source program.
-It is reported as unrecognized by `LowerCheck`. The remaining proof needs a
-VM model for fresh-stack row calls, owner-frame cutting and shared bounds,
-then a lowering correspondence for replacing an instance expression by its
-row load. Existing lowering theorems cover the source compiler without that
-sharing transformation.
+expansion and `instance_iff` still use substitution. `VmRows` runs these
+calls over `Vm.step`: a fresh callee machine, empty parameters and writable
+slots, frames cut to the owner, and the caller restored with the returned
+value. Calls share a 65,536-call counter and a depth bound of 64. Callback
+work shares a 65,536-step counter. `owner_frames_cut` proves selection of
+the nearest owner; `frame_read_rebase` relates item, index and bound reads
+across the cut. Its checked examples exercise owner
+selection, local isolation, depth, sibling calls and caller-spent callback work.
+
+`LowerCheck` receives row bytecode, owner regions and the checked substituted
+expressions that lowering shares. It decodes every body and compares root-owned
+rows with source evaluation, including transitive row calls. A mutation test
+changes an executable body and requires a divergence. Arm-owned rows are
+reported as needing an instance environment and counted as refused by this
+check; they are not claimed as validated.
+
+Still owed: the general correspondence between shared loads and substitution,
+including the matcher's scope and binder conditions; contextual validation of
+arm-owned bodies and their view readers; and refinement of `VmRows` to the
+runner's row-call implementation. The model does not yet carry owned-slot
+stores or the roster's list-step, string and extent accounting. The existing
+lowering theorems cover `Vm` without this sharing transformation. The call
+model and its local invariants do not extend those theorems.

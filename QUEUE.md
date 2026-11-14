@@ -10,6 +10,7 @@
 - `GroupedListIOSTests.testATappedRowStaysSelectedThroughThePushAndLetsGoOnReturn` fails on an iPhone 17 Pro simulator with iOS 27.0: the first route push leaves one controller instead of two, both in the standalone run and in the hosted app with its navigation fixture. Seen on the #379 branch; origin/main was not checked.
 
 - **Grouped section pointer hover on iPad (#379).** Forward hover from UIKit’s visible cells, header and footer to the logical section, clearing it on exit, reuse and removal. The section’s own hover recognizer is on its hidden authored view, so a real pointer cannot activate its shadow.
+- **Photo Editor property suggestions miss a kept enum block.** `cargo test -p contract-difftest --lib suggest::precision_tests::the_nineteen_kept_blocks_survive_without_existing_property_suppression` fails to suggest "printSize is one of 3 values". It fails with both unshared control plans and executable sharing; the app-plan observations agree through the seeded drives.
 
 - realworld (68.1 KiB brotli against 45), caltrain (50.0 KiB against 25) and video-player (29.3 KiB against 17) are over their web byte budgets on main at 69668888a (`bun scripts/metrics.mjs --web-bytes`).
 - `exact-runner`'s incremental test (`every_app_plan_updates_incrementally_exactly_as_it_does_in_full`, the geofence fixture) fails on main with unchanged runner code (seen by three lanes on Linux).
@@ -1343,10 +1344,13 @@ sits on that list carries the trade it would take.
   `plain` tier — persisted slots, with Caltrain's "last station"; `me`; the iOS
   first-launch keychain wipe; the data-protection keychain on macOS (a bundle and a
   profile); the Linux file store when that host links ibex2.
-- **Executable instance rows: lowering proof** (LLP 1017.000 P4c): model row
-  calls in `Vm`, then prove lowering-level sharing against substituted source
-  expressions. `Expand` and `instance_iff` stay unchanged. Implementer: Codex,
-  fs/derive, 2026-11-13; runtime difftest covers rendering meanwhile.
+- **Executable instance rows: lowering proof** (LLP 1017.000 P4c):
+  `VmRows` models calls and `LowerCheck` validates root-owned bodies against
+  checked substitution. Prove the sharing correspondence, including the
+  matcher's binder and owner conditions and transitive calls; validate arm-owned
+  bodies and view readers in instance environments; add owned-slot stores and
+  roster/extent accounting to the model and prove its runner refinement.
+
 - **Plan / runner** (LLP 1005 §8): cached per-instance derives or resources inside `each`. At-read instance
   expressions share executable rows without caching their values.
 - **Contract** (LLP 1006 §8): inlining budget; `contract` blocks as assertions;

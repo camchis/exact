@@ -20,7 +20,8 @@ async function pageFor(source, check) {
   let server, browser;
   try {
     writeFileSync(resolve(dir, 'app.contract'), source);
-    command(resolve(target, 'debug/exact-web-js'), ['js', resolve(dir, 'app.contract'), '-o', dir]);
+    command(resolve(target, 'debug/contract'), ['build', resolve(dir, 'app.contract'), '-o', resolve(dir, 'app.plan')]);
+    command(resolve(target, 'debug/exact-web-js'), ['js', resolve(dir, 'app.plan'), '-o', dir]);
     const js = readFileSync(resolve(dir, 'app.js'), 'utf8');
     server = Bun.serve({ port: 0, hostname: '127.0.0.1', fetch(request) {
       const path = new URL(request.url).pathname.slice(1);
@@ -152,3 +153,15 @@ test('the form keeps its encoded plan and bundled JS margins and follows real ed
   for (let i = 0; i < 2; i++) expect(sizes[0][i]).toBeLessThanOrEqual(sizes[1][i] * 1.1);
   expect(observations[0]).toEqual(observations[1]);
 }, 120000);
+
+test('65 equivalent sibling derives all render on JS', async () => {
+  await pageFor(readFileSync(resolve(corpus, 'siblings.contract'), 'utf8'), async page => {
+    for (let i = 0; i < 65; i++) expect(await page.getByTestId(`alias${i}`).textContent()).toBe('1');
+  });
+}, 60000);
+
+test('65 compiled equivalent aliases keep their authored style', async () => {
+  await pageFor(readFileSync(resolve(corpus, 'aliases.contract'), 'utf8'), async page => {
+    expect(await page.getByTestId('alias64').evaluate(n => getComputedStyle(n).opacity)).toBe('0.25');
+  });
+}, 60000);

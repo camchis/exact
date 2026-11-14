@@ -1,5 +1,6 @@
 use exact_kernel::Kernel;
-use exact_plan::Value;
+use exact_plan::{Opcode, Value};
+use exact_runner::vm::instructions;
 use exact_runner::{DataError, DataSource, Event, Runner};
 use std::path::Path;
 
@@ -125,4 +126,112 @@ fn sharing_dependencies_does_not_depend_on_declaration_order() {
     .unwrap();
     assert_eq!(forward.code.len(), reverse.code.len());
     assert_eq!(forward.encode().len(), reverse.encode().len());
+}
+
+#[test]
+fn equivalent_sibling_derives_render_without_spending_call_depth() {
+    let plan = plan("siblings.contract");
+    assert_eq!(plan.derives.iter().filter(|row| row.unsettled).count(), 1);
+    let runner = Runner::boot(
+        plan,
+        Empty,
+        Kernel::with_monospace(),
+        Default::default(),
+        "/",
+    )
+    .unwrap();
+    for i in 0..65 {
+        let id = format!("alias{i}");
+        let key = runner.kernel().find_by_test_id(&id)[0];
+        assert_eq!(
+            runner
+                .kernel()
+                .node_by_key(key)
+                .unwrap()
+                .props
+                .str(exact_kernel::PropId::Text),
+            Some("1"),
+            "{id}"
+        );
+    }
+    assert!(runner.journal().all(|line| !line.contains("trapped")));
+}
+
+#[test]
+fn transitive_derives_share_without_a_direct_view_read() {
+    let source = |direct: bool| {
+        let derives = (0..40)
+            .map(|i| format!("  derive a{i} = expensive.length + {i}\n"))
+            .collect::<String>();
+        let labels = (0..40)
+            .map(|i| format!("      text `${{a{i}}}`\n"))
+            .collect::<String>();
+        let direct = if direct {
+            "      text `${expensive.length}`\n"
+        } else {
+            ""
+        };
+        format!("component App\n  state items = [\"one\", \"two\"]\n  view\n    Child(items=items)\ncomponent Child\n  props\n    items: string[]\n  derive expensive = items.filter(x => x.length > 2)\n{derives}  view\n    column\n{labels}{direct}")
+    };
+    let indirect = contract::compile(&source(false)).unwrap();
+    let direct = contract::compile(&source(true)).unwrap();
+    let rows = indirect
+        .derives
+        .iter()
+        .enumerate()
+        .filter(|(_, row)| row.unsettled)
+        .map(|(id, row)| {
+            let body = instructions(indirect.code(row.body))
+                .map(Result::unwrap)
+                .collect::<Vec<_>>();
+            (id, body)
+        })
+        .collect::<Vec<_>>();
+    let filters = rows
+        .iter()
+        .filter(|(_, body)| body.iter().any(|ins| ins.op == Opcode::Filter))
+        .collect::<Vec<_>>();
+    assert_eq!(filters.len(), 1);
+    let filter_id = filters[0].0;
+    let readers = rows.iter().filter(|(id, _)| *id != filter_id);
+    assert_eq!(readers.clone().count(), 40);
+    for (_, body) in readers {
+        let loads = body
+            .iter()
+            .filter(|ins| ins.op == Opcode::LoadDerive)
+            .map(|ins| ins.args[0] as usize)
+            .collect::<Vec<_>>();
+        assert_eq!(loads, [filter_id]);
+    }
+    assert_eq!(
+        instructions(&indirect.code)
+            .map(Result::unwrap)
+            .filter(|ins| ins.op == Opcode::Filter)
+            .count(),
+        1
+    );
+    assert!(
+        indirect.encode().len() <= direct.encode().len(),
+        "indirect {} / direct {}",
+        indirect.encode().len(),
+        direct.encode().len()
+    );
+}
+
+#[test]
+fn equivalent_aliases_keep_their_style_on_the_runner() {
+    let runner = Runner::boot(
+        plan("aliases.contract"),
+        Empty,
+        Kernel::with_monospace(),
+        Default::default(),
+        "/",
+    )
+    .unwrap();
+    for i in 0..65 {
+        let key = runner.kernel().find_by_test_id(&format!("alias{i}"))[0];
+        let node = runner.kernel().node_by_key(key).unwrap();
+        assert_eq!(node.style.opacity, 0.25);
+    }
+    assert!(runner.journal().all(|line| !line.contains("trapped")));
 }

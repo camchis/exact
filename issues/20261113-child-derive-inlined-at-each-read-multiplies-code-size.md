@@ -56,26 +56,35 @@ and swipe dispatch.
 The acceptance margin is 10% against a root-structured twin. The fixtures in
 `contract/corpus/derive-form/` have 19 editable sections, 152 fields, repeated
 derive reads and nested keyed rows. The component form's bundled `app.js` is
-146,068 B against 136,471 B (7.03% larger); its encoded plan is 32,801 B against
+146,270 B against 137,217 B (6.60% larger); its encoded plan is 32,801 B against
 30,253 B (8.42%). Tests enforce both size margins, compare runner trees and
 receipts, and compare rendered JS labels at boot and after 100 seeded edits.
 The edits change labels across the filter threshold, toggle inclusion, change
 row keys and edit section drafts.
 
 Source expansion remains substitution, preserving `Expand` and `instance_iff`.
-The new row operation's Lean model and lowering correspondence remain to be
-proved, as recorded in `semantics/README.md` and `QUEUE.md`.
+The executable-call model and translation validation are described in
+`semantics/README.md`; their remaining proof work is listed below.
 
 ## Work still owed
 
-Keep this issue open until the Lean VM models executable derive calls and
-lowering proves the sharing transformation corresponds to source substitution.
-The VM model must cover fresh stacks and locals, calls cut to their owner
-frame, and work and depth bounds shared with the reader. The lowering proof
-must relate each row body and its loads to the substituted instance expression,
-including transitive dependencies and enclosing arm frames. `LowerCheck` must
-recognize these rows and validate the transformed bodies; its present checks
-and `instance_iff` do not prove that correspondence.
+Equivalent substituted expressions now register one sharing candidate per
+instance and owner. All 65 sibling aliases render on the runner and JS.
+Registration includes derives reached only through other derives, so their
+bodies stay shared without a direct view read. Static readers stop after
+64 alias peels.
+Compiled-source regressions cover both alias shapes; a plan test retains
+the 64/65 boundary independently of equivalent-expression deduplication.
+
+Keep this issue open for the general lowering-sharing correspondence.
+`VmRows` models fresh callee machines, owner-frame selection, shared call
+and callback-work counters, and restoration of the reader. `LowerCheck`
+validates root-owned bodies against their checked substituted expressions
+and detects a mutated row. Arm-owned bodies still need contextual validation
+in instance environments, including their view readers. The model still
+needs owned-slot stores, roster list-step and extent accounting, and a
+refinement proof against the runner. Its local invariants do not prove
+the transformation's scope, binder or transitive-dependency conditions.
 
 The strict browser conformance comparison before and after sharing also remains owed.
 Focused browser regressions cover row-field updates, metric CSS before and

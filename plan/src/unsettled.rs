@@ -14,7 +14,10 @@ impl Plan {
         mut code: &'a [u8],
     ) -> (&'a [u8], Option<Option<crate::ArmsId>>) {
         let mut owner = None;
-        while let Some(row) = self.executable_alias(code) {
+        for _ in 0..64 {
+            let Some(row) = self.executable_alias(code) else {
+                break;
+            };
             code = self.code(row.body);
             owner = Some(row.owner);
         }
@@ -132,6 +135,34 @@ impl Plan {
 #[cfg(test)]
 mod tests {
     use crate::{asm::Asm, builder::PlanBuilder, DerivesId, PlanError, TypeKind, Value};
+
+    #[test]
+    fn static_alias_read_stops_at_the_runtime_call_depth() {
+        use crate::Opcode;
+        let mut b = PlanBuilder::new(0, 1);
+        let ty = b.primitive(TypeKind::Number);
+        let body = b.constant(&Value::Number(1.0));
+        let mut row = b.derive("base", ty, body);
+        b.set_derive_unsettled(row, None);
+        for _ in 1..65 {
+            let mut a = Asm::default();
+            a.load_derive(row);
+            let body = b.code(a);
+            row = b.derive("alias", ty, body);
+            b.set_derive_unsettled(row, None);
+        }
+        let mut a = Asm::default();
+        a.load_derive(row);
+        let reader = b.code(a);
+        let p = b.finish().unwrap();
+        let (code, _) = p.read_code(p.code(reader));
+        assert_eq!(code[0], Opcode::LoadDerive as u8);
+        assert!(p
+            .read_code_in(p.code(reader), &[] as &[u32], |f| Some(*f))
+            .is_none());
+        let (code, _) = p.read_code(code);
+        assert_eq!(code[0], Opcode::Number as u8);
+    }
 
     #[test]
     fn executable_rows_refuse_self_and_forward_calls() {

@@ -23,9 +23,18 @@ pub(super) struct Sharing {
 impl Sharing {
     pub fn new(ex: &contract_syntax::Expanded) -> Self {
         let thunks = &ex.thunks;
-        let mut by_span = BTreeMap::<_, Vec<_>>::new();
+        let mut by_span = BTreeMap::<_, Vec<usize>>::new();
         for (i, thunk) in thunks.iter().enumerate() {
-            by_span.entry(thunk.expr.span()).or_default().push(i);
+            let candidates = by_span.entry(thunk.expr.span()).or_default();
+            // Equivalent declarations in one instance are one body. Registering
+            // each alias would let an active body call an equivalent sibling.
+            if !candidates.iter().any(|&j| {
+                thunks[j].instance == thunk.instance
+                    && thunks[j].owner == thunk.owner
+                    && thunks[j].expr == thunk.expr
+            }) {
+                candidates.push(i);
+            }
         }
         Self {
             thunks: thunks.to_vec(),
