@@ -1468,7 +1468,7 @@ test('a verb that builds refuses at once in a checkout without node_modules, and
     const run = (verb) => spawnSync(process.execPath, [resolve(dir, 'exact.mjs'), ...verb], { cwd: dir, env: { ...process.env, EXACT2: sdk, EXACT_FEEDBACK: '0' }, encoding: 'utf8', timeout: 30_000 });
     for (const verb of [['agent', 'web', '--url', 'http://127.0.0.1:9', 'tree'], ['test', 'web', '--url', '127.0.0.1:9'], ['test', 'web', '--web-dist', resolve(parent, 'dist')]])
       assert.doesNotMatch(run(verb).stderr, /node_modules is missing/, verb.join(' '));
-    for (const verb of [['agent', 'web', '--url', '/inbox', 'tree'], ['ios', '--url', 'http://127.0.0.1:9'], ['test', 'ios', '--url', 'http://127.0.0.1:9']])
+    for (const verb of [['agent', 'web', '--url', '/inbox', 'tree'], ['ios', '--url', 'http://127.0.0.1:9'], ['test', 'ios', '--url', 'http://127.0.0.1:9'], ['test', 'web', '--url', '--backend', 'http://127.0.0.1:9', '/inbox']])
       assert.match(run(verb).stderr, /node_modules is missing/, verb.join(' '));
     // Under --json the one object on stdout says it: verify's, and a build's.
     assert.deepEqual(JSON.parse(run(['verify', 'web', '--json']).stdout).exit, 1);
