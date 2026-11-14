@@ -84,6 +84,9 @@ test.each([[false, false], [true, false], [true, true]])('a list first opened of
     const built = spawnSync(process.execPath, ['host/web-js/build.mjs', 'offline-list', '--out', dist, '--render', interaction ? 'js' : 'none',
       ...(production ? ['--production'] : [])], { cwd: root, env: { ...process.env, EXACT_APP_DIR: dir }, encoding: 'utf8' });
     expect(built.status, built.stdout + built.stderr).toBe(0);
+    expect(built.stdout).toContain('own plan code by component (shared bodies counted per use)');
+    expect(built.stdout).toMatch(/OfflineList: \d+ B \(1 instance\)/);
+    expect(built.stdout).toContain(`${dist}: app.js ${statSync(resolve(dist, 'app.js')).size} B, built`);
     const collection = readdirSync(dist).find(name => /^collection-glue-.*\.js$/.test(name));
     expect(collection).toBeDefined();
     // A probe in the deferred chunk distinguishes preparation from evaluation.

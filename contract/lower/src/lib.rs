@@ -1053,6 +1053,9 @@ impl<'a> Lowerer<'a> {
                 let (_r, arms) =
                     self.b
                         .region(RegionKind::When, parent, arm, order, subject, unit, 2);
+                if let Some(sites) = &mut self.sites {
+                    sites.region(*tag);
+                }
                 let mut inner = scope.clone();
                 inner.push_none();
                 self.arm_scopes.insert((*tag, 0), (arms[0], inner.clone()));
@@ -1076,6 +1079,9 @@ impl<'a> Lowerer<'a> {
                 let (_r, arms) =
                     self.b
                         .region(RegionKind::Each, parent, arm, order, subject, key, 1);
+                if let Some(sites) = &mut self.sites {
+                    sites.region(*tag);
+                }
                 self.arm_scopes.insert((*tag, 0), (arms[0], inner.clone()));
                 self.nodes(body, None, Some(arms[0]), &inner, locals, parent_tag)
             }
@@ -1091,6 +1097,9 @@ impl<'a> Lowerer<'a> {
                 let (_r, arms) =
                     self.b
                         .region(RegionKind::Match, parent, arm, order, code, unit, 2);
+                if let Some(sites) = &mut self.sites {
+                    sites.region(*tag);
+                }
                 let mut some_scope = scope.clone();
                 some_scope.push_some_of(&some.0, subject_ty);
                 self.arm_scopes

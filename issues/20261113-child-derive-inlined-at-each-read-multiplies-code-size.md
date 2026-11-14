@@ -27,3 +27,10 @@ The reporting agent's real 19-section edit form, each section a component with i
 ## Fix
 
 The reporter asked for any of: a warning when one derive is inlined many times, a size report by component from the build, or not inlining. The durable fix is to lower a child's derive once per instance, as a lifted slot or a function of the instance's props, as `state` already is lifted (`Expanded::owners`), and to call a shared action body rather than copy it. Until then, report each component's share of the plan and the bundle from the web build, and say in `docs/contract-for-agents.md`'s components section that a derive read in many places belongs in the root.
+
+## Size report
+
+Web builds report the final `app.js` size and the largest components by
+their own expanded plan code and compiled instance count, including external
+apps. Identical stored bodies may be shared, so the report counts them per
+use. The representation change is approved and remains to be implemented.

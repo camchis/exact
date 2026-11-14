@@ -94,6 +94,8 @@ pub struct Expanded {
     pub state_instances: Vec<u32>,
     /// For each of `root.actions`, the same.
     pub action_instances: Vec<u32>,
+    /// Each region tag's declaring instance, for compile-time cost reports.
+    pub region_instances: BTreeMap<u32, u32>,
 }
 
 /// What owns a slot of the expanded root, and so when its initializer runs.
@@ -306,6 +308,7 @@ fn expand_with_sites(
         arms: Vec::new(),
         tabs: false,
         next_tag: 1,
+        region_instances: BTreeMap::new(),
         extra_states: Vec::new(),
         extra_actions: Vec::new(),
         instance: 0,
@@ -378,6 +381,7 @@ fn expand_with_sites(
         root,
         owners,
         instances: ctx.instances,
+        region_instances: ctx.region_instances,
         state_instances,
         action_instances,
     };
@@ -412,6 +416,7 @@ struct Ctx<'a> {
     tabs: bool,
     /// The next region tag.
     next_tag: u32,
+    region_instances: BTreeMap<u32, u32>,
     /// The children's `state`s lifted into the root, with their owners and
     /// the instance that declared them.
     extra_states: Vec<(Binding, Owner, u32)>,
@@ -449,6 +454,9 @@ impl Ctx<'_> {
     /// A fresh region tag.
     fn tag(&mut self) -> u32 {
         let tag = self.next_tag;
+        if self.capture_sites {
+            self.region_instances.insert(tag, self.instance);
+        }
         self.next_tag += 1;
         tag
     }

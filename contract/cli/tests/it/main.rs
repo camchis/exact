@@ -308,3 +308,5 @@ mod window_commands;
 mod windows_shortcuts;
 
 mod properties;
+
+mod child_derive_costs;

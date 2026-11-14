@@ -324,6 +324,21 @@ fn build(options: &Options) -> ExitCode {
         );
         // Every use is inlined: name what the plan's size is made of.
         if let Some(map) = &map {
+            let code = map.component_code_costs(&plan);
+            let top: Vec<_> = code
+                .iter()
+                .take(5)
+                .map(|(name, instances, bytes)| {
+                    format!(
+                        "{name}: {bytes} B ({instances} instance{})",
+                        if *instances == 1 { "" } else { "s" }
+                    )
+                })
+                .collect();
+            println!(
+                "  own plan code by component (shared bodies counted per use): {}",
+                top.join(", ")
+            );
             let costs = map.component_costs();
             if !costs.is_empty() {
                 let top: Vec<String> = costs
