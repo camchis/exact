@@ -1466,3 +1466,21 @@ test('an installed command opens the bundle it names, whatever the name holds', 
   assert.equal(run.status, 0, run.stderr);
   assert.deepEqual(run.stdout.split('\n').slice(0, -1), ['-a', target, '--', ...files]);
 });
+
+test('a checkout without node_modules refuses the type check before it starts, and says to install', async () => {
+  const { checkTypes, modulesMissing, modulesRefusal } = await import('./exact.mjs');
+  assert.equal(modulesMissing(), false, 'this checkout is installed');
+  inDir((dir) => {
+    const root = resolve(dir, 'checkout'), app = resolve(dir, 'app'), ran = resolve(dir, 'ran');
+    mkdirSync(root);
+    mkdirSync(app);
+    writeFileSync(resolve(app, 'app.ts'), 'export const grants = \'\';\n');
+    writeFileSync(resolve(app, 'app.json'), '{}\n');
+    writeFileSync(resolve(dir, 'builder.mjs'), `require('node:fs').writeFileSync(${JSON.stringify(ran)}, '');`);
+    assert.equal(modulesMissing(root), true);
+    const checked = checkTypes(app, { capture: true, builder: resolve(dir, 'builder.mjs'), root });
+    assert.deepEqual(checked, { status: 1, report: `error: ${modulesRefusal(root)}\n` });
+    assert.match(checked.report, /node_modules is missing: run `bun install --frozen-lockfile` in .*checkout/);
+    assert.ok(!existsSync(ran), 'the check never started');
+  });
+});

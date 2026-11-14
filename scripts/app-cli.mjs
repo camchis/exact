@@ -299,6 +299,12 @@ async function verbRun({ dir, name, game = false, exact2, args }, reply) {
     for (const line of feedback.nudge(dir, { verb, host, exit, ms: Date.now() - started, args: rest, interrupted })) console.error(line);
   } catch {}
   return exit; };
+  // A verb that builds the app bundles app.ts with rolldown from this checkout's node_modules (the web's build and
+  // every native bake); without it Bun's auto-install spins silently instead of failing.
+  if (['web', 'web-build', 'serve', 'test', 'agent', 'verify', 'ios', 'mac', 'linux', 'windows', 'android'].includes(verb) && !['rolldown', 'rolldown.exe'].some((bin) => existsSync(resolve(exact2, 'node_modules/.bin', bin)))) {
+    console.error(`${verb}: exact's node_modules is missing: run \`bun install --frozen-lockfile\` in ${exact2} (every build's type check imports rolldown from it)`);
+    return log(1);
+  }
   // A drive with no host the app ships here runs nowhere, and says why (verify runs its semantics check alone).
   if (host === null && verb !== 'verify') {
     const { why } = shippedHost(verb, declared);

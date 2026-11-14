@@ -523,8 +523,7 @@ export function sdkReport(env = process.env, { only = null, device = false, tv =
     const opt = binaryenVersion(output('wasm-opt', ['--version']));
     rows.push(row('wasm-opt', opt, BINARYEN, opt === BINARYEN, 'exact setup'));
   }
-  // Bun on Windows writes `rolldown.exe` and `rolldown.bunx` there.
-  const modules = ['rolldown', 'rolldown.exe'].some(bin => existsSync(resolve(ROOT, 'node_modules/.bin', bin)));
+  const modules = !modulesMissing();
   if (want('node_modules')) rows.push(row('node_modules', modules ? 'installed' : '', 'bun.lock', modules, `bun install --frozen-lockfile in ${ROOT}`));
   if (want('Chrome')) {
     // Both pinned builds: the headless shell, and the full build a GPU app's drive or a `perf` need launches. Without
@@ -682,14 +681,27 @@ export function contract(args, env = process.env) {
   if (json) process.stdout.write(result.stdout ?? '');
   return result.status ?? 1;
 }
+/** Whether this checkout's node_modules is missing (Bun on Windows writes `rolldown.exe` and `rolldown.bunx`):
+ * every build's type check imports rolldown from it, and without it Bun's auto-install spins at full CPU with no
+ * output rather than failing (the chat bench's first 20 minutes). */
+export const modulesMissing = (root = ROOT) => !['rolldown', 'rolldown.exe'].some(bin => existsSync(resolve(root, 'node_modules/.bin', bin)));
+/** What a command that needs node_modules says in its place. */
+export const modulesRefusal = (root = ROOT) => `exact's node_modules is missing: run \`bun install --frozen-lockfile\` in ${root} (every build's type check imports rolldown from it)`;
+
 /** `app.ts` against the plan just built, by the type check every host's build runs (the web JS
  * target's `--check`), so a TypeScript error surfaces at the build an author runs most, not at an
  * iOS build. Its report goes to stderr, or is returned as `report` when `capture` (`--json`). Supervised
  * (scripts/check-supervise.mjs): a check that outlasts its bound, or outlives its caller, is stopped, its process
- * group with it. `builder`: the check's script (a test's stand-in). */
-export function checkTypes(dir, {capture = false, builder = resolve(ROOT, 'host/web-js/build.mjs')} = {}) {
+ * group with it; one this checkout's node_modules is missing for is refused before it starts. `builder`: the check's
+ * script (a test's stand-in); `root`: the checkout whose node_modules it needs. */
+export function checkTypes(dir, {capture = false, builder = resolve(ROOT, 'host/web-js/build.mjs'), root = ROOT} = {}) {
   // An app's directory alone: the check is the app build's, which reads its app.json.
   if (!existsSync(resolve(dir, 'app.ts')) || !existsSync(resolve(dir, 'app.json'))) return {status: 0, report: ''};
+  if (modulesMissing(root)) {
+    const report = `error: ${modulesRefusal(root)}\n`;
+    if (!capture) process.stderr.write(report);
+    return {status: 1, report};
+  }
   const out = mkdtempSync(resolve(tmpdir(), 'exact-check-'));
   try {
     const r = spawnSync(process.execPath, [resolve(ROOT, 'scripts/check-supervise.mjs'), String(process.pid), builder, basename(dir), '--check', '--out', out], { stdio: ['ignore', capture ? 'pipe' : 2, capture ? 'pipe' : 2], encoding: 'utf8', maxBuffer: 1 << 26, env: { ...process.env, EXACT_APP_DIR: dir } });

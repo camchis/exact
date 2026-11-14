@@ -35,6 +35,9 @@ function authorCrates(dir) {
 const withCli = (sdk) => {
   const root = resolve(import.meta.dir, '..');
   mkdirSync(resolve(sdk, 'scripts'), { recursive: true });
+  // An installed checkout's: a verb that builds is refused without node_modules (app-cli.mjs).
+  mkdirSync(resolve(sdk, 'node_modules/.bin'), { recursive: true });
+  writeFileSync(resolve(sdk, 'node_modules/.bin/rolldown'), '');
   const copied = ['app-cli', 'verify', 'help', 'bun', 'port-lock'].map(file => `scripts/${file}.mjs`);
   for (const file of copied) copyFileSync(resolve(root, file), resolve(sdk, file));
   // A copy resolves its static relative imports beside itself: each is linked at its path, and a link resolves its own
@@ -1447,3 +1450,18 @@ for (const [name, options, crate] of [
     assert.ok(!existsSync(destination), 'a refused name writes nothing');
   } finally { rmSync(parent, { recursive: true, force: true }); }
 }, 120_000);
+
+test('a verb that builds refuses at once in a checkout without node_modules, and says to install', () => {
+  const parent = realpathSync(mkdtempSync(resolve(tmpdir(), 'exact new-')));
+  try {
+    const dir = resolve(parent, 'field-log'), sdk = resolve(parent, 'sdk');
+    createApp(dir);
+    withCli(sdk);
+    rmSync(resolve(sdk, 'node_modules'), { recursive: true });
+    for (const verb of [['web-build'], ['test', 'web'], ['ios']]) {
+      const r = spawnSync(process.execPath, [resolve(dir, 'exact.mjs'), ...verb], { cwd: dir, env: { ...process.env, EXACT2: sdk, EXACT_FEEDBACK: '0' }, encoding: 'utf8', timeout: 30_000 });
+      assert.equal(r.status, 1, `${verb.join(' ')}: ${r.stderr}`);
+      assert.match(r.stderr, new RegExp(`^${verb[0]}: exact's node_modules is missing: run \`bun install --frozen-lockfile\` in `, 'm'));
+    }
+  } finally { rmSync(parent, { recursive: true, force: true }); }
+});
