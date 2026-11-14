@@ -5127,14 +5127,23 @@ ends the drag on another node (refused by name when it is not mounted or off
 screen); a drag that should autoscroll a list or a board is `drag dx dy hold ms`. On iOS
 without `--touch platform` a drag scrolls the scroll or list it starts on with the
 finger, no fling; any other drag there is refused, naming the flag.
+
+`into keyboard` (library: `drag.into: 'keyboard'`) lets the end pass the
+viewport's bottom, down to the screen minus its bottom safe area. It requires
+an iOS simulator with `--touch platform` and the software keyboard up at the
+press. The start stays in the viewport. For a held dismissal, write
+`tap transcript drag 0 200 hold 1000 into keyboard during "state"` and compare
+`keyboard.top` with the finger's endpoint.
+
 On an iOS simulator, append `then dx dy [over ms] [hold ms] [during "op" …]`
 to script another leg with the same finger. For example:
 `tap handle drag 0 120 over 300 hold 500 during "layout" then 0 -120 over 300 hold 500 during "state"`.
 Each delta starts at the previous endpoint. All legs play in one XCTest
 synthesizer record, with one down and one up. Reads run inside their leg's hold;
 if they outlast it, the drive fails. The complete path must stay inside the
-viewport, last at most 10 seconds, and spend at most 2 seconds moving, across
-at most eight legs. Library calls use `drag.path: [{dx, dy, over, hold, during}]`
+viewport (or the extended end bounds with `into keyboard`), last at most
+10 seconds, and spend at most 2 seconds moving, across at most eight legs.
+Library calls use `drag.path: [{dx, dy, over, hold, during}]`
 for the additional legs, with `during` read functions. Separate requests never
 keep an iOS contact down.
 Under `--touch platform` a tap replies `viewGone: true` when its view left the
@@ -5159,14 +5168,16 @@ As a person's, none stops with the content partway under
 a large title: it eases to the title's open or closed rest, whichever is nearer,
 so under one a wheel of 20 from the top moves nothing (with a search field in the
 bar it stays where it ends: not measured). Under `--touch platform` a drag whose ends
-are both on screen is a real one (`delivery: platform`): the content follows the
+are both in the viewport is a real one (`delivery: platform`): the content follows the
 finger once UIKit's pan begins, some 10 points in. Without a hold it glides on
 after the lift, and `clock settle` waits up to 4 s for it to stop (`reason:
 "scroll"` past that). Held for `hold 100` or longer it stops with the finger,
 which the runner steps a point across the drag and back in the hold's last
-150 ms, as a finger does (measured along a list); `hold 50` still glides. A
-drag that ends past the screen is the agent's drag above, `delivery:
-recognized`.
+150 ms, as a finger does (measured along a list); `hold 50` still glides. With
+`into keyboard` and the keyboard up at the press, an end below the viewport
+stays `delivery: platform`, down to the screen minus its bottom safe area;
+farther ends are refused. Without that option, a drag that ends past the
+viewport is the agent's drag above, `delivery: recognized`.
 
 On macOS a wheel is applied at once, with no momentum and no rubber band.
 `tap <scroller> wheel 0 600 fling` is a trackpad's fling instead: the driver
@@ -5331,7 +5342,7 @@ before, so the app's dates agree with the server's but differ run to run. The st
 `tap "list" into "key"` (a virtualized list's row brought into view by its key,
 so the next step can tap a row outside the rendered window),
 `tap "id" pinch <scale> [at x y]` (two fingers; `scale` greater than 0),
-`tap "id" drag dx dy [from x y] [mouse] [press ms] [over ms] [hold ms] [during "op" …]`
+`tap "id" drag dx dy [from x y] [mouse] [press ms] [over ms] [hold ms] [into keyboard] [during "op" …]`
 (a finger, `pointerType` touch, where the carrier has one, unless `mouse` names the left button; `during`
 is last: quoted reads or `clock` while that contact is down, after the move and
 before the hold; `press` and `hold` advance the virtual clock, except under

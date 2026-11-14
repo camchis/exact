@@ -12,7 +12,7 @@
 //     {"history":n} | mouse | dblclick | contextmenu | auxclick | clicks <1-3> (each [at <x> <y>] [modifiers
 //     <Shift+Meta…>]) | modifiers <Shift+Meta…> | pinch <scale> [at <x> <y>] | mediasession <action> [seconds] |
 //     pictureinpicture minimize|back|close|hover (Exact's picture-in-picture window, macOS) | drag <dx> <dy> [from <x>
-//     <y>] [mouse] [modifiers <M>] [press <ms>] [over <ms>] [hold <ms>] [during "<op>" …, inside the hold under --touch
+//     <y>] [mouse] [modifiers <M>] [press <ms>] [over <ms>] [hold <ms>] [into keyboard] [during "<op>" …, inside the hold under --touch
 //     platform] [then <dx> <dy> over <ms> hold <ms> during "<op>" …: another leg, same iOS touch] | drag to <target>
 //     [at <x> <y>] […]] | type <target> <text…> (the navigation root: a path or a deep link) | type <target> key <Name>
 //     | type <target> copy|cut|paste <text…> | type <target> paste --file <path…> | type <target> paste --image <png>
@@ -296,7 +296,7 @@ export async function main(argv, injected = {}) {
             'pinch <scale> [at <x> <y>]',
             'mediasession <action> [seconds]',
             "pictureinpicture minimize|back|close|hover (Exact's picture-in-picture window, macOS)",
-            'drag <dx> <dy> [from <x> <y>] [mouse: the left button, desktop pointers] [modifiers <M>] [press <ms>] [over <ms>] [hold <ms>] [during "<op>" …: after the move, the finger down; inside the hold under --touch platform] [then <dx> <dy> [over <ms>] [hold <ms>] [during "<op>" …]: another leg, same iOS touch]',
+            'drag <dx> <dy> [from <x> <y>] [mouse: the left button, desktop pointers] [modifiers <M>] [press <ms>] [over <ms>] [hold <ms>] [into keyboard: iOS --touch platform, keyboard up; end above the screen bottom safe area] [during "<op>" …: after the move, the finger down; inside the hold under --touch platform] [then <dx> <dy> [over <ms>] [hold <ms>] [during "<op>" …]: another leg, same iOS touch]',
             'drag to <target> [at <x> <y>: from its top left] [same options]]',
             'tap <target> down [at <x> <y>] [modifiers <M>], then tap move [by] <x> <y> [over <ms>] [modifiers <M>]',
             'tap hold <ms>',
