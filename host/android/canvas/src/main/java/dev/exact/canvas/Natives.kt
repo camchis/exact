@@ -767,8 +767,8 @@ class Natives(
     }
 
     /** The frame rates GPU canvases ask for ([Native.frameRates]: view and rate pairs, 0 for the display's): a
-     * canvas with a window of its own asks the compositor for its rate as a fixed source (Android 11 and later), so
-     * a 60 fps canvas on a 120 Hz panel is shown at an even 60; one drawn in the reader's window votes for its rate
+     * canvas with a window of its own asks the compositor for its rate with DEFAULT compatibility (Android 11 and
+     * later); one drawn in the reader's window votes for its rate
      * as a view (Android 15 and later). Elsewhere the module's own pacing holds the rate (LLP 1009). */
     fun frameRates(rates: IntArray) {
         for (k in 0 until rates.size / 2) {
@@ -787,8 +787,10 @@ class Natives(
         val surface = e.surface
         if (e.view is SurfaceView && surface != null && surface.isValid && android.os.Build.VERSION.SDK_INT >= 30) {
             try {
-                surface.setFrameRate(fps, if (fps > 0f) android.view.Surface.FRAME_RATE_COMPATIBILITY_FIXED_SOURCE
-                    else android.view.Surface.FRAME_RATE_COMPATIBILITY_DEFAULT)
+                // DEFAULT, not FIXED_SOURCE: FIXED_SOURCE (ExactOrMultiple) lets touch boost choose a multiple of the
+                // rate. On a 120 Hz Android 16 phone, the first touch took the panel from 60 to 120 Hz and a 60 fps
+                // canvas's frames were shown 8.3 or 25 ms apart; with DEFAULT the panel stayed at 60 Hz.
+                surface.setFrameRate(fps, android.view.Surface.FRAME_RATE_COMPATIBILITY_DEFAULT)
             } catch (x: IllegalArgumentException) {}
         } else if (android.os.Build.VERSION.SDK_INT >= 35) {
             e.view.requestedFrameRate = if (fps > 0f) fps else android.view.View.REQUESTED_FRAME_RATE_CATEGORY_DEFAULT
