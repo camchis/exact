@@ -1484,3 +1484,12 @@ test('a checkout without node_modules refuses the type check before it starts, a
     assert.ok(!existsSync(ran), 'the check never started');
   });
 });
+
+test('exact new names setup --check for each native platform the app names, whose rows its web table leaves out', () => inDir((dir) => {
+  const made = spawnSync(process.execPath, [resolve(import.meta.dir, 'exact.mjs'), 'new', resolve(dir, 'with-native'), '--with', 'ios', '--with', 'mac'], { encoding: 'utf8', timeout: 120_000 });
+  assert.equal(made.status, 0, made.stderr);
+  assert.match(made.stdout, /^Before the first ios build: bun exact\.mjs setup --check ios names what it lacks \(the Xcode or SDK it needs among them\)\.$/m);
+  assert.match(made.stdout, /^Before the first macos build: bun exact\.mjs setup --check macos names/m);
+  const plain = spawnSync(process.execPath, [resolve(import.meta.dir, 'exact.mjs'), 'new', resolve(dir, 'web-only')], { encoding: 'utf8', timeout: 120_000 });
+  assert.doesNotMatch(plain.stdout, /Before the first/);
+}));

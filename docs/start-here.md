@@ -49,6 +49,7 @@ For an SDK-named folder such as `exact`, `--name Everbloom` supplies the crate p
 a prefix that still collides gains `-app`. The prefix stays in `package.json`'s `name` across
 updates and directory renames. Authored host crates keep their own names.
 `bun <exact2>/scripts/exact.mjs setup` takes a few minutes, a first macOS or iOS build ten to fifteen on a laptop, later builds a minute or two.
+Before a platform's first build, `bun exact.mjs setup --check ios` (or `macos`, `android`, …) names what it lacks, the Xcode it needs among them: `exact new`'s table shows the web's rows alone.
 Run each once and let it finish, in the background with a completion notification if your tool has one, rather than polling its log.
 
 On Linux or Windows through WSL, install the [iOS cross tools](../README.md#1-install-the-tools)
