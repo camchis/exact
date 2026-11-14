@@ -562,43 +562,14 @@ package final class NodeView: UIView, UITextViewDelegate, UITextFieldDelegate, U
             // What the image says is its node's (`aria-label`), never the
             // name UIKit gives the symbol, which a cell gathering its
             // children's words would read ("checkmark.circle" is "selected").
+            SymbolEffectState.of(leaf).pathTemplate = nil
             showSymbol(image, on: leaf); leaf.isAccessibilityElement = false; leaf.accessibilityElementsHidden = true; leaf.isUserInteractionEnabled = false
             // The symbol's size when the kernel's measurer could not say
             presenter?.queueIntrinsicSize(self, generation: generation, SymbolMeasure.size(name, points: points, weight: weight))
         }
-        inkSymbolView()
         symbolView?.preferredSymbolConfiguration = symbolConfiguration(SymbolMeasure.configuration(points: points, weight: weight))
         if let leaf = symbolView { applySymbolEffect(leaf) }
         layoutSymbol()
-    }
-    func layoutSymbol() {
-        guard let leaf = symbolView else { return }
-        let content = contentBox()
-        leaf.frame = content; leaf.clipsToBounds = !listSymbol // a list cell's image is its own size, centred, as UIKit's
-        switch listSymbol ? "none" : style["object_fit"]?.string ?? "fill" {
-        case "cover": leaf.contentMode = .scaleAspectFill
-        case "none": leaf.contentMode = .center
-        case "scale-down":
-            let size = image?.size ?? .zero
-            leaf.contentMode = size.width <= content.width && size.height <= content.height ? .center : .scaleAspectFit
-        // `contain`, and `fill`: a symbol is a vector glyph, which keeps its
-        // aspect in a box of another shape as an SVG's default
-        // `preserveAspectRatio` (`xMidYMid meet`) keeps it, and as the web
-        // host's symbol mask draws it (LLP 1011 §4).
-        default: leaf.contentMode = .scaleAspectFit
-        }
-        // An icon path is a vector: drawn again at the box it fills, not its em square stretched (UIKit scales a bitmap).
-        if props["symbolPath"] != nil, let image {
-            let side = max(content.width, content.height)
-            // (Centred, it is its em square again, whatever the box was before.)
-            if leaf.contentMode == .center { if leaf.image !== image { leaf.image = image } }
-            else if side > 0, leaf.image?.size.width != side { leaf.image = iconPathImage(side: side) }
-        }
-        // A square box clips nothing the content box does not.
-        if cornerRadii(in: bounds).allSatisfy({ $0 == 0 }) { if leaf.layer.mask != nil { leaf.layer.mask = nil }; return }
-        let path = roundedPath(in: bounds).cgPath
-        var transform = CGAffineTransform(translationX: -content.minX, y: -content.minY)
-        let mask = CAShapeLayer(); mask.path = path.copy(using: &transform); leaf.layer.mask = mask
     }
 
     /// The view is gone: no load in flight may report for it.

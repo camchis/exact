@@ -2852,7 +2852,7 @@ colour of its own is for what means something by itself**: status
 except on a native button, which greys whole as UIKit greys a button, its
 symbol's `-exact-tint-color` too. On iOS the tint dims, whoever set it (the
 root's `accent-color` or a node's own), as UIKit greys a view's `tintColor`:
-controls, bars, text, symbols, fills, shadows and SVG paints in `AccentColor`.
+controls, bars, text, symbols, fills, shadows, gradient stops and SVG paints in `AccentColor`.
 To keep the tint from dimming on a mark that must follow an accent the app
 cannot write as a value (a theme's, or one the person picks), write
 `-exact-tint-adjustment="normal"` on it or an ancestor (UIKit's

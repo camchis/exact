@@ -117,7 +117,7 @@ extension NodeView {
         let radii = sizes.map { $0.width }
         let authored = channels("background_color").map { CGColor(srgbRed: $0[0] / 255, green: $0[1] / 255, blue: $0[2] / 255, alpha: $0[3] / 255) }
         let fill = authored ?? fieldGround
-        let gradients = Gradient.layers(style["background_image"])
+        let gradients = Gradient.layers(style["background_image"], tint: gradientTint)
         let radius = radii.max() ?? 0
         let shape = CornerShape(style["corner_shape"])
         // A background clipped inside the border box is drawn, in the clip `paintBackground` takes (`backgroundOutline`).

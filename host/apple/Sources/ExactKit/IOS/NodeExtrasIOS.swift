@@ -14,6 +14,7 @@ import UIKit
 struct AimedGradient {
     weak var layer: CAGradientLayer?
     let source: BatchValue, dark: Bool, bounds: CGRect, box: CGRect
+    let tint: UIColor?
     let gradient: Gradient, stops: ([CGFloat], [CGColor])
 }
 

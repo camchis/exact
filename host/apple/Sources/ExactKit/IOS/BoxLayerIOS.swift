@@ -227,7 +227,7 @@ extension NodeView {
     /// unless it is `background-attachment: fixed` (`gradientLayered`).
     func applyGradientLayer() {
         let fixed = gradientLayered
-        guard !cssVisibilityHidden, !drawsPaint || fixed, surface == nil, let gradient = Gradient(style["background_image"]), !gradient.needsDrawing else {
+        guard !cssVisibilityHidden, !drawsPaint || fixed, surface == nil, let gradient = Gradient(style["background_image"], tint: gradientTint), !gradient.needsDrawing else {
             boxGradient?.removeFromSuperlayer(); boxGradient = nil
             presenter?.fixedGradients.remove(self)
             return
@@ -283,14 +283,15 @@ extension NodeView {
     func reaimFixedGradient() {
         guard let g = boxGradient, let source = style["background_image"] else { return }
         let bounds = layer.bounds, box = gradientBox, dark = drawsDark
-        let last = aimedGradient.flatMap { $0.layer === g && $0.source == source && $0.dark == dark ? $0 : nil }
+        let tint = source.namesTint ? gradientTint : nil
+        let last = aimedGradient.flatMap { $0.layer === g && $0.source == source && $0.dark == dark && $0.tint == tint ? $0 : nil }
         if let last, last.bounds == bounds, last.box == box { return }
-        guard let gradient = last?.gradient ?? Gradient(source) else { return }
+        guard let gradient = last?.gradient ?? Gradient(source, tint: gradientTint) else { return }
         let stops = last?.stops ?? gradient.stops(dark: dark, dense: true)
         CATransaction.begin(); CATransaction.setDisableActions(true)
         gradient.apply(g, bounds: bounds, box: box, dark: dark, limit: style["dynamic_range_limit"]?.string, stops: stops)
         CATransaction.commit()
-        aimedGradient = AimedGradient(layer: g, source: source, dark: dark, bounds: bounds, box: box, gradient: gradient, stops: stops)
+        aimedGradient = AimedGradient(layer: g, source: source, dark: dark, bounds: bounds, box: box, tint: tint, gradient: gradient, stops: stops)
     }
 
     /// CSS paints a positive border in whole device pixels, at least one.
