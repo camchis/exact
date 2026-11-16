@@ -37,6 +37,8 @@ pub use wgpu;
 
 #[cfg(not(target_arch = "wasm32"))]
 mod acquire;
+mod bind_layout;
+pub use bind_layout::dynamic_offset;
 mod binding;
 #[cfg(target_os = "android")]
 mod buffers;

@@ -16,7 +16,9 @@
 //! `BindGroupLayoutEntry` const per binding (`U`, `CHILDREN`, …) — its
 //! visibility the stages that use it, a float texture filterable exactly
 //! when some entry point samples it with a sampler — and a `GROUP_n`
-//! descriptor per group; a Rust struct per host-shareable struct
+//! descriptor per group (a buffer bound at a dynamic offset, which WGSL
+//! cannot declare, is `exact_gpu::dynamic_offset(U)` in the surface's own
+//! layout); a Rust struct per host-shareable struct
 //! (`Uniforms { time, width, height, seed }` with `SIZE`, `write`, `bytes`;
 //! a trailing runtime-sized array becomes `<NAME>_OFFSET`/`<NAME>_STRIDE`
 //! beside the fixed members); and, for a vertex entry point with
