@@ -64,6 +64,13 @@ impl Layers {
     pub(super) fn shared_ancestors(&self) -> Vec<u32> {
         self.open.iter().map(|layer| layer.id).collect()
     }
+
+    /// How many clips were open around the innermost recording layer (none
+    /// outside a layer): the clips its reader moves it past.
+    pub(super) fn clips_outside(&self) -> usize {
+        self.open.last().map_or(0, |o| o.emitted.len())
+    }
+
     pub(super) fn needs_world(&self) -> bool {
         self.sent
             .values()
@@ -477,5 +484,49 @@ component App
         );
         let at = drawn.iter().position(|op| *op == LAYER_REF).unwrap();
         assert!(drawn[..at].iter().any(clip), "no clip around it: {drawn:?}");
+    }
+
+    /// A reel in its window: a column the reader rolls up through a clip
+    /// that shows one row of it. Its rows below the window where it rests are
+    /// still recorded in its layer, as the reader brings them into view;
+    /// the same drawing outside a layer is culled.
+    #[test]
+    fn a_layer_keeps_its_drawing_outside_the_clip_around_it() {
+        use super::super::{RRECT, ROW_BEGIN};
+        let draw = |layered: bool| {
+            let mut r = Recorder::new();
+            r.begin(400.0, 400.0, 1.0);
+            r.push_clip(&Shape::rect((0.0, 0.0, 20.0, 18.0)), Transform::identity());
+            if layered {
+                assert!(r.layer_begin(
+                    42,
+                    Transform::identity(),
+                    (10.0, 9.0),
+                    [0., 0., 1., 0., 1., 0., 0.]
+                ));
+            }
+            for row in 0..10 {
+                r.fill(
+                    &Shape::rect((0.0, row as f32 * 18.0, 20.0, 18.0)),
+                    [255, 0, 0, 255],
+                    Transform::identity(),
+                );
+            }
+            if layered {
+                r.layer_end();
+            }
+            r.pop_clip();
+            let _ = r.finish();
+            let ops = FINISHED.with(|f| f.borrow_mut().take()).unwrap();
+            let (mut drawn, mut layers) = (Vec::new(), Vec::new());
+            walk(&ops, &mut drawn, &mut layers);
+            assert!(!drawn.contains(&ROW_BEGIN));
+            let fills = |ops: &[u32]| ops.iter().filter(|op| **op == RRECT).count();
+            (fills(&drawn), layers.iter().map(|l| fills(l)).sum::<usize>())
+        };
+        // Outside a layer: only the window's row.
+        assert_eq!(draw(false), (1, 0));
+        // In a layer: all ten rows, in the layer.
+        assert_eq!(draw(true), (0, 10));
     }
 }

@@ -291,10 +291,14 @@ impl Recorder {
 
     /// Whether a drawing within `bounds` (page space) would be clipped away
     /// entirely: outside some clip's rectangle (the list's overscan rows, out
-    /// of its viewport). Such drawings are not recorded at all.
+    /// of its viewport). Such drawings are not recorded at all. In a layer,
+    /// only the clips opened inside it count: its reader moves the layer past
+    /// the clips around it, so a drawing outside them where the layer rests
+    /// can come into view (an odometer reel rolling up through its window).
     pub(super) fn culled(&self, bounds: Option<Rect4>) -> bool {
         let Some(b) = bounds else { return false };
-        self.clips
+        let inside = self.layers.clips_outside();
+        self.clips[inside.min(self.clips.len())..]
             .iter()
             .any(|c| c.page.is_some_and(|(r, _)| !overlaps(b, r)))
     }
