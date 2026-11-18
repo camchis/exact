@@ -116,3 +116,51 @@ fn native_module_events_commit_only_for_the_view_allocation_that_emitted_them() 
     assert!(!p.reader_module_event(menu, key, session, "change", "retired".into(), 8.));
     assert_eq!(selection(&p), "week");
 }
+
+#[test]
+fn an_iframes_webview_reports_its_load_and_nothing_else() {
+    let source = r#"component App
+  state loads = 0
+  action loaded
+    loads = loads + 1
+  view
+    column width=400 height=400
+      text `${loads}` testId="loads" height=24
+      iframe "https://example.com/" load=loaded width=300 height=200 testId="frame"
+"#;
+    let (mut p, error) = Presenter::boot_with(
+        &crate::test_plan(source),
+        (),
+        (400., 400.),
+        1.,
+        PathBuf::new(),
+        PainterChoice::Cpu,
+    )
+    .unwrap();
+    assert!(error.is_none(), "{error:?}");
+    let frame = id(&p, "frame");
+    let key = p.host.kernel().node(frame).unwrap().key;
+    let session = p.brush.native_session;
+    let loads = |p: &Presenter<()>| {
+        p.host
+            .kernel()
+            .node(id(p, "loads"))
+            .unwrap()
+            .props
+            .str(PropId::Text)
+            .unwrap()
+            .to_string()
+    };
+    // A WebView says only `load`: a module's other events from it are refused.
+    assert!(!p.reader_module_event(frame, key, session, "change", "x".into(), 1.));
+    // A stale allocation's or session's load is refused too.
+    let stale = exact_kernel::NodeKey {
+        generation: key.generation.wrapping_add(1),
+        ..key
+    };
+    assert!(!p.reader_module_event(frame, stale, session, "load", String::new(), 1.));
+    assert!(!p.reader_module_event(frame, key, session + 1, "load", String::new(), 1.));
+    assert_eq!(loads(&p), "0");
+    assert!(p.reader_module_event(frame, key, session, "load", String::new(), 1.));
+    assert_eq!(loads(&p), "1");
+}

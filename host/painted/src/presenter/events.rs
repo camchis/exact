@@ -61,7 +61,12 @@ impl<D: DataSource> Presenter<D> {
                 .host
                 .kernel()
                 .node(id)
-                .is_some_and(|node| node.node_type == NodeType::NativeView && node.key == key);
+                .is_some_and(|node| {
+                    node.key == key
+                        && (node.node_type == NodeType::NativeView
+                            // An iframe's WebView says only that its page loaded.
+                            || (node.node_type == NodeType::WebView && kind == "load"))
+                });
         // A control disabled or hidden since its view was shown (by itself or
         // an ancestor) takes no action, as a popup it opened before may still send one.
         let action = matches!(kind, "press" | "change" | "input");

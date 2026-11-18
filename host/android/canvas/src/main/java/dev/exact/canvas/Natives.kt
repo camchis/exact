@@ -894,6 +894,15 @@ class Natives(
                 rendererGone(view, detail.didCrash())
                 return true
             }
+
+            // The iframe's `load`, as the web's: each page it finishes, for the element holding the view now.
+            override fun onPageFinished(view: WebView, url: String?) {
+                val e = byView[view] ?: return
+                if (e.kind != 1 || e.parked) return
+                post {
+                    if (byView[view] === e && !e.parked) Exact.moduleEvent(e.id, e.slot, e.generation, e.session, "load", "")
+                }
+            }
         }
         isVerticalScrollBarEnabled = false; isHorizontalScrollBarEnabled = false
         overScrollMode = View.OVER_SCROLL_NEVER
@@ -932,6 +941,11 @@ class Natives(
         val view = obtain(kind, json, id) ?: return null
         if (view.parent == null) addView(view, LayoutParams(1, 1))
         val e = Element(id, kind, view, RenderNode("exact native"))
+        if (kind == 1) {
+            e.generation = json.optInt("generation")
+            e.session = json.optLong("session")
+            e.slot = json.optInt("slot")
+        }
         if (kind == 2) {
             e.module = json.optString("module")
             e.generation = json.optInt("generation")

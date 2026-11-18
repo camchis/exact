@@ -177,6 +177,10 @@ impl Painter {
                 serde_json::json!({
                     "src": p.str(PropId::Src),
                     "sandbox": p.str(PropId::Sandbox),
+                    // The allocation and session its `load` answers for, as a module's events do.
+                    "generation": node.key.generation,
+                    "slot": node.key.index,
+                    "session": self.native_session,
                 }),
             ),
             NodeType::NativeView => (
